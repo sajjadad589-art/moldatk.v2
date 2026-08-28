@@ -1,25 +1,27 @@
-# مولدتك - النسخة الأولية v15
+# مولدتك - نسخة الانطلاق الأولى v17
 
-هذه النسخة تحتوي آخر ملف مشروع جاهز للتجربة:
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
+</div>
 
-- `molidatk_supabase_v15_delete_reset_ready.zip`
+# Run and deploy your AI Studio app
 
-## ملاحظات مهمة
+This contains everything you need to run your app locally.
 
-- الملف المضغوط يحتوي مشروع التطبيق كامل كما تم تجهيزه في المحادثة.
-- بعد التحميل وفك الضغط شغّل:
+View your app in AI Studio: https://ai.studio/apps/b1b3735b-2c88-425c-a255-c83c973891fc
 
-```powershell
-npm install
-npm run build
-npm run dev
-```
+## Run Locally
 
-## آخر التعديلات داخل v15
+**Prerequisites:**  Node.js
 
-- زر حذف المشترك في واجهة الإدارة وواجهة الهاتف.
-- تصفير بيانات الحسابات التجريبية وتجهيز نسخة إطلاق نظيفة.
-- عزل بيانات الحسابات حسب صاحب المولدة.
-- ربط الجابي وصاحب المولدة بنفس بيانات الحساب.
-- إصلاح واجهة الهاتف وأزرار التنقل وتسجيل الخروج.
-- إبقاء حساب السوبر أدمن بدون حذف حتى لا ينقفل النظام.
+
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`
+
+
+## Push Notifications
+
+راجع ملف `PUSH_FINAL_SETUP.md` للإعداد النهائي لإشعارات Android وWeb/iPhone.

@@ -1,0 +1,2 @@
+ضع ملف google-services.json الخاص بمشروع Firebase molidatk في هذا المجلد قبل بناء APK.
+المسار النهائي: android/app/google-services.json
