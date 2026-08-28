@@ -1,0 +1,58 @@
+name: Unzip Molodatk Project
+
+on:
+  push:
+    paths:
+      - 'molidatk_supabase_v*.zip'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  unzip-and-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Find latest Molodatk ZIP
+        id: find_zip
+        shell: bash
+        run: |
+          ZIP_FILE=$(ls -t molidatk_supabase_v*.zip 2>/dev/null | head -n 1 || true)
+          if [ -z "$ZIP_FILE" ]; then
+            echo "No molidatk_supabase_v*.zip file found. Upload the latest ZIP to the repository root."
+            exit 1
+          fi
+          echo "zip_file=$ZIP_FILE" >> "$GITHUB_OUTPUT"
+          echo "Using $ZIP_FILE"
+
+      - name: Unzip project source
+        shell: bash
+        run: |
+          rm -rf _molodatk_extract
+          mkdir _molodatk_extract
+          unzip -o "${{ steps.find_zip.outputs.zip_file }}" -d _molodatk_extract
+
+          rsync -a --delete \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='dist' \
+            --exclude='*.zip' \
+            _molodatk_extract/ ./
+
+          rm -rf _molodatk_extract
+
+      - name: Commit extracted source files
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "Extract Molodatk project source from ZIP"
+          git push
