@@ -31,18 +31,20 @@ jobs:
       - name: Unzip project source
         shell: bash
         run: |
-          rm -rf _molodatk_extract
-          mkdir _molodatk_extract
-          unzip -o "${{ steps.find_zip.outputs.zip_file }}" -d _molodatk_extract
+          WORK_DIR="$RUNNER_TEMP/molodatk_extract"
+          rm -rf "$WORK_DIR"
+          mkdir -p "$WORK_DIR"
+          unzip -o "${{ steps.find_zip.outputs.zip_file }}" -d "$WORK_DIR"
 
           rsync -a --delete \
             --exclude='.git' \
+            --exclude='.github' \
             --exclude='node_modules' \
             --exclude='dist' \
             --exclude='*.zip' \
-            _molodatk_extract/ ./
+            "$WORK_DIR"/ ./
 
-          rm -rf _molodatk_extract
+          rm -rf "$WORK_DIR"
 
       - name: Commit extracted source files
         shell: bash
