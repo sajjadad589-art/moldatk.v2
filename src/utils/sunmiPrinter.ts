@@ -30,13 +30,32 @@ const SunmiPrinter = registerPlugin<SunmiPrinterPlugin>('SunmiPrinter');
 
 export const isNativeAndroid = () => Capacitor.getPlatform() === 'android';
 
+let printInFlight = false;
+let lastPrintKey = '';
+let lastPrintAt = 0;
+
 export async function printSunmiReceipt(receipt: SunmiReceiptPayload): Promise<boolean> {
   if (!isNativeAndroid()) return false;
-  const state = await SunmiPrinter.isAvailable();
-  if (!state.available) {
-    // The service can still be in the process of binding; printReceipt itself retries briefly.
-    await new Promise(resolve => window.setTimeout(resolve, 250));
+
+  const now = Date.now();
+  const key = receipt.receiptNumber || `${receipt.subscriberCode}-${receipt.issueDate}-${receipt.paidAmount}`;
+  if (printInFlight || (lastPrintKey === key && now - lastPrintAt < 2500)) {
+    return true;
   }
-  const result = await SunmiPrinter.printReceipt({ receipt });
-  return Boolean(result?.printed);
+
+  printInFlight = true;
+  lastPrintKey = key;
+  lastPrintAt = now;
+
+  try {
+    const state = await SunmiPrinter.isAvailable();
+    if (!state.available) {
+      // The service can still be in the process of binding; printReceipt itself retries briefly.
+      await new Promise(resolve => window.setTimeout(resolve, 250));
+    }
+    const result = await SunmiPrinter.printReceipt({ receipt });
+    return Boolean(result?.printed);
+  } finally {
+    printInFlight = false;
+  }
 }
