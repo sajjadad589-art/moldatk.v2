@@ -22,7 +22,7 @@ jobs:
     env:
       VITE_SUPABASE_URL: https://adluynhkikoodjljoxeu.supabase.co
       VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CObjK2Uua18kVkXCkxdRog_keQLIDiE
-      CURRENT_VERSION: 1.1.0
+      CURRENT_VERSION: 1.2.0
 
     steps:
       - name: Checkout
@@ -77,5 +77,5 @@ jobs:
           else
             gh release create "$TAG" release/Moldatk-Android.apk \
               --title "Moldatk ${CURRENT_VERSION}" \
-              --notes "نسخة Android الحالية لتجربة تطبيق مولدتك."
+              --notes "نسخة Android 1.2.0 تشمل المزامنة السحابية ونظام التحديث التلقائي وتحسينات طباعة SUNMI."
           fi
