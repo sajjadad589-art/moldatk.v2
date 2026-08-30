@@ -1,0 +1,9 @@
+{
+  "enabled": false,
+  "versionCode": 2,
+  "versionName": "1.1.0",
+  "minimumVersionCode": 2,
+  "force": false,
+  "apkUrl": "",
+  "notes": "نظام التحديث داخل التطبيق جاهز. يتم تفعيله عند رفع أول APK رسمي."
+}
