@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Capacitor, registerPlugin } from '@capacitor/core';
+import { loadActiveRelease } from '../lib/siteManagement';
 
 type VersionManifest = {
   enabled: boolean;
@@ -33,15 +34,35 @@ export const AndroidUpdateChecker: React.FC = () => {
     const run = async () => {
       setChecking(true);
       try {
-        const [version, response] = await Promise.all([
-          AppUpdater.getVersionInfo(),
-          fetch('/app-version.json?ts=' + Date.now(), { cache: 'no-store' }),
-        ]);
-        if (!response.ok) throw new Error('تعذر التحقق من آخر إصدار');
-        const latest = await response.json() as VersionManifest;
+        const version = await AppUpdater.getVersionInfo();
+        let latestManifest: VersionManifest | null = null;
+
+        try {
+          const release = await loadActiveRelease();
+          if (release) {
+            latestManifest = {
+              enabled: true,
+              versionCode: Number(release.version_code),
+              versionName: release.version_name,
+              force: Boolean(release.is_mandatory),
+              minimumVersionCode: release.is_mandatory ? Number(release.version_code) : 0,
+              apkUrl: release.apk_url,
+              notes: release.release_notes,
+            };
+          }
+        } catch (e) {
+          // Fallback to the static manifest so older installations keep working.
+        }
+
+        if (!latestManifest) {
+          const response = await fetch('/app-version.json?ts=' + Date.now(), { cache: 'no-store' });
+          if (!response.ok) throw new Error('تعذر التحقق من آخر إصدار');
+          latestManifest = await response.json() as VersionManifest;
+        }
+
         if (cancelled) return;
         setCurrentVersionCode(Number(version.versionCode));
-        setManifest(latest);
+        setManifest(latestManifest);
       } catch (e: any) {
         if (!cancelled) setError(e?.message || 'تعذر التحقق من التحديث');
       } finally {
@@ -84,39 +105,18 @@ export const AndroidUpdateChecker: React.FC = () => {
         <div className="w-16 h-16 mx-auto rounded-2xl bg-blue-600 text-white flex items-center justify-center text-3xl">↻</div>
         <div>
           <h2 className="text-lg font-black text-slate-900 dark:text-white">يوجد تحديث جديد</h2>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            الإصدار {manifest.versionName} متوفر الآن
-          </p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">الإصدار {manifest.versionName} متوفر الآن</p>
         </div>
 
-        {manifest.notes && (
-          <div className="rounded-2xl bg-slate-50 dark:bg-slate-800 p-3 text-xs text-slate-600 dark:text-slate-300 text-right">
-            {manifest.notes}
-          </div>
-        )}
-
+        {manifest.notes && <div className="rounded-2xl bg-slate-50 dark:bg-slate-800 p-3 text-xs text-slate-600 dark:text-slate-300 text-right whitespace-pre-wrap">{manifest.notes}</div>}
         {error && <div className="text-xs font-bold text-rose-600">{error}</div>}
 
-        <button
-          onClick={install}
-          disabled={installing}
-          className="w-full rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-3 font-black text-sm"
-        >
+        <button onClick={install} disabled={installing} className="w-full rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-3 font-black text-sm">
           {installing ? 'جاري تنزيل التحديث...' : 'تنزيل وتحديث التطبيق'}
         </button>
 
-        {!forceUpdate && (
-          <button
-            onClick={() => setDismissed(true)}
-            className="w-full rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 py-2.5 font-bold text-xs"
-          >
-            لاحقاً
-          </button>
-        )}
-
-        {forceUpdate && (
-          <p className="text-[11px] font-bold text-amber-600">هذا التحديث مطلوب للاستمرار باستخدام التطبيق.</p>
-        )}
+        {!forceUpdate && <button onClick={() => setDismissed(true)} className="w-full rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 py-2.5 font-bold text-xs">لاحقاً</button>}
+        {forceUpdate && <p className="text-[11px] font-bold text-amber-600">هذا التحديث مطلوب للاستمرار باستخدام التطبيق.</p>}
       </div>
     </div>
   );
