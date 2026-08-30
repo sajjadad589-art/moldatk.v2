@@ -16,6 +16,9 @@ jobs:
   build-apk:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    env:
+      VITE_SUPABASE_URL: https://adluynhkikoodjljoxeu.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CObjK2Uua18kVkXCkxdRog_keQLIDiE
 
     steps:
       - name: Checkout
