@@ -15,6 +15,17 @@ if (!admin.includes("tab === 'website' && <WebsiteReleaseManager")) {
 }
 fs.writeFileSync(adminFile, admin);
 
+const appFile = 'src/App.tsx';
+let app = fs.readFileSync(appFile, 'utf8');
+if (!app.includes("import { useGeneratorCloudSync } from './lib/useGeneratorCloudSync';")) {
+  app = app.replace("import { supabase } from './lib/supabase';", "import { supabase } from './lib/supabase';\nimport { useGeneratorCloudSync } from './lib/useGeneratorCloudSync';");
+}
+if (!app.includes('useGeneratorCloudSync(userSession);')) {
+  const anchor = "  const settingsFolders: SettingsFolderItem[] = INITIAL_SETTINGS_FOLDERS;";
+  app = app.replace(anchor, `${anchor}\n\n  // مزامنة فورية بين نسخة الويب وتطبيق Android لنفس حساب المولدة.\n  useGeneratorCloudSync(userSession);`);
+}
+fs.writeFileSync(appFile, app);
+
 const landingFile = 'src/LandingPage.tsx';
 let landing = fs.readFileSync(landingFile, 'utf8');
 landing = landing.replace("import React from 'react';", "import React, { useEffect, useState } from 'react';");
@@ -36,4 +47,4 @@ if (landing.includes(releaseWhatsapp) && !landing.includes('activeRelease?.apk_u
 landing = landing.replace(/<a href=\{whatsappUrl\} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1\.5 text-emerald-400 hover:text-emerald-300 font-bold"><MessageCircle className="w-4 h-4" \/> 07766334555<\/a>/, '<a href={whatsappUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 font-bold"><MessageCircle className="w-4 h-4" /> {siteSettings.whatsapp_phone}</a>');
 fs.writeFileSync(landingFile, landing);
 
-console.log('Website/release management applied');
+console.log('Website/release management and cloud sync applied');
