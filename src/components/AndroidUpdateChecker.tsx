@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Capacitor, registerPlugin } from '@capacitor/core';
+import { Download, RefreshCw, X, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { loadActiveRelease } from '../lib/siteManagement';
 
 type VersionManifest = {
@@ -22,10 +23,12 @@ const AppUpdater = registerPlugin<AppUpdaterPlugin>('AppUpdater');
 export const AndroidUpdateChecker: React.FC = () => {
   const [manifest, setManifest] = useState<VersionManifest | null>(null);
   const [currentVersionCode, setCurrentVersionCode] = useState<number | null>(null);
+  const [currentVersionName, setCurrentVersionName] = useState('');
   const [checking, setChecking] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  const [showUpToDate, setShowUpToDate] = useState(false);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') return;
@@ -33,6 +36,7 @@ export const AndroidUpdateChecker: React.FC = () => {
     let cancelled = false;
     const run = async () => {
       setChecking(true);
+      setError(null);
       try {
         const version = await AppUpdater.getVersionInfo();
         let latestManifest: VersionManifest | null = null;
@@ -50,8 +54,8 @@ export const AndroidUpdateChecker: React.FC = () => {
               notes: release.release_notes,
             };
           }
-        } catch (e) {
-          // Fallback to the static manifest so older installations keep working.
+        } catch {
+          // Keep the static manifest as a safe fallback.
         }
 
         if (!latestManifest) {
@@ -61,8 +65,17 @@ export const AndroidUpdateChecker: React.FC = () => {
         }
 
         if (cancelled) return;
-        setCurrentVersionCode(Number(version.versionCode));
+        const installedCode = Number(version.versionCode);
+        setCurrentVersionCode(installedCode);
+        setCurrentVersionName(version.versionName || '');
         setManifest(latestManifest);
+
+        if (!latestManifest.enabled || Number(latestManifest.versionCode) <= installedCode) {
+          setShowUpToDate(true);
+          window.setTimeout(() => {
+            if (!cancelled) setShowUpToDate(false);
+          }, 3200);
+        }
       } catch (e: any) {
         if (!cancelled) setError(e?.message || 'تعذر التحقق من التحديث');
       } finally {
@@ -75,16 +88,12 @@ export const AndroidUpdateChecker: React.FC = () => {
   }, []);
 
   if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') return null;
-  if (checking || !manifest || currentVersionCode === null || !manifest.enabled) return null;
 
-  const hasUpdate = Number(manifest.versionCode) > currentVersionCode;
-  if (!hasUpdate) return null;
-
-  const forceUpdate = Boolean(manifest.force) || currentVersionCode < Number(manifest.minimumVersionCode || 0);
-  if (dismissed && !forceUpdate) return null;
+  const hasUpdate = Boolean(manifest?.enabled && currentVersionCode !== null && Number(manifest.versionCode) > currentVersionCode);
+  const forceUpdate = Boolean(hasUpdate && (manifest?.force || currentVersionCode! < Number(manifest?.minimumVersionCode || 0)));
 
   const install = async () => {
-    if (!manifest.apkUrl) {
+    if (!manifest?.apkUrl) {
       setError('رابط ملف التحديث غير مفعّل بعد');
       return;
     }
@@ -99,24 +108,46 @@ export const AndroidUpdateChecker: React.FC = () => {
     }
   };
 
+  if (dismissed && !forceUpdate) return null;
+  if (!checking && !error && !hasUpdate && !showUpToDate) return null;
+
   return (
-    <div className="fixed inset-0 z-[9999] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4" dir="rtl">
-      <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl p-6 text-center space-y-4">
-        <div className="w-16 h-16 mx-auto rounded-2xl bg-blue-600 text-white flex items-center justify-center text-3xl">↻</div>
-        <div>
-          <h2 className="text-lg font-black text-slate-900 dark:text-white">يوجد تحديث جديد</h2>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">الإصدار {manifest.versionName} متوفر الآن</p>
+    <div className="fixed z-[9999] left-3 right-3 bottom-[76px] sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[430px]" dir="rtl">
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl shadow-xl px-3.5 py-3">
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${error ? 'bg-rose-50 text-rose-600' : hasUpdate ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'}`}>
+            {checking ? <RefreshCw className="w-5 h-5 animate-spin" /> : error ? <AlertTriangle className="w-5 h-5" /> : hasUpdate ? <Download className="w-5 h-5" /> : <CheckCircle2 className="w-5 h-5" />}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="text-xs font-black text-slate-900 dark:text-white">
+              {checking ? 'جاري التحقق من التحديثات...' : error ? 'تعذر التحقق من التحديث' : hasUpdate ? `تحديث ${manifest?.versionName || ''} متوفر` : 'أنت تستخدم أحدث إصدار'}
+            </div>
+            <div className="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400 truncate">
+              {error || (hasUpdate ? (manifest?.notes || `الإصدار الحالي ${currentVersionName || currentVersionCode}`) : `الإصدار الحالي ${currentVersionName || currentVersionCode || ''}`)}
+            </div>
+          </div>
+
+          {hasUpdate && (
+            <button type="button" onClick={() => void install()} disabled={installing} className="shrink-0 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white px-3 py-2 text-[11px] font-black">
+              {installing ? 'جاري...' : 'تحديث'}
+            </button>
+          )}
+
+          {!forceUpdate && !checking && (
+            <button type="button" onClick={() => setDismissed(true)} className="shrink-0 p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="إغلاق إشعار التحديث">
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
-        {manifest.notes && <div className="rounded-2xl bg-slate-50 dark:bg-slate-800 p-3 text-xs text-slate-600 dark:text-slate-300 text-right whitespace-pre-wrap">{manifest.notes}</div>}
-        {error && <div className="text-xs font-bold text-rose-600">{error}</div>}
+        {(checking || installing) && (
+          <div className="mt-2 h-1 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+            <div className="h-full w-2/3 rounded-full bg-blue-600 animate-pulse" />
+          </div>
+        )}
 
-        <button onClick={install} disabled={installing} className="w-full rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-3 font-black text-sm">
-          {installing ? 'جاري تنزيل التحديث...' : 'تنزيل وتحديث التطبيق'}
-        </button>
-
-        {!forceUpdate && <button onClick={() => setDismissed(true)} className="w-full rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 py-2.5 font-bold text-xs">لاحقاً</button>}
-        {forceUpdate && <p className="text-[11px] font-bold text-amber-600">هذا التحديث مطلوب للاستمرار باستخدام التطبيق.</p>}
+        {forceUpdate && <div className="mt-2 text-[10px] font-bold text-amber-600">هذا التحديث مطلوب للاستمرار باستخدام التطبيق.</div>}
       </div>
     </div>
   );
