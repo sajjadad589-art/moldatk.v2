@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import CollectorApp from './CollectorApp';
+import LandingPage from './LandingPage';
 import { AndroidUpdateChecker } from './components/AndroidUpdateChecker';
 import './index.css';
 
@@ -19,6 +20,10 @@ function RootRouter() {
       window.removeEventListener('popstate', handleLocationChange);
     };
   }, []);
+
+  if (window.location.pathname === '/download' || window.location.pathname === '/about') {
+    return <LandingPage />;
+  }
 
   // بوابة Super Admin منفصلة عن جلسة الأدمن المحلية القديمة.
   if (window.location.pathname === '/super-admin' || route.includes('#super-admin')) {
