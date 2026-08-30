@@ -12,6 +12,9 @@ on:
       - 'package.json'
       - '.github/workflows/android-apk.yml'
 
+permissions:
+  contents: write
+
 jobs:
   build-apk:
     runs-on: ubuntu-latest
@@ -19,6 +22,7 @@ jobs:
     env:
       VITE_SUPABASE_URL: https://adluynhkikoodjljoxeu.supabase.co
       VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CObjK2Uua18kVkXCkxdRog_keQLIDiE
+      CURRENT_VERSION: 1.1.0
 
     steps:
       - name: Checkout
@@ -54,11 +58,24 @@ jobs:
       - name: Prepare APK
         run: |
           mkdir -p release
-          cp android/app/build/outputs/apk/debug/app-debug.apk release/Moldatk-Android-debug.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk release/Moldatk-Android.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: Moldatk-Android-APK
-          path: release/Moldatk-Android-debug.apk
+          path: release/Moldatk-Android.apk
           retention-days: 14
+
+      - name: Publish website download release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${CURRENT_VERSION}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" release/Moldatk-Android.apk --clobber
+          else
+            gh release create "$TAG" release/Moldatk-Android.apk \
+              --title "Moldatk ${CURRENT_VERSION}" \
+              --notes "نسخة Android الحالية لتجربة تطبيق مولدتك."
+          fi
