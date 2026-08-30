@@ -53,15 +53,9 @@ export default function LandingPage() {
   return (
     <div dir="rtl" className="min-h-screen bg-[#071126] text-white font-['Cairo',sans-serif] selection:bg-blue-500 selection:text-white">
       <header className="sticky top-0 z-40 border-b border-white/10 bg-[#071126]/90 backdrop-blur-xl">
-        <div className="max-w-6xl mx-auto px-5 py-4 flex items-center justify-between gap-4">
-          <a href="#top" className="flex items-center gap-3 shrink-0">
-            <div className="w-11 h-11 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-900/30">
-              <Zap className="w-6 h-6 text-yellow-300 fill-yellow-300" />
-            </div>
-            <div>
-              <div className="font-black text-lg">مولدتك</div>
-              <div className="text-[11px] text-slate-400">Moldatk</div>
-            </div>
+        <div className="max-w-6xl mx-auto px-5 py-3 flex items-center justify-between gap-4">
+          <a href="#top" className="flex items-center shrink-0 rounded-2xl bg-white px-2.5 py-1 shadow-lg shadow-black/10">
+            <img src="/brand/moldatk-logo.svg" alt="مولدتك" className="h-12 w-auto object-contain" />
           </a>
 
           <nav className="hidden md:flex items-center gap-5 text-xs font-bold text-slate-300">
@@ -79,23 +73,26 @@ export default function LandingPage() {
       </header>
 
       <main id="top">
-        <section className="max-w-6xl mx-auto px-5 pt-16 pb-20 grid lg:grid-cols-2 gap-12 items-center">
+        <section className="max-w-6xl mx-auto px-5 pt-14 pb-20 grid lg:grid-cols-2 gap-12 items-center">
           <div className="space-y-6">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-600/15 border border-blue-500/20 text-blue-300 text-xs font-bold">
               <Wifi className="w-4 h-4" /> نظام واحد لكل أجهزتك
             </div>
+            <div className="inline-flex rounded-[2rem] bg-white p-3 shadow-2xl shadow-blue-950/20">
+              <img src="/brand/moldatk-logo.svg" alt="شعار مولدتك" className="w-[230px] sm:w-[280px] h-auto" />
+            </div>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black leading-[1.2]">
-              إدارة المولدة والجباية<br/><span className="text-blue-400">من أي جهاز</span>
+              إدارة المولدة والجباية<br/><span className="text-amber-400">من أي جهاز</span>
             </h1>
             <p className="text-slate-300 leading-8 max-w-xl text-sm sm:text-base">
               مولدتك يجمع المشتركين، التسديدات، الفواتير، الجباة والإعدادات في نظام واحد. استخدمه على Android أو iPhone أو الكمبيوتر بدون ما تنفصل بياناتك بين جهاز وجهاز.
             </p>
 
             <div className="flex flex-wrap gap-3">
-              <a href={appUrl} className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-white text-slate-950 font-black hover:bg-slate-100 transition-all">
+              <a href={appUrl} className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-amber-400 text-slate-950 font-black hover:bg-amber-300 transition-all">
                 فتح النظام الآن <ArrowLeft className="w-5 h-5" />
               </a>
-              <a href="#release" className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-blue-600/15 border border-blue-500/20 text-blue-200 font-black hover:bg-blue-600/20 transition-all">
+              <a href="#release" className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/10 border border-white/15 text-white font-black hover:bg-white/15 transition-all">
                 <Download className="w-5 h-5" /> نسخة Android
               </a>
             </div>
@@ -108,12 +105,12 @@ export default function LandingPage() {
           </div>
 
           <div className="relative">
-            <div className="absolute -inset-8 bg-blue-600/10 blur-3xl rounded-full" />
+            <div className="absolute -inset-8 bg-amber-400/10 blur-3xl rounded-full" />
             <div className="relative bg-white/5 border border-white/10 rounded-[2rem] p-6 shadow-2xl">
               <div className="grid grid-cols-3 gap-3 mb-5">
                 {[['Android', Smartphone], ['iPhone', Apple], ['Computer', Monitor]].map(([name, Icon]: any) => (
                   <div key={name} className="rounded-2xl bg-white/5 border border-white/10 p-4 text-center">
-                    <Icon className="w-7 h-7 mx-auto mb-2 text-blue-300" />
+                    <Icon className="w-7 h-7 mx-auto mb-2 text-amber-300" />
                     <div className="text-xs font-bold">{name}</div>
                   </div>
                 ))}
@@ -138,14 +135,14 @@ export default function LandingPage() {
         <section id="features" className="scroll-mt-24 border-y border-white/10 bg-white/[0.025]">
           <div className="max-w-6xl mx-auto px-5 py-20">
             <div className="max-w-2xl mx-auto text-center mb-11">
-              <span className="text-blue-300 text-xs font-black">كل شغلك بمكان واحد</span>
+              <span className="text-amber-300 text-xs font-black">كل شغلك بمكان واحد</span>
               <h2 className="text-2xl sm:text-3xl font-black mt-2">مزايا مولدتك</h2>
               <p className="text-slate-400 text-sm leading-7 mt-3">مصمم حتى يقلل التكرار ويخلي صاحب المولدة والجابي يشتغلون على نفس المعلومات.</p>
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {features.map(({ icon: Icon, title, text }) => (
                 <div key={title} className="rounded-2xl bg-white/5 border border-white/10 p-5 hover:bg-white/[0.07] transition-colors">
-                  <div className="w-10 h-10 rounded-xl bg-blue-600/15 flex items-center justify-center mb-4"><Icon className="w-5 h-5 text-blue-300" /></div>
+                  <div className="w-10 h-10 rounded-xl bg-amber-400/10 flex items-center justify-center mb-4"><Icon className="w-5 h-5 text-amber-300" /></div>
                   <h3 className="font-black mb-2">{title}</h3>
                   <p className="text-sm leading-6 text-slate-400">{text}</p>
                 </div>
@@ -161,17 +158,17 @@ export default function LandingPage() {
               <p className="text-slate-400 text-sm mt-3">كلهم يوصلون لنفس الحساب ونفس قاعدة البيانات.</p>
             </div>
             <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-              <Smartphone className="w-9 h-9 text-blue-300 mb-5" />
+              <Smartphone className="w-9 h-9 text-amber-300 mb-5" />
               <h3 className="text-lg font-black">Android</h3>
               <p className="text-sm text-slate-400 leading-7 mt-2">تطبيق مخصص لأجهزة Android وSUNMI مع دعم الخصائص الأصلية مثل الطباعة والتحديث.</p>
             </div>
             <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-              <Apple className="w-9 h-9 text-blue-300 mb-5" />
+              <Apple className="w-9 h-9 text-amber-300 mb-5" />
               <h3 className="text-lg font-black">iPhone</h3>
               <p className="text-sm text-slate-400 leading-7 mt-2">نسخة ويب مصغّرة تنضاف إلى الشاشة الرئيسية وتفتح كتطبيق مستقل من Safari.</p>
             </div>
             <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-              <Monitor className="w-9 h-9 text-blue-300 mb-5" />
+              <Monitor className="w-9 h-9 text-amber-300 mb-5" />
               <h3 className="text-lg font-black">الكمبيوتر</h3>
               <p className="text-sm text-slate-400 leading-7 mt-2">لوحة تحكم كاملة من المتصفح لمتابعة المشتركين والجباية والتقارير والإعدادات.</p>
             </div>
@@ -190,7 +187,7 @@ export default function LandingPage() {
               <div className="grid sm:grid-cols-2 gap-4">
                 {iphoneSteps.map(({ icon: Icon, title, text }) => (
                   <div key={title} className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                    <Icon className="w-5 h-5 text-blue-300 mb-4" />
+                    <Icon className="w-5 h-5 text-amber-300 mb-4" />
                     <h3 className="font-black text-sm">{title}</h3>
                     <p className="text-xs text-slate-400 leading-6 mt-2">{text}</p>
                   </div>
@@ -201,7 +198,7 @@ export default function LandingPage() {
         </section>
 
         <section id="release" className="scroll-mt-24 max-w-5xl mx-auto px-5 py-20">
-          <div className="rounded-[2rem] border border-blue-500/20 bg-gradient-to-br from-blue-600/15 to-white/[0.03] p-6 sm:p-8">
+          <div className="rounded-[2rem] border border-amber-400/20 bg-gradient-to-br from-amber-400/10 to-white/[0.03] p-6 sm:p-8">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div>
                 <div className="inline-flex items-center gap-2 text-emerald-300 text-xs font-black mb-3"><CheckCircle2 className="w-4 h-4" /> تم بناء أول نسخة Android تجريبية بنجاح</div>
@@ -209,7 +206,7 @@ export default function LandingPage() {
                 <p className="text-slate-400 text-sm leading-7 mt-2 max-w-2xl">النسخة التجريبية صارت جاهزة للاختبار. زر التنزيل العام راح يتفعّل هنا بعد اعتماد نسخة Release موقعة بشكل ثابت حتى تشتغل التحديثات المستقبلية بدون تعارض.</p>
               </div>
               <div className="shrink-0 text-center md:text-left">
-                <button disabled className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-blue-600/50 text-white/70 font-black cursor-not-allowed">
+                <button disabled className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-amber-400/60 text-slate-950/70 font-black cursor-not-allowed">
                   <Download className="w-5 h-5" /> التحميل العام قريباً
                 </button>
                 <div className="text-[11px] text-slate-500 mt-2">الإصدار التجريبي: 1.1.0</div>
@@ -220,16 +217,16 @@ export default function LandingPage() {
 
         <section className="max-w-6xl mx-auto px-5 pb-20">
           <div className="grid md:grid-cols-3 gap-4">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5"><LockKeyhole className="w-5 h-5 text-blue-300 mb-3"/><h3 className="font-black text-sm">حسابات آمنة</h3><p className="text-xs leading-6 text-slate-400 mt-2">دخول الإدارة والجباة مربوط بنظام مصادقة مركزي وصلاحيات منفصلة.</p></div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5"><Layers3 className="w-5 h-5 text-blue-300 mb-3"/><h3 className="font-black text-sm">قاعدة بيانات مشتركة</h3><p className="text-xs leading-6 text-slate-400 mt-2">المشتركين والتسديدات والفواتير والإعدادات الأساسية تبقى موحدة بين الأجهزة.</p></div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5"><RefreshCw className="w-5 h-5 text-blue-300 mb-3"/><h3 className="font-black text-sm">تحديث مستمر</h3><p className="text-xs leading-6 text-slate-400 mt-2">نسخة الويب تتحدث مباشرة وAndroid مهيأ لفحص الإصدارات الجديدة.</p></div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-5"><LockKeyhole className="w-5 h-5 text-amber-300 mb-3"/><h3 className="font-black text-sm">حسابات آمنة</h3><p className="text-xs leading-6 text-slate-400 mt-2">دخول الإدارة والجباة مربوط بنظام مصادقة مركزي وصلاحيات منفصلة.</p></div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-5"><Layers3 className="w-5 h-5 text-amber-300 mb-3"/><h3 className="font-black text-sm">قاعدة بيانات مشتركة</h3><p className="text-xs leading-6 text-slate-400 mt-2">المشتركين والتسديدات والفواتير والإعدادات الأساسية تبقى موحدة بين الأجهزة.</p></div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-5"><RefreshCw className="w-5 h-5 text-amber-300 mb-3"/><h3 className="font-black text-sm">تحديث مستمر</h3><p className="text-xs leading-6 text-slate-400 mt-2">نسخة الويب تتحدث مباشرة وAndroid مهيأ لفحص الإصدارات الجديدة.</p></div>
           </div>
         </section>
 
         <section id="faq" className="scroll-mt-24 border-t border-white/10 bg-white/[0.025]">
           <div className="max-w-4xl mx-auto px-5 py-20">
             <div className="text-center mb-9">
-              <HelpCircle className="w-8 h-8 text-blue-300 mx-auto mb-3" />
+              <HelpCircle className="w-8 h-8 text-amber-300 mx-auto mb-3" />
               <h2 className="text-2xl sm:text-3xl font-black">أسئلة شائعة</h2>
             </div>
             <div className="space-y-3">
@@ -246,11 +243,11 @@ export default function LandingPage() {
         </section>
 
         <section className="max-w-5xl mx-auto px-5 py-20 text-center">
-          <div className="rounded-[2rem] bg-blue-600 p-8 sm:p-10 shadow-2xl shadow-blue-950/30">
-            <Zap className="w-9 h-9 text-yellow-300 fill-yellow-300 mx-auto mb-4" />
+          <div className="rounded-[2rem] bg-[#0b2b59] border border-amber-400/20 p-8 sm:p-10 shadow-2xl shadow-black/30">
+            <div className="inline-flex rounded-2xl bg-white p-2 mb-5"><img src="/brand/moldatk-logo.svg" alt="مولدتك" className="w-40 h-auto" /></div>
             <h2 className="text-2xl sm:text-3xl font-black">مولدتك وياك وين ما تشتغل</h2>
-            <p className="text-blue-100 text-sm leading-7 mt-3 max-w-xl mx-auto">افتح النظام من جهازك الحالي وسجل دخولك بنفس الحساب حتى تبقى كل بياناتك مرتبطة بمكان واحد.</p>
-            <a href={appUrl} className="inline-flex mt-6 items-center gap-2 px-5 py-3 rounded-2xl bg-white text-slate-950 font-black">دخول النظام <ArrowLeft className="w-5 h-5" /></a>
+            <p className="text-slate-300 text-sm leading-7 mt-3 max-w-xl mx-auto">افتح النظام من جهازك الحالي وسجل دخولك بنفس الحساب حتى تبقى كل بياناتك مرتبطة بمكان واحد.</p>
+            <a href={appUrl} className="inline-flex mt-6 items-center gap-2 px-5 py-3 rounded-2xl bg-amber-400 text-slate-950 font-black">دخول النظام <ArrowLeft className="w-5 h-5" /></a>
           </div>
         </section>
       </main>
