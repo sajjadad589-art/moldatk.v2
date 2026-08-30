@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Deep navy brand tile -->
+    <path
+        android:fillColor="#0B1530"
+        android:pathData="M18,8H90A10,10 0,0 1,100 18V90A10,10 0,0 1,90 100H18A10,10 0,0 1,8 90V18A10,10 0,0 1,18 8Z" />
+
+    <!-- Generator body -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M28,34H80A6,6 0,0 1,86 40V73A6,6 0,0 1,80 79H28A6,6 0,0 1,22 73V40A6,6 0,0 1,28 34Z" />
+
+    <!-- Generator handle -->
+    <path
+        android:fillColor="#0B1530"
+        android:pathData="M39,27H69A4,4 0,0 1,73 31V35H66V33H42V35H35V31A4,4 0,0 1,39 27Z" />
+
+    <!-- Control panel -->
+    <path
+        android:fillColor="#0B1530"
+        android:pathData="M64,43H78V56H64Z" />
+    <path
+        android:fillColor="#F4B400"
+        android:pathData="M71,45A4,4 0,1 1,70.99 45Z" />
+
+    <!-- Vent lines -->
+    <path
+        android:strokeColor="#0B1530"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M31,47H48M31,54H48M31,61H48" />
+
+    <!-- Lightning bolt -->
+    <path
+        android:fillColor="#F4B400"
+        android:pathData="M55,40L45,58H53L49,72L65,51H57L62,40Z" />
+
+    <!-- Feet -->
+    <path
+        android:fillColor="#F4B400"
+        android:pathData="M30,78H42V84H30ZM66,78H78V84H66Z" />
+</vector>
