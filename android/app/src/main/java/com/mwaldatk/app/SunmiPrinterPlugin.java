@@ -4,10 +4,10 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.RemoteException;
 import android.text.Layout;
 import android.text.StaticLayout;
 import android.text.TextPaint;
@@ -79,7 +79,6 @@ public class SunmiPrinterPlugin extends Plugin {
 
         if (printerService == null) {
             bindPrinter();
-            // Give SUNMI's printer service a brief chance to bind, then print.
             new Handler(Looper.getMainLooper()).postDelayed(() -> {
                 if (printerService == null) {
                     call.reject("SUNMI printer service is not ready");
@@ -98,17 +97,15 @@ public class SunmiPrinterPlugin extends Plugin {
         return (v == null || v.trim().isEmpty()) ? fallback : v.trim();
     }
 
-    // عرض الورق بالبكسل لطابعة حرارية 58مم بدقة 203dpi (القياس القياسي لأجهزة SUNMI V2).
+    private String raw(JSObject obj, String key) {
+        String v = obj.optString(key, "");
+        return v == null ? "" : v.trim();
+    }
+
     private static final int PAPER_WIDTH_PX = 384;
     private static final int PADDING = 10;
     private static final int CONTENT_WIDTH = PAPER_WIDTH_PX - (PADDING * 2);
 
-    /**
-     * طابعة SUNMI الحرارية تستخدم خط داخلي (built-in font) لا يدعم الحروف العربية إطلاقاً،
-     * فاستدعاء printText() مباشرة بنص عربي يطبع سطراً فارغاً (الورق يتحرك بدون أي حرف مرئي).
-     * الحل القياسي هو رسم الوصل بالكامل كصورة (Bitmap) باستخدام خط النظام (الذي يدعم العربية
-     * بشكل كامل) ثم إرساله للطابعة عبر printBitmap بدلاً من printText.
-     */
     private void printReceiptNow(PluginCall call, JSObject r) {
         new Thread(() -> {
             SunmiPrinterService service = printerService;
@@ -122,7 +119,6 @@ public class SunmiPrinterPlugin extends Plugin {
                 service.printerInit(null);
                 service.setAlignment(1, null);
                 service.printBitmap(bitmap, null);
-                // سطر تغذية واحد فقط بعد نهاية الوصل لتقليل الفراغات.
                 service.lineWrap(1, null);
 
                 JSObject result = new JSObject();
@@ -137,55 +133,75 @@ public class SunmiPrinterPlugin extends Plugin {
     private Bitmap buildReceiptBitmap(JSObject r) {
         List<DrawLine> lines = new ArrayList<>();
 
-        lines.add(new DrawLine(val(r, "header", "مولدتك"), 30f, true, Layout.Alignment.ALIGN_CENTER, 6));
-        String location = val(r, "location", "");
-        if (!location.isEmpty()) lines.add(new DrawLine(location, 20f, false, Layout.Alignment.ALIGN_CENTER, 4));
-        lines.add(new DrawLine("وصل قبض", 20f, false, Layout.Alignment.ALIGN_CENTER, 2));
-        lines.add(new DrawLine("رقم الوصل: " + val(r, "receiptNumber", "-"), 20f, false, Layout.Alignment.ALIGN_CENTER, 8));
+        String generatorName = val(r, "header", "المولدة");
+        lines.add(new DrawLine(generatorName, 31f, true, Layout.Alignment.ALIGN_CENTER, 10, true));
+        lines.add(new DrawLine("إيصال تسديد", 24f, true, Layout.Alignment.ALIGN_CENTER, 8));
+
+        String receiptNumber = raw(r, "receiptNumber");
+        if (!receiptNumber.isEmpty()) addField(lines, "رقم الإيصال", receiptNumber, false);
+
+        String issueDate = raw(r, "issueDate");
+        if (!issueDate.isEmpty()) addField(lines, "التاريخ", issueDate, true);
 
         lines.add(separatorLine());
 
-        addField(lines, "اسم المشترك", val(r, "subscriberName", "-"));
-        addField(lines, "كود المشترك", val(r, "subscriberCode", "-"));
-
-        String phone = val(r, "phone", "");
-        if (!phone.isEmpty()) addField(lines, "رقم الهاتف", phone);
-
-        String lineName = val(r, "lineName", "");
-        if (!lineName.isEmpty()) addField(lines, "الكابينة / الفيز", lineName);
-
-        addField(lines, "عدد الأمبيرات", val(r, "amperes", "-"));
-        addField(lines, "سعر الأمبير", val(r, "pricePerAmp", "-"));
-        addField(lines, "شهر التسديد", val(r, "month", "-"));
-        addField(lines, "حالة الوصل", val(r, "status", "-"));
-
-        String collector = val(r, "collector", "");
-        if (!collector.isEmpty()) addField(lines, "اسم المحاسب", collector);
-
-        lines.add(separatorLine());
-
-        lines.add(new DrawLine("المبلغ الكلي", 24f, true, Layout.Alignment.ALIGN_CENTER, 2));
-        lines.add(new DrawLine(val(r, "totalAmount", "0 د.ع"), 32f, true, Layout.Alignment.ALIGN_CENTER, 6));
-        lines.add(new DrawLine("المبلغ المسدد: " + val(r, "paidAmount", "0 د.ع"), 22f, true, Layout.Alignment.ALIGN_CENTER, 2));
-        lines.add(new DrawLine("المتبقي: " + val(r, "remainingAmount", "0 د.ع"), 22f, true, Layout.Alignment.ALIGN_CENTER, 8));
-
-        lines.add(separatorLine());
-
-        String note = val(r, "note", "");
-        if (!note.isEmpty()) {
-            lines.add(new DrawLine(note, 20f, true, Layout.Alignment.ALIGN_CENTER, 6));
+        String subscriberName = raw(r, "subscriberName");
+        if (!subscriberName.isEmpty()) {
+            lines.add(new DrawLine("اسم المشترك", 18f, true, Layout.Alignment.ALIGN_NORMAL, 1));
+            lines.add(new DrawLine(subscriberName, 29f, true, Layout.Alignment.ALIGN_NORMAL, 7));
         }
 
-        lines.add(new DrawLine("تاريخ الإصدار: " + val(r, "issueDate", "-"), 18f, false, Layout.Alignment.ALIGN_CENTER, 2));
-        lines.add(new DrawLine("وقت الطباعة: " + val(r, "printTime", "-"), 18f, false, Layout.Alignment.ALIGN_CENTER, 2));
+        String phone = raw(r, "phone");
+        if (!phone.isEmpty()) addField(lines, "رقم الهاتف", phone, false);
 
-        // تمرير أول لحساب الارتفاع الكلي للصورة.
+        String lineName = raw(r, "lineName");
+        if (!lineName.isEmpty()) addField(lines, "الكابينة", lineName, false);
+
+        String amperes = raw(r, "amperes");
+        if (!amperes.isEmpty()) addField(lines, "عدد الأمبيرات", amperes, false);
+
+        String pricePerAmp = raw(r, "pricePerAmp");
+        if (!pricePerAmp.isEmpty()) addField(lines, "سعر الأمبير الشهري", pricePerAmp, true);
+
+        String month = raw(r, "month");
+        if (!month.isEmpty()) addField(lines, "شهر التسديد", month, true);
+
+        String status = raw(r, "status");
+        if (!status.isEmpty()) addField(lines, "حالة التسديد", status, false);
+
+        lines.add(separatorLine());
+
+        String paidAmount = raw(r, "paidAmount");
+        String totalAmount = raw(r, "totalAmount");
+        String finalAmount = !paidAmount.isEmpty() ? paidAmount : totalAmount;
+        if (!finalAmount.isEmpty()) {
+            lines.add(new DrawLine("مبلغ التسديد", 19f, true, Layout.Alignment.ALIGN_NORMAL, 1));
+            lines.add(new DrawLine(finalAmount, 29f, true, Layout.Alignment.ALIGN_NORMAL, 7));
+        }
+
+        String remainingAmount = raw(r, "remainingAmount");
+        if (!remainingAmount.isEmpty() && !remainingAmount.startsWith("0 ") && !remainingAmount.equals("0") && !remainingAmount.equals("0 د.ع")) {
+            addField(lines, "المتبقي", remainingAmount, false);
+        }
+
+        lines.add(separatorLine());
+
+        if (!finalAmount.isEmpty()) {
+            lines.add(new DrawLine("المبلغ النهائي\n" + finalAmount, 31f, true, Layout.Alignment.ALIGN_CENTER, 10, true));
+        }
+
+        lines.add(new DrawLine("شكراً لتسديدكم", 19f, true, Layout.Alignment.ALIGN_CENTER, 8));
+        lines.add(separatorLine());
+        lines.add(new DrawLine("مولدتي", 31f, true, Layout.Alignment.ALIGN_CENTER, 2));
+        lines.add(new DrawLine("نظام إدارة المولدات والجباية", 16f, true, Layout.Alignment.ALIGN_CENTER, 2));
+
         int totalHeight = PADDING * 2;
         List<StaticLayout> layouts = new ArrayList<>();
         for (DrawLine dl : lines) {
             StaticLayout sl = buildLayout(dl);
             layouts.add(sl);
-            totalHeight += sl.getHeight() + dl.marginBottom;
+            int boxExtra = dl.boxed ? 18 : 0;
+            totalHeight += sl.getHeight() + dl.marginBottom + boxExtra;
         }
 
         Bitmap bitmap = Bitmap.createBitmap(PAPER_WIDTH_PX, Math.max(totalHeight, 1), Bitmap.Config.ARGB_8888);
@@ -196,31 +212,44 @@ public class SunmiPrinterPlugin extends Plugin {
         for (int i = 0; i < lines.size(); i++) {
             DrawLine dl = lines.get(i);
             StaticLayout sl = layouts.get(i);
-            canvas.save();
-            canvas.translate(PADDING, y);
-            sl.draw(canvas);
-            canvas.restore();
-            y += sl.getHeight() + dl.marginBottom;
+
+            if (dl.boxed) {
+                Paint border = new Paint(Paint.ANTI_ALIAS_FLAG);
+                border.setColor(Color.BLACK);
+                border.setStyle(Paint.Style.STROKE);
+                border.setStrokeWidth(3f);
+                RectF rect = new RectF(PADDING, y, PAPER_WIDTH_PX - PADDING, y + sl.getHeight() + 16);
+                canvas.drawRoundRect(rect, 11f, 11f, border);
+                canvas.save();
+                canvas.translate(PADDING, y + 8);
+                sl.draw(canvas);
+                canvas.restore();
+                y += sl.getHeight() + 16 + dl.marginBottom;
+            } else {
+                canvas.save();
+                canvas.translate(PADDING, y);
+                sl.draw(canvas);
+                canvas.restore();
+                y += sl.getHeight() + dl.marginBottom;
+            }
         }
 
         return bitmap;
     }
 
-    private void addField(List<DrawLine> lines, String label, String value) {
-        lines.add(new DrawLine(label, 22f, true, Layout.Alignment.ALIGN_NORMAL, 0));
-        lines.add(new DrawLine(value, 21f, false, Layout.Alignment.ALIGN_NORMAL, 6));
+    private void addField(List<DrawLine> lines, String label, String value, boolean strong) {
+        if (value == null || value.trim().isEmpty()) return;
+        lines.add(new DrawLine(label + ":  " + value, strong ? 23f : 21f, strong, Layout.Alignment.ALIGN_NORMAL, 6));
     }
 
     private DrawLine separatorLine() {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < 32; i++) sb.append('-');
-        return new DrawLine(sb.toString(), 18f, false, Layout.Alignment.ALIGN_CENTER, 6);
+        return new DrawLine(sb.toString(), 17f, false, Layout.Alignment.ALIGN_CENTER, 6);
     }
 
     private StaticLayout buildLayout(DrawLine dl) {
         TextPaint paint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
-        // Typeface.DEFAULT على أندرويد يدعم العربية عبر آلية fallback الخاصة بالنظام،
-        // على عكس الخط المدمج داخل شريحة الطباعة الحرارية.
         paint.setTypeface(Typeface.create(Typeface.DEFAULT, dl.bold ? Typeface.BOLD : Typeface.NORMAL));
         paint.setTextSize(dl.textSizePx);
         paint.setColor(Color.BLACK);
@@ -240,13 +269,19 @@ public class SunmiPrinterPlugin extends Plugin {
         final boolean bold;
         final Layout.Alignment alignment;
         final int marginBottom;
+        final boolean boxed;
 
         DrawLine(String text, float textSizePx, boolean bold, Layout.Alignment alignment, int marginBottom) {
+            this(text, textSizePx, bold, alignment, marginBottom, false);
+        }
+
+        DrawLine(String text, float textSizePx, boolean bold, Layout.Alignment alignment, int marginBottom, boolean boxed) {
             this.text = text;
             this.textSizePx = textSizePx;
             this.bold = bold;
             this.alignment = alignment;
             this.marginBottom = marginBottom;
+            this.boxed = boxed;
         }
     }
 
