@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 720" role="img" aria-labelledby="title desc">
+  <title id="title">مولدتك</title>
+  <desc id="desc">شعار مولدتك لإدارة المولدات والطاقة</desc>
+  <rect width="900" height="720" rx="72" fill="#ffffff"/>
+  <g transform="translate(205 72)">
+    <path d="M185 30h150c42 0 76 34 76 76v10h-34v-10c0-23-19-42-42-42H185c-23 0-42 19-42 42v10h-34v-10c0-42 34-76 76-76z" fill="#0b2b59"/>
+    <rect x="55" y="105" width="410" height="280" rx="58" fill="#0b2b59"/>
+    <rect x="86" y="179" width="58" height="13" rx="6.5" fill="#fff" opacity=".96"/>
+    <rect x="86" y="222" width="58" height="13" rx="6.5" fill="#fff" opacity=".96"/>
+    <rect x="86" y="265" width="58" height="13" rx="6.5" fill="#fff" opacity=".96"/>
+    <rect x="86" y="308" width="58" height="13" rx="6.5" fill="#fff" opacity=".96"/>
+    <rect x="354" y="180" width="73" height="78" rx="14" fill="none" stroke="#fff" stroke-width="9"/>
+    <path d="M374 222a22 22 0 0 1 36 0" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+    <path d="M392 223l17-12" stroke="#ffbd18" stroke-width="7" stroke-linecap="round"/>
+    <circle cx="411" cy="305" r="13" fill="#ffbd18"/>
+    <rect x="355" y="294" width="50" height="12" rx="6" fill="#fff"/>
+    <rect x="464" y="203" width="32" height="88" rx="8" fill="#0b2b59"/>
+    <rect x="474" y="245" width="18" height="10" rx="5" fill="#fff"/>
+    <rect x="90" y="385" width="44" height="26" rx="8" fill="#0b2b59"/>
+    <rect x="386" y="385" width="44" height="26" rx="8" fill="#0b2b59"/>
+    <path d="M266 88l-85 151h66l-45 151 145-202h-69l55-100z" fill="#ffbd18" stroke="#fff" stroke-width="18" stroke-linejoin="round"/>
+  </g>
+  <text x="450" y="575" text-anchor="middle" font-family="Arial, Tahoma, sans-serif" font-size="112" font-weight="800" fill="#0b2b59">مولدتك</text>
+  <path d="M561 512l-17 35h18l-12 37 38-51h-19l15-21z" fill="#ffbd18"/>
+  <line x1="255" y1="625" x2="350" y2="625" stroke="#0b2b59" stroke-width="3"/>
+  <line x1="550" y1="625" x2="645" y2="625" stroke="#0b2b59" stroke-width="3"/>
+  <text x="450" y="642" text-anchor="middle" font-family="Arial, Tahoma, sans-serif" font-size="36" letter-spacing="9" fill="#0b2b59">Moldatk</text>
+</svg>
