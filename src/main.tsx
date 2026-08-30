@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import CollectorApp from './CollectorApp';
+import { AndroidUpdateChecker } from './components/AndroidUpdateChecker';
 import './index.css';
 
 function RootRouter() {
@@ -35,6 +36,7 @@ function RootRouter() {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <RootRouter />
+    <AndroidUpdateChecker />
   </React.StrictMode>
 );
 
