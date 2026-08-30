@@ -102,11 +102,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ collectors, onLoginSuccess
     <div className="min-h-screen w-full flex items-center justify-center p-4 bg-slate-100 dark:bg-[#070d1e] font-['Cairo',sans-serif] transition-colors">
       <div className="w-full max-w-md bg-white dark:bg-[#111c38] rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 space-y-6">
         
-        <div className="text-center space-y-2">
-          <div className="w-14 h-14 mx-auto bg-[#1E3A8A] text-white rounded-2xl flex items-center justify-center text-2xl font-black shadow-lg shadow-blue-900/30">
-            <Zap className="w-7 h-7 text-yellow-400 fill-yellow-400" />
+        <div className="text-center space-y-3">
+          <div className="mx-auto w-full max-w-[250px] rounded-3xl bg-white p-2.5 shadow-lg shadow-blue-950/10 border border-slate-100">
+            <img src="/brand/moldatk-logo.svg" alt="مولدتك" className="w-full h-auto object-contain" />
           </div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-white">مولدتك</h1>
           <p className="text-xs text-slate-500 dark:text-slate-400">
             منظومة إدارة المولدات والاشتراكات
           </p>
@@ -118,7 +117,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ collectors, onLoginSuccess
             onClick={() => { setRole('admin'); setErrorMessage(null); setUsernameInput(''); setPasswordInput(''); }}
             className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               role === 'admin'
-                ? 'bg-[#1E3A8A] text-white shadow-sm'
+                ? 'bg-[#0b2b59] text-white shadow-sm'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -131,11 +130,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ collectors, onLoginSuccess
             onClick={() => { setRole('collector'); setErrorMessage(null); setUsernameInput(''); setPasswordInput(''); }}
             className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               role === 'collector'
-                ? 'bg-[#1E3A8A] text-white shadow-sm'
+                ? 'bg-[#0b2b59] text-white shadow-sm'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <User className="w-4 h-4 text-blue-300" />
+            <User className="w-4 h-4 text-amber-300" />
             <span>جابي / كادر</span>
           </button>
         </div>
@@ -160,7 +159,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ collectors, onLoginSuccess
                 placeholder={role === 'admin' ? 'name@example.com' : '07800000000'}
                 value={usernameInput}
                 onChange={(e) => setUsernameInput(e.target.value)}
-                className="w-full pl-3 pr-10 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-600 font-bold font-mono"
+                className="w-full pl-3 pr-10 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-400 font-bold font-mono"
               />
             </div>
           </div>
@@ -177,7 +176,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ collectors, onLoginSuccess
                 placeholder={role === 'admin' ? '••••••' : 'رمز الدخول'}
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
-                className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-600 font-mono"
+                className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-400 font-mono"
               />
               <button
                 type="button"
@@ -192,9 +191,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ collectors, onLoginSuccess
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-3 px-4 rounded-xl bg-[#1E3A8A] hover:bg-blue-900 disabled:opacity-60 text-white font-bold text-xs shadow-lg shadow-blue-950/20 transition-all cursor-pointer flex items-center justify-center gap-2 mt-2"
+            className="w-full py-3 px-4 rounded-xl bg-[#0b2b59] hover:bg-[#123d73] disabled:opacity-60 text-white font-bold text-xs shadow-lg shadow-blue-950/20 transition-all cursor-pointer flex items-center justify-center gap-2 mt-2"
           >
-            <Sparkles className="w-4 h-4 text-yellow-400" />
+            <Sparkles className="w-4 h-4 text-amber-400" />
             <span>{isSubmitting ? 'جاري التحقق...' : 'تسجيل الدخول للنظام'}</span>
           </button>
         </form>
