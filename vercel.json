@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/download", "destination": "/" },
+    { "source": "/about", "destination": "/" }
+  ]
+}
