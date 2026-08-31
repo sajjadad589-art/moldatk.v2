@@ -39,14 +39,31 @@ const mobileSubscribersFile = 'src/components/mobile/MobileSubscribers.tsx';
 if (fs.existsSync(mobileSubscribersFile)) {
   let text = fs.readFileSync(mobileSubscribersFile, 'utf8');
 
-  // احذف زر «تسديد / خيارات الدفع» من بطاقة المشترك في واجهة الهاتف فقط.
-  // نعتمد على title الثابت حتى يبقى الحذف صحيحاً حتى لو تغير اسم الـ handler لاحقاً.
-  text = text.replace(
-    /\n\s*<button\b[\s\S]*?title="تغيير طريقة التسديد"[\s\S]*?<\/button>\n/,
-    '\n'
-  );
+  // Remove only the payment button identified by its stable title.
+  // Do not use a broad regex starting at an arbitrary <button>, because that can
+  // consume earlier JSX buttons and leave the component syntactically invalid.
+  const paymentTitle = 'title="تغيير طريقة التسديد"';
+  const titleIndex = text.indexOf(paymentTitle);
 
-  // احذف CreditCard من الاستيراد فقط إذا لم يعد مستخدماً بعد حذف الزر.
+  if (titleIndex !== -1) {
+    const buttonStart = text.lastIndexOf('<button', titleIndex);
+    const buttonEndTag = '</button>';
+    const buttonEnd = text.indexOf(buttonEndTag, titleIndex);
+
+    if (buttonStart !== -1 && buttonEnd !== -1) {
+      let removeStart = buttonStart;
+      let removeEnd = buttonEnd + buttonEndTag.length;
+
+      // Include surrounding indentation/newline for clean JSX formatting.
+      const previousNewline = text.lastIndexOf('\n', buttonStart);
+      if (previousNewline !== -1) removeStart = previousNewline;
+      if (text[removeEnd] === '\n') removeEnd += 1;
+
+      text = text.slice(0, removeStart) + '\n' + text.slice(removeEnd);
+    }
+  }
+
+  // Remove CreditCard from the import only if it is no longer used.
   const bodyWithoutImport = text.replace(/import[\s\S]*?from 'lucide-react';/, '');
   if (!/\bCreditCard\b/.test(bodyWithoutImport)) {
     text = text.replace('  CreditCard,\n', '');
@@ -55,4 +72,4 @@ if (fs.existsSync(mobileSubscribersFile)) {
   fs.writeFileSync(mobileSubscribersFile, text);
 }
 
-console.log('Mobile payment strip removed and English digits enforced');
+console.log('Mobile payment strip removed safely and English digits enforced');
