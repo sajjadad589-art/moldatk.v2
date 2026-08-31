@@ -12,6 +12,20 @@ if (fs.existsSync(appFile)) {
   fs.writeFileSync(appFile, app);
 }
 
+const cloudFile = 'src/lib/useGeneratorCloudSync.ts';
+if (fs.existsSync(cloudFile)) {
+  let cloud = fs.readFileSync(cloudFile, 'utf8');
+  cloud = cloud.replace(
+    "        await replaceMissingRows('generator_subscribers', generatorId, subscribers.map(s => s.id));",
+    "        if (session?.role === 'generator_admin') await replaceMissingRows('generator_subscribers', generatorId, subscribers.map(s => s.id));"
+  );
+  cloud = cloud.replace(
+    "        await replaceMissingRows('generator_invoices', generatorId, invoices.map(i => i.id));",
+    "        if (session?.role === 'generator_admin') await replaceMissingRows('generator_invoices', generatorId, invoices.map(i => i.id));"
+  );
+  fs.writeFileSync(cloudFile, cloud);
+}
+
 const posFile = 'src/components/POSQuickView.tsx';
 if (fs.existsSync(posFile)) {
   let pos = fs.readFileSync(posFile, 'utf8');
@@ -72,11 +86,6 @@ if (fs.existsSync(posFile)) {
   pos = pos.replace(
     "                        setPaymentSubscriber(sub);",
     "                        if (permissions.canCollectPayments || permissions.canCancelPayments || permissions.canApplyFreeExemption) setPaymentSubscriber(sub);"
-  );
-
-  pos = pos.replace(
-    "          collectors={effectiveCollectors}\n          currency={generatorSpecs.currency || 'د.ع'}",
-    "          collectors={effectiveCollectors}\n          currency={generatorSpecs.currency || 'د.ع'}"
   );
 
   fs.writeFileSync(posFile, pos);
