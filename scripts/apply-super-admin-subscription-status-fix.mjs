@@ -19,10 +19,16 @@ if (source.includes(oldEffect)) {
   changed = true;
 }
 
+// IMPORTANT: Keep this calculation self-contained. Calling latestSubscriptionFor here
+// causes a runtime TDZ crash because that const function is declared after this useMemo.
 const oldActive = "      active: generators.filter(g => g.status === 'active').length,";
-const newActive = "      active: generators.filter(g => effectiveGeneratorStatus(g, latestSubscriptionFor(g.id), now) === 'active').length,";
-if (source.includes(oldActive)) {
-  source = source.replace(oldActive, newActive);
+const previouslyPatchedActive = "      active: generators.filter(g => effectiveGeneratorStatus(g, latestSubscriptionFor(g.id), now) === 'active').length,";
+const safeActive = "      active: generators.filter(g => { const latest = subscriptions.filter(s => s.generator_id === g.id).sort((a,b) => new Date(b.ends_at).getTime() - new Date(a.ends_at).getTime())[0] || null; return effectiveGeneratorStatus(g, latest, now) === 'active'; }).length,";
+if (source.includes(previouslyPatchedActive)) {
+  source = source.replace(previouslyPatchedActive, safeActive);
+  changed = true;
+} else if (source.includes(oldActive)) {
+  source = source.replace(oldActive, safeActive);
   changed = true;
 }
 
