@@ -20,10 +20,11 @@ if (fs.existsSync(appFile)) {
 
   const cloudCollectorCallback = `onUpdateCollectors={newCollectors => {\n                const scopedCollectors = newCollectors.map(c => ({ ...c, generatorId: userSession?.generatorId || c.generatorId || null }));\n                void syncCloudCollectorRoster(scopedCollectors)\n                  .then(savedCollectors => {\n                    const persistedCollectors = savedCollectors.map(c => ({ ...c, generatorId: userSession?.generatorId || c.generatorId || null }));\n                    setCollectors(persistedCollectors);\n                    try {\n                      localStorage.setItem(getStorageKey('moldatk_collectors'), JSON.stringify(persistedCollectors));\n                      window.dispatchEvent(new Event('moldatk-local-sync'));\n                    } catch (e) {}\n                    showToast('تم إنشاء وحفظ حسابات الجباة بنجاح');\n                  })\n                  .catch(error => {\n                    console.error('Collector account sync failed:', error);\n                    showToast('فشل إنشاء حساب الجابي على السيرفر. تأكد من رقم الهاتف والرمز السري ثم أعد المحاولة');\n                  });\n              }}\n              onUpdateInvoiceTemplate`;
 
-  app = app.replace(
-    /onUpdateCollectors=\{(?:\(newCollectors\)|newCollectors) => \{[\s\S]*?\}\}\n\s*onUpdateInvoiceTemplate/g,
-    cloudCollectorCallback
-  );
+  // مهم: لا نستخدم [\s\S]*? بشكل مفتوح هنا، لأن أول onUpdateCollectors في SettingsFolderView
+  // لا يتبعه onUpdateInvoiceTemplate داخل نفس المكوّن، وكان الـregex القديم يعبر </main> ومكونات كاملة
+  // ويحذف جزءاً كبيراً من JSX. هذا النمط يتوقف عند إغلاق أي مكوّن /> قبل الوصول للهدف.
+  const safeCollectorCallbackPattern = /onUpdateCollectors=\{(?:\(newCollectors\)|newCollectors) => \{(?:(?!\n\s*\/>)[\s\S])*?\}\}\n\s*onUpdateInvoiceTemplate/g;
+  app = app.replace(safeCollectorCallbackPattern, cloudCollectorCallback);
 
   if (!app.includes('collectorPermissions={userSession.collectorPermissions}')) {
     app = app.replace(
