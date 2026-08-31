@@ -146,6 +146,9 @@ export interface ActiveUserSession {
   role: UserRole;
   collectorId?: string;
   collectorName?: string;
+  collectorPermissions?: CollectorPermissions;
+  assignedLineId?: string;
+  assignedLineName?: string;
   username?: string;
   loginTime?: string;
   email?: string;
