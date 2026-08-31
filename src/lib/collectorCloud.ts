@@ -1,9 +1,26 @@
 import { supabase } from './supabase';
-import type { ActiveUserSession, Collector } from '../types';
+import type { ActiveUserSession, Collector, CollectorPermissions } from '../types';
 
 const normalizePhone = (value: string) => String(value || '').replace(/\D/g, '');
 const collectorEmail = (phone: string) => `c_${normalizePhone(phone)}@collector.molidatk.app`;
 const authPassword = (pin: string) => `Md!${String(pin || '').trim()}`;
+
+const DEFAULT_COLLECTOR_PERMISSIONS: CollectorPermissions = {
+  canCollectPayments: true,
+  canCancelPayments: false,
+  canAddSubscribers: false,
+  canEditSubscribers: false,
+  canDeleteSubscribers: false,
+  canApplyFreeExemption: false,
+  canPrintReceipts: true,
+  canViewFinancialReports: false,
+  canAccessSystemSettings: false,
+};
+
+const normalizePermissions = (value: any): CollectorPermissions => ({
+  ...DEFAULT_COLLECTOR_PERMISSIONS,
+  ...(value && typeof value === 'object' ? value : {}),
+});
 
 const fromRow = (row: any): Collector => ({
   id: row.id,
@@ -12,7 +29,7 @@ const fromRow = (row: any): Collector => ({
   phone: row.phone,
   // PIN is never downloaded from the server. Empty means "keep current PIN" when saving.
   passcode: '',
-  permissions: row.permissions || {},
+  permissions: normalizePermissions(row.permissions),
   assignedLineId: row.assigned_line_id || undefined,
   assignedLineName: row.assigned_line_name || undefined,
   nationalId: row.national_id || '',
@@ -43,7 +60,7 @@ export async function loginCollectorWithCloud(phoneInput: string, pinInput: stri
 
   const { data: collector, error: collectorError } = await supabase
     .from('generator_collectors')
-    .select('id,name,phone,is_active')
+    .select('id,name,phone,is_active,permissions,assigned_line_id,assigned_line_name')
     .eq('id', data.user.id)
     .single();
   if (collectorError || !collector || collector.is_active === false) {
@@ -55,6 +72,9 @@ export async function loginCollectorWithCloud(phoneInput: string, pinInput: stri
     role: 'collector',
     collectorId: collector.id,
     collectorName: collector.name || profile.full_name || 'جابي ميداني',
+    collectorPermissions: normalizePermissions(collector.permissions),
+    assignedLineId: collector.assigned_line_id || undefined,
+    assignedLineName: collector.assigned_line_name || undefined,
     generatorId: profile.generator_id,
     loginTime: new Date().toISOString(),
   };
