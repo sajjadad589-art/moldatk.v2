@@ -86,8 +86,12 @@ export const SyncProgressIndicator: React.FC = () => {
   return (
     <div
       dir="rtl"
-      className={`fixed z-[160] left-3 top-[max(0.5rem,env(safe-area-inset-top))] max-w-[calc(100vw-24px)] rounded-full border px-2.5 py-1.5 shadow-sm backdrop-blur text-[10px] sm:text-[11px] font-black flex items-center gap-1.5 ${tone}`}
-      style={{ pointerEvents: 'none' }}
+      className={`fixed z-[9999] right-3 max-w-[calc(100vw-24px)] rounded-full border px-2.5 py-1.5 shadow-sm backdrop-blur text-[10px] sm:text-[11px] font-black flex items-center gap-1.5 ${tone}`}
+      style={{
+        pointerEvents: 'none',
+        top: 'calc(env(safe-area-inset-top, 0px) + 8px)',
+        bottom: 'auto',
+      }}
       aria-live="polite"
     >
       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotTone}`} />
