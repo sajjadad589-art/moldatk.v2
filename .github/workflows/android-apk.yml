@@ -36,7 +36,7 @@ jobs:
           node-version: 22
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
@@ -72,7 +72,8 @@ jobs:
           path: release/Moldatk-Android.apk
           retention-days: 14
 
-      - name: Publish website download release
+      - name: Publish manually approved test release
+        if: github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -82,5 +83,5 @@ jobs:
           else
             gh release create "$TAG" release/Moldatk-Android.apk \
               --title "Moldatk ${CURRENT_VERSION}" \
-              --notes "نسخة Android 1.2.0 تشمل المزامنة السحابية ونظام التحديث التلقائي وتحسينات طباعة SUNMI."
+              --notes "نسخة اختبار معتمدة يدوياً. التحديث التلقائي يبقى متوقفاً حتى اعتماد توقيع Release ثابت."
           fi
