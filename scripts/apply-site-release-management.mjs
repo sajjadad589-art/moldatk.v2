@@ -20,6 +20,16 @@ let app = fs.readFileSync(appFile, 'utf8');
 if (!app.includes("import { useGeneratorCloudSync } from './lib/useGeneratorCloudSync';")) {
   app = app.replace("import { supabase } from './lib/supabase';", "import { supabase } from './lib/supabase';\nimport { useGeneratorCloudSync } from './lib/useGeneratorCloudSync';");
 }
+if (!app.includes("const ENABLE_NATIVE_PUSH = import.meta.env.VITE_ENABLE_NATIVE_PUSH === 'true';")) {
+  app = app.replace(
+    "import { FolderDetailModal } from './components/FolderDetailModal';\n",
+    "import { FolderDetailModal } from './components/FolderDetailModal';\n\nconst ENABLE_NATIVE_PUSH = import.meta.env.VITE_ENABLE_NATIVE_PUSH === 'true';\n"
+  );
+}
+app = app.replace(
+  "if (userSession?.role !== 'generator_admin' || !Capacitor.isNativePlatform()) return;",
+  "if (userSession?.role !== 'generator_admin' || !Capacitor.isNativePlatform() || !ENABLE_NATIVE_PUSH) return;"
+);
 if (!app.includes('useGeneratorCloudSync(userSession);')) {
   const anchor = "  const settingsFolders: SettingsFolderItem[] = INITIAL_SETTINGS_FOLDERS;";
   app = app.replace(anchor, `${anchor}\n\n  // مزامنة فورية بين نسخة الويب وتطبيق Android لنفس حساب المولدة.\n  useGeneratorCloudSync(userSession);`);
@@ -47,4 +57,4 @@ if (landing.includes(releaseWhatsapp) && !landing.includes('activeRelease?.apk_u
 landing = landing.replace(/<a href=\{whatsappUrl\} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1\.5 text-emerald-400 hover:text-emerald-300 font-bold"><MessageCircle className="w-4 h-4" \/> 07766334555<\/a>/, '<a href={whatsappUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 font-bold"><MessageCircle className="w-4 h-4" /> {siteSettings.whatsapp_phone}</a>');
 fs.writeFileSync(landingFile, landing);
 
-console.log('Website/release management and cloud sync applied');
+console.log('Website/release management, cloud sync, and Android stability guards applied');
