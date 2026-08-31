@@ -1,0 +1,35 @@
+import fs from 'node:fs';
+
+const path = 'src/App.tsx';
+let source = fs.readFileSync(path, 'utf8');
+let changed = false;
+
+const oldState = "  const [subscriptionInfo, setSubscriptionInfo] = useState<SubscriptionInfo | null>(null);\n  const [subscriptionLoading, setSubscriptionLoading] = useState(false);";
+const newState = `  const [subscriptionInfo, setSubscriptionInfo] = useState<SubscriptionInfo | null>(() => {\n    try {\n      if (!userSession?.generatorId) return null;\n      const cached = localStorage.getItem(\`moldatk_subscription_info_\${userSession.generatorId}\`);\n      return cached ? JSON.parse(cached) as SubscriptionInfo : null;\n    } catch (e) {\n      return null;\n    }\n  });\n  const [subscriptionLoading, setSubscriptionLoading] = useState(false);\n  const [subscriptionUnavailable, setSubscriptionUnavailable] = useState(false);`;
+if (source.includes(oldState)) {
+  source = source.replace(oldState, newState);
+  changed = true;
+}
+
+const oldBlock = `      if (!cancelled) {\n        if (!g.error && g.data && (userSession.role === 'collector' || (!sub.error && sub.data))) {\n          const serverGeneratorName = g.data.name || 'مولدتك';\n          const serverOwnerName = g.data.owner_name || 'صاحب المولدة';\n\n          if (userSession.role === 'generator_admin' && sub.data) {\n            setSubscriptionInfo({\n              generatorId: g.data.id,\n              generatorName: serverGeneratorName,\n              ownerName: serverOwnerName,\n              phone: g.data.phone,\n              startsAt: sub.data.starts_at,\n              endsAt: sub.data.ends_at,\n              subscriptionStatus: sub.data.status,\n              accountStatus: g.data.status,\n              suspensionReason: g.data.suspension_reason,\n            });\n          } else {\n            setSubscriptionInfo(null);\n          }\n\n          setGeneratorSpecs(prev => {\n            const updated = {\n              ...prev,\n              generatorName: serverGeneratorName,\n              ownerName: serverOwnerName,\n              location: g.data.area || prev.location,\n            };\n\n            try {\n              localStorage.setItem(getStorageKey('moldatk_generator'), JSON.stringify(updated));\n              rememberGeneratorAccount(userSession, updated);\n\n              const rawInvoiceSettings = localStorage.getItem(getStorageKey('moldatk_invoice_custom_settings'));\n              if (rawInvoiceSettings) {\n                const parsedInvoiceSettings = JSON.parse(rawInvoiceSettings);\n                localStorage.setItem(\n                  getStorageKey('moldatk_invoice_custom_settings'),\n                  JSON.stringify({ ...parsedInvoiceSettings, headerTitle: serverGeneratorName })\n                );\n              }\n            } catch (e) {}\n\n            return updated;\n          });\n        } else {\n          setSubscriptionInfo(null);\n        }\n        setSubscriptionLoading(false);\n      }`;
+
+const newBlock = `      if (!cancelled) {\n        const requestFailed = Boolean(g.error || (userSession.role === 'generator_admin' && sub.error));\n\n        if (requestFailed) {\n          // فشل الشبكة أو Supabase لا يعني أن الاشتراك انتهى. أبقِ آخر حالة ناجحة محفوظة.\n          setSubscriptionUnavailable(true);\n          if (userSession.role === 'generator_admin') {\n            try {\n              const cached = localStorage.getItem(\`moldatk_subscription_info_\${userSession.generatorId}\`);\n              if (cached) setSubscriptionInfo(JSON.parse(cached) as SubscriptionInfo);\n            } catch (e) {}\n          }\n          setSubscriptionLoading(false);\n          return;\n        }\n\n        setSubscriptionUnavailable(false);\n\n        if (g.data) {\n          const serverGeneratorName = g.data.name || 'مولدتك';\n          const serverOwnerName = g.data.owner_name || 'صاحب المولدة';\n\n          if (userSession.role === 'generator_admin') {\n            if (sub.data) {\n              const nextSubscriptionInfo: SubscriptionInfo = {\n                generatorId: g.data.id,\n                generatorName: serverGeneratorName,\n                ownerName: serverOwnerName,\n                phone: g.data.phone,\n                startsAt: sub.data.starts_at,\n                endsAt: sub.data.ends_at,\n                subscriptionStatus: sub.data.status,\n                accountStatus: g.data.status,\n                suspensionReason: g.data.suspension_reason,\n              };\n              setSubscriptionInfo(nextSubscriptionInfo);\n              try {\n                localStorage.setItem(\`moldatk_subscription_info_\${userSession.generatorId}\`, JSON.stringify(nextSubscriptionInfo));\n              } catch (e) {}\n            } else {\n              // الاستعلام نجح فعلاً ولا يوجد اشتراك: هذه حالة حقيقية وليست انقطاع شبكة.\n              setSubscriptionInfo(null);\n              try { localStorage.removeItem(\`moldatk_subscription_info_\${userSession.generatorId}\`); } catch (e) {}\n            }\n          } else {\n            setSubscriptionInfo(null);\n          }\n\n          setGeneratorSpecs(prev => {\n            const updated = {\n              ...prev,\n              generatorName: serverGeneratorName,\n              ownerName: serverOwnerName,\n              location: g.data.area || prev.location,\n            };\n\n            try {\n              localStorage.setItem(getStorageKey('moldatk_generator'), JSON.stringify(updated));\n              rememberGeneratorAccount(userSession, updated);\n\n              const rawInvoiceSettings = localStorage.getItem(getStorageKey('moldatk_invoice_custom_settings'));\n              if (rawInvoiceSettings) {\n                const parsedInvoiceSettings = JSON.parse(rawInvoiceSettings);\n                localStorage.setItem(\n                  getStorageKey('moldatk_invoice_custom_settings'),\n                  JSON.stringify({ ...parsedInvoiceSettings, headerTitle: serverGeneratorName })\n                );\n              }\n            } catch (e) {}\n\n            return updated;\n          });\n        }\n        setSubscriptionLoading(false);\n      }`;
+
+if (source.includes(oldBlock)) {
+  source = source.replace(oldBlock, newBlock);
+  changed = true;
+}
+
+const oldExpired = "  if (userSession.role === 'generator_admin' && !subscriptionLoading && (!subscriptionInfo || subscriptionInfo.subscriptionStatus !== 'active' || daysUntilExpiry(subscriptionInfo.endsAt) <= 0)) {";
+const newExpired = "  if (userSession.role === 'generator_admin' && !subscriptionLoading && !subscriptionUnavailable && (!subscriptionInfo || subscriptionInfo.subscriptionStatus !== 'active' || daysUntilExpiry(subscriptionInfo.endsAt) <= 0)) {";
+if (source.includes(oldExpired)) {
+  source = source.replace(oldExpired, newExpired);
+  changed = true;
+}
+
+if (changed) {
+  fs.writeFileSync(path, source);
+  console.log('Applied offline subscription fallback fix');
+} else {
+  console.log('Offline subscription fallback fix already applied');
+}
