@@ -7,7 +7,8 @@
     "dev": "node scripts/apply-site-release-management.mjs && node scripts/apply-launch-hardening.mjs && vite --port=3000 --host=0.0.0.0",
     "build": "node scripts/apply-site-release-management.mjs && node scripts/apply-launch-hardening.mjs && vite build",
     "preview": "vite preview",
-    "lint": "node scripts/apply-site-release-management.mjs && node scripts/apply-launch-hardening.mjs && tsc --noEmit"
+    "audit": "node scripts/apply-site-release-management.mjs && node scripts/apply-launch-hardening.mjs && node scripts/launch-audit.mjs",
+    "lint": "node scripts/apply-site-release-management.mjs && node scripts/apply-launch-hardening.mjs && node scripts/launch-audit.mjs && tsc --noEmit"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",
