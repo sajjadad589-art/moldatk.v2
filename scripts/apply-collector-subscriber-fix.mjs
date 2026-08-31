@@ -54,14 +54,31 @@ if (fs.existsSync(subscriberFile)) {
 }
 
 // 3) إذا الجابي مربوط بكابينة/خط محدد، نموذج إضافة المشترك يعرض هذا الخط فقط.
+// 4) حفظ المشترك من حساب الجابي يذهب مباشرة إلى Supabase قبل إطلاق مزامنة السحب،
+//    حتى لا تضيع الإضافة المحلية إذا وصلت مزامنة Realtime قبل الـ push الدوري.
 const appFile = 'src/App.tsx';
 if (fs.existsSync(appFile)) {
   let app = fs.readFileSync(appFile, 'utf8');
+
+  if (!app.includes("import { persistCollectorSubscriber } from './lib/subscriberCloud';")) {
+    app = app.replace(
+      "import { supabase } from './lib/supabase';",
+      "import { supabase } from './lib/supabase';\nimport { persistCollectorSubscriber } from './lib/subscriberCloud';"
+    );
+  }
+
   app = app.replace(
     "          pricingTiers={pricingTiers}\n          lines={lines}\n          onSaveSubscriber={handleSaveSubscriber}\n          isReadOnlyAmperes={false}",
     "          pricingTiers={pricingTiers}\n          lines={userSession.assignedLineId ? lines.filter(l => l.id === userSession.assignedLineId) : lines}\n          onSaveSubscriber={handleSaveSubscriber}\n          isReadOnlyAmperes={false}"
   );
+
+  const oldSave = `  const handleSaveSubscriber = (newSub: Subscriber) => {\n    setSubscribers(prev => {\n      const exists = prev.some(s => s.id === newSub.id);\n      const normalizedSub: Subscriber = {\n        ...newSub,\n        code: newSub.code || newSub.subscriberCode || generateUniqueSubscriberCode(prev),\n        subscriberCode: newSub.subscriberCode || newSub.code || generateUniqueSubscriberCode(prev),\n        line: newSub.line || newSub.lineName,\n        lineName: newSub.lineName || newSub.line,\n      };\n      const updated = exists ? prev.map(s => (s.id === normalizedSub.id ? normalizedSub : s)) : [normalizedSub, ...prev];\n      try {\n        localStorage.setItem(getStorageKey('moldatk_subscribers'), JSON.stringify(updated));\n        window.dispatchEvent(new Event('moldatk-local-sync'));\n      } catch (e) {}\n      return updated;\n    });\n    setSubscriberToEdit(newSub);\n    showToast('تم حفظ بيانات المشترك بنجاح');\n  };`;
+
+  const newSave = `  const handleSaveSubscriber = (newSub: Subscriber) => {\n    const previous = subscribers;\n    const exists = previous.some(s => s.id === newSub.id);\n    const generatedCode = newSub.code || newSub.subscriberCode || generateUniqueSubscriberCode(previous);\n    const normalizedSub: Subscriber = {\n      ...newSub,\n      code: generatedCode,\n      subscriberCode: newSub.subscriberCode || generatedCode,\n      line: newSub.line || newSub.lineName,\n      lineName: newSub.lineName || newSub.line,\n    };\n    const updated = exists\n      ? previous.map(s => (s.id === normalizedSub.id ? normalizedSub : s))\n      : [normalizedSub, ...previous];\n\n    setSubscribers(updated);\n    try {\n      localStorage.setItem(getStorageKey('moldatk_subscribers'), JSON.stringify(updated));\n    } catch (e) {}\n    setSubscriberToEdit(normalizedSub);\n\n    if (userSession?.role === 'collector' && userSession.generatorId) {\n      void persistCollectorSubscriber(userSession.generatorId, normalizedSub)\n        .then(() => {\n          window.dispatchEvent(new Event('moldatk-local-sync'));\n          showToast(exists ? 'تم تحديث بيانات المشترك بنجاح' : 'تمت إضافة المشترك وحفظه على السيرفر بنجاح');\n        })\n        .catch(error => {\n          console.error('Collector subscriber direct save failed:', error);\n          setSubscribers(previous);\n          try { localStorage.setItem(getStorageKey('moldatk_subscribers'), JSON.stringify(previous)); } catch (e) {}\n          showToast('فشل حفظ المشترك على السيرفر، لم يتم اعتماد الإضافة');\n        });\n      return;\n    }\n\n    window.dispatchEvent(new Event('moldatk-local-sync'));\n    showToast('تم حفظ بيانات المشترك بنجاح');\n  };`;
+
+  if (app.includes(oldSave)) app = app.replace(oldSave, newSave);
+
   fs.writeFileSync(appFile, app);
 }
 
-console.log('Collector add-subscriber workflow restored and linked to cabin/tier/details');
+console.log('Collector add-subscriber workflow restored, persisted directly, and linked to cabin/tier/details');
