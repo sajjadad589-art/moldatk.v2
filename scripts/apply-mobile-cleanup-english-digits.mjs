@@ -38,8 +38,20 @@ if (fs.existsSync(formatterFile)) {
 const mobileSubscribersFile = 'src/components/mobile/MobileSubscribers.tsx';
 if (fs.existsSync(mobileSubscribersFile)) {
   let text = fs.readFileSync(mobileSubscribersFile, 'utf8');
-  text = text.replace('  CreditCard,\n', '');
-  text = text.replace(/\n\s*<button\n\s*onClick=\{\(e\) => \{\n\s*e\.stopPropagation\(\);\n\s*onTogglePaymentStatus\(sub\.id\);\n\s*\}\}\n\s*className="flex-1 flex items-center justify-center gap-1\.5 py-2 px-3 rounded-xl text-xs font-bold transition-all bg-\[#1E3A8A\] hover:bg-blue-900 text-white shadow-xs cursor-pointer active:scale-98"\n\s*title="تغيير طريقة التسديد"\n\s*>\n\s*<CreditCard className="w-3\.5 h-3\.5 text-yellow-300" \/>\n\s*<span>تسديد \/ خيارات الدفع 💳<\/span>\n\s*<\/button>\n/, '\n');
+
+  // احذف زر «تسديد / خيارات الدفع» من بطاقة المشترك في واجهة الهاتف فقط.
+  // نعتمد على title الثابت حتى يبقى الحذف صحيحاً حتى لو تغير اسم الـ handler لاحقاً.
+  text = text.replace(
+    /\n\s*<button\b[\s\S]*?title="تغيير طريقة التسديد"[\s\S]*?<\/button>\n/,
+    '\n'
+  );
+
+  // احذف CreditCard من الاستيراد فقط إذا لم يعد مستخدماً بعد حذف الزر.
+  const bodyWithoutImport = text.replace(/import[\s\S]*?from 'lucide-react';/, '');
+  if (!/\bCreditCard\b/.test(bodyWithoutImport)) {
+    text = text.replace('  CreditCard,\n', '');
+  }
+
   fs.writeFileSync(mobileSubscribersFile, text);
 }
 
