@@ -26,7 +26,8 @@ assert(!pos.includes('inv.amount - (inv.paidAmount'), 'POS still references the 
 assert(pos.includes('collectorPermissions'), 'Collector permissions are not enforced in POS UI.');
 assert(cloud.includes("from('generator_invoices')"), 'Invoice history is missing from cloud synchronization.');
 assert(cloud.includes("session?.role === 'collector'"), 'Collector sessions are missing from cloud synchronization.');
-assert(cloud.includes("session?.role === 'generator_admin') await replaceMissingRows('generator_subscribers'"), 'Collector sync could delete remote subscribers.');
+assert(!cloud.includes("await replaceMissingRows('generator_subscribers'"), 'Subscriber sync still contains destructive inferred deletion.');
+assert(!cloud.includes("await replaceMissingRows('generator_invoices'"), 'Invoice sync still contains destructive inferred deletion.');
 assert(Number.isInteger(updaterManifest.versionCode) && updaterManifest.versionCode > 0, 'Invalid Android update versionCode.');
 
 if (workflow.includes('assembleDebug')) {
