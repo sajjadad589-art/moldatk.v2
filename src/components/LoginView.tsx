@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Collector, UserRole, ActiveUserSession } from '../types';
 import { supabase } from '../lib/supabase';
+import { loginCollectorWithCloud } from '../lib/collectorCloud';
 
 interface LoginViewProps {
   collectors: Collector[];
@@ -82,18 +83,15 @@ export const LoginView: React.FC<LoginViewProps> = ({ collectors, onLoginSuccess
         setIsSubmitting(false);
       }
     } else {
-      const collector = collectors.find(c => c.phone.trim() === cleanInput && (c.passcode || '1234').trim() === cleanPass);
-
-      if (collector) {
-        onLoginSuccess({
-          role: 'collector',
-          collectorId: collector.id,
-          collectorName: collector.name,
-          generatorId: collector.generatorId || null,
-          loginTime: new Date().toISOString(),
-        });
-      } else {
-        setErrorMessage('رقم الهاتف أو الرمز السري للجابي غير صحيح');
+      setIsSubmitting(true);
+      try {
+        const session = await loginCollectorWithCloud(cleanInput, cleanPass);
+        onLoginSuccess(session);
+      } catch (error) {
+        console.error('Collector cloud login failed:', error);
+        setErrorMessage('رقم الهاتف أو الرمز السري للجابي غير صحيح أو الحساب موقوف');
+      } finally {
+        setIsSubmitting(false);
       }
     }
   };
@@ -140,7 +138,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ collectors, onLoginSuccess
         </div>
 
         {errorMessage && (
-          <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-600 dark:text-rose-400 text-xs font-bold flex items-center gap-2">
+          <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-slate-900 text-rose-600 dark:text-rose-400 text-xs font-bold flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{errorMessage}</span>
           </div>
@@ -199,7 +197,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ collectors, onLoginSuccess
         </form>
 
         <div className="text-center pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400">
-          دخول الإدارة العليا أصبح مرتبطاً بـ Supabase Authentication
+          جميع حسابات المالك والجباة مرتبطة بـ Supabase Authentication
         </div>
       </div>
     </div>
