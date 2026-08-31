@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import CollectorApp from './CollectorApp';
 import LandingPage from './LandingPage';
 import { AndroidUpdateChecker } from './components/AndroidUpdateChecker';
 import './index.css';
@@ -30,11 +29,8 @@ function RootRouter() {
     return <App forceSuperAdmin />;
   }
 
-  // إذا كان الرابط يحتوي على #collector يتم عرض تطبيق الجباة، وإلا يتم عرض لوحة التحكم الرئيسية
-  if (route.includes('collector') || route.includes('col')) {
-    return <CollectorApp />;
-  }
-
+  // جميع المستخدمين، بما فيهم الجباة، يدخلون من البوابة الرئيسية حتى يمروا
+  // بمصادقة Supabase الموحدة ولا يمكن الرجوع لمسار الجباة المحلي القديم.
   return <App />;
 }
 
