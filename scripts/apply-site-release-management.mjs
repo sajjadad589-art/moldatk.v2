@@ -36,6 +36,32 @@ if (!app.includes('useGeneratorCloudSync(userSession);')) {
 }
 fs.writeFileSync(appFile, app);
 
+// إصلاح زر التسديد في واجهة الهاتف: كان مرتبطاً بهاندلر فارغ من App.
+const mobileSubscribersFile = 'src/components/mobile/MobileSubscribers.tsx';
+if (fs.existsSync(mobileSubscribersFile)) {
+  let mobileSubscribers = fs.readFileSync(mobileSubscribersFile, 'utf8');
+  mobileSubscribers = mobileSubscribers.replace(
+    "sub.boxNumber.toLowerCase().includes(searchTerm.toLowerCase());",
+    "(sub.boxNumber || '').toLowerCase().includes(searchTerm.toLowerCase());"
+  );
+  mobileSubscribers = mobileSubscribers.replace(
+    "onTogglePaymentStatus(sub.id);",
+    "onOpenSubscriberModal(sub);"
+  );
+  fs.writeFileSync(mobileSubscribersFile, mobileSubscribers);
+}
+
+// إصلاح جمع المبالغ غير المسددة: SubscriberInvoice يستخدم totalAmount وليس amount.
+const posFile = 'src/components/POSQuickView.tsx';
+if (fs.existsSync(posFile)) {
+  let pos = fs.readFileSync(posFile, 'utf8');
+  pos = pos.replace(
+    "Math.max(0, inv.amount - (inv.paidAmount || 0))",
+    "Math.max(0, inv.totalAmount - (inv.paidAmount || 0))"
+  );
+  fs.writeFileSync(posFile, pos);
+}
+
 const landingFile = 'src/LandingPage.tsx';
 let landing = fs.readFileSync(landingFile, 'utf8');
 landing = landing.replace("import React from 'react';", "import React, { useEffect, useState } from 'react';");
@@ -57,4 +83,4 @@ if (landing.includes(releaseWhatsapp) && !landing.includes('activeRelease?.apk_u
 landing = landing.replace(/<a href=\{whatsappUrl\} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1\.5 text-emerald-400 hover:text-emerald-300 font-bold"><MessageCircle className="w-4 h-4" \/> 07766334555<\/a>/, '<a href={whatsappUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 font-bold"><MessageCircle className="w-4 h-4" /> {siteSettings.whatsapp_phone}</a>');
 fs.writeFileSync(landingFile, landing);
 
-console.log('Website/release management, cloud sync, and Android stability guards applied');
+console.log('Website/release management, cloud sync, mobile payment fixes, and Android stability guards applied');
