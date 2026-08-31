@@ -27,7 +27,7 @@ const replacements = [
   ],
   [
     "className={`receipt-value text-left text-slate-950 ${strong ? 'font-black text-sm' : 'font-bold'}`}",
-    "className={`receipt-value text-left text-black font-black ${strong ? 'text-sm' : ''}`}`"
+    "className={`receipt-value text-left text-black font-black ${strong ? 'text-sm' : ''}`}"
   ]
 ];
 
@@ -38,12 +38,16 @@ for (const [from, to] of replacements) {
   }
 }
 
-source = source
+const normalized = source
   .replace(/text-slate-500/g, 'text-black')
   .replace(/text-slate-600/g, 'text-black')
   .replace(/font-bold/g, 'font-black');
+if (normalized !== source) {
+  source = normalized;
+  changed = true;
+}
 
-if (!source.includes('font-black text-black rounded-xl p-3')) {
+if (!source.includes('font-black rounded-xl p-3')) {
   source = source.replace(
     'id="thermal-receipt-printable" className="bg-white text-slate-950 rounded-xl p-3',
     'id="thermal-receipt-printable" className="bg-white text-black font-black rounded-xl p-3'
