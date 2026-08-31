@@ -24,7 +24,8 @@ jobs:
     env:
       VITE_SUPABASE_URL: https://adluynhkikoodjljoxeu.supabase.co
       VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CObjK2Uua18kVkXCkxdRog_keQLIDiE
-      CURRENT_VERSION: 1.2.0
+      CURRENT_VERSION: 1.3.0
+      CURRENT_VERSION_CODE: 4
 
     steps:
       - name: Checkout
@@ -54,25 +55,76 @@ jobs:
       - name: Sync Capacitor Android
         run: npx cap sync android
 
+      # Every normal push still gets a disposable debug artifact for testing.
       - name: Build debug APK
+        if: github.event_name != 'workflow_dispatch'
         run: |
           chmod +x android/gradlew
           cd android
           ./gradlew assembleDebug --no-daemon
 
-      - name: Prepare APK
+      - name: Prepare debug APK
+        if: github.event_name != 'workflow_dispatch'
         run: |
           mkdir -p release
-          cp android/app/build/outputs/apk/debug/app-debug.apk release/Moldatk-Android.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk release/Moldatk-Android-Debug.apk
 
-      - name: Upload APK artifact
+      - name: Upload debug artifact
+        if: github.event_name != 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: Moldatk-Android-APK
-          path: release/Moldatk-Android.apk
+          name: Moldatk-Android-Debug
+          path: release/Moldatk-Android-Debug.apk
           retention-days: 14
 
-      - name: Publish manually approved test release
+      # A manually approved release is always signed with the same private key.
+      - name: Validate signing secrets
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.MOLDATK_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.MOLDATK_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.MOLDATK_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.MOLDATK_KEY_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE_BASE64" || (echo "Missing MOLDATK_KEYSTORE_BASE64" && exit 1)
+          test -n "$KEYSTORE_PASSWORD" || (echo "Missing MOLDATK_KEYSTORE_PASSWORD" && exit 1)
+          test -n "$KEY_ALIAS" || (echo "Missing MOLDATK_KEY_ALIAS" && exit 1)
+          test -n "$KEY_PASSWORD" || (echo "Missing MOLDATK_KEY_PASSWORD" && exit 1)
+
+      - name: Restore release signing key
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.MOLDATK_KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/moldatk-release.keystore
+
+      - name: Build signed release APK
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          MOLDATK_SIGNING_STORE_FILE: ${{ github.workspace }}/android/app/moldatk-release.keystore
+          MOLDATK_SIGNING_STORE_PASSWORD: ${{ secrets.MOLDATK_KEYSTORE_PASSWORD }}
+          MOLDATK_SIGNING_KEY_ALIAS: ${{ secrets.MOLDATK_KEY_ALIAS }}
+          MOLDATK_SIGNING_KEY_PASSWORD: ${{ secrets.MOLDATK_KEY_PASSWORD }}
+        run: |
+          chmod +x android/gradlew
+          cd android
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Prepare signed release APK
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          mkdir -p release
+          cp android/app/build/outputs/apk/release/app-release.apk release/Moldatk-Android.apk
+
+      - name: Upload signed release artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Moldatk-Android-Release
+          path: release/Moldatk-Android.apk
+          retention-days: 30
+
+      - name: Publish approved GitHub release
         if: github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -83,5 +135,32 @@ jobs:
           else
             gh release create "$TAG" release/Moldatk-Android.apk \
               --title "Moldatk ${CURRENT_VERSION}" \
-              --notes "نسخة اختبار معتمدة يدوياً. التحديث التلقائي يبقى متوقفاً حتى اعتماد توقيع Release ثابت."
+              --notes "نسخة Android Release موقعة ومعتمدة للتحديث من داخل تطبيق مولدتك."
+          fi
+
+      - name: Activate in-app update manifest
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const version = process.env.CURRENT_VERSION;
+          const versionCode = Number(process.env.CURRENT_VERSION_CODE);
+          const manifest = {
+            enabled: true,
+            versionCode,
+            versionName: version,
+            minimumVersionCode: 3,
+            force: false,
+            apkUrl: `https://github.com/sajjadad589-art/moldatk.v2/releases/download/v${version}/Moldatk-Android.apk`,
+            notes: 'تحسين مزامنة المشتركين بين الحاسبة وأجهزة SUNMI وتفعيل نظام التحديث الداخلي.'
+          };
+          fs.writeFileSync('public/app-version.json', JSON.stringify(manifest, null, 2) + '\n');
+          NODE
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/app-version.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Activate in-app update ${CURRENT_VERSION}"
+            git push
           fi
