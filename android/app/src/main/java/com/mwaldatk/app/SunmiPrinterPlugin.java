@@ -239,18 +239,19 @@ public class SunmiPrinterPlugin extends Plugin {
 
     private void addField(List<DrawLine> lines, String label, String value, boolean strong) {
         if (value == null || value.trim().isEmpty()) return;
-        lines.add(new DrawLine(label + ":  " + value, strong ? 23f : 21f, strong, Layout.Alignment.ALIGN_NORMAL, 6));
+        lines.add(new DrawLine(label + ":  " + value, strong ? 23f : 21f, true, Layout.Alignment.ALIGN_NORMAL, 6));
     }
 
     private DrawLine separatorLine() {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < 32; i++) sb.append('-');
-        return new DrawLine(sb.toString(), 17f, false, Layout.Alignment.ALIGN_CENTER, 6);
+        return new DrawLine(sb.toString(), 17f, true, Layout.Alignment.ALIGN_CENTER, 6);
     }
 
     private StaticLayout buildLayout(DrawLine dl) {
-        TextPaint paint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
-        paint.setTypeface(Typeface.create(Typeface.DEFAULT, dl.bold ? Typeface.BOLD : Typeface.NORMAL));
+        TextPaint paint = new TextPaint(Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
+        paint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+        paint.setFakeBoldText(true);
         paint.setTextSize(dl.textSizePx);
         paint.setColor(Color.BLACK);
 
@@ -278,7 +279,7 @@ public class SunmiPrinterPlugin extends Plugin {
         DrawLine(String text, float textSizePx, boolean bold, Layout.Alignment alignment, int marginBottom, boolean boxed) {
             this.text = text;
             this.textSizePx = textSizePx;
-            this.bold = bold;
+            this.bold = true;
             this.alignment = alignment;
             this.marginBottom = marginBottom;
             this.boxed = boxed;
