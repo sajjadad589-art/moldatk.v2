@@ -5,10 +5,15 @@ let source = fs.readFileSync(appPath, 'utf8');
 let changed = false;
 
 const syncImport = "import { useGeneratorCloudSync } from './lib/useGeneratorCloudSync';";
-if (!source.includes(syncImport)) {
+const persistImport = "import { persistCollectorSubscriber } from './lib/subscriberCloud';";
+if (!source.includes(syncImport) || !source.includes(persistImport)) {
   const importMarker = "import { supabase } from './lib/supabase';";
   if (!source.includes(importMarker)) throw new Error('Supabase import marker not found in src/App.tsx');
-  source = source.replace(importMarker, `${importMarker}\n${syncImport}`);
+  const additions = [
+    !source.includes(syncImport) ? syncImport : '',
+    !source.includes(persistImport) ? persistImport : '',
+  ].filter(Boolean).join('\n');
+  source = source.replace(importMarker, `${importMarker}\n${additions}`);
   changed = true;
 }
 
@@ -28,9 +33,20 @@ if (!source.includes('useGeneratorCloudSync(userSession);')) {
   changed = true;
 }
 
+const oldSave = `  const handleSaveSubscriber = (newSub: Subscriber) => {\n    setSubscribers(prev => {\n      const exists = prev.some(s => s.id === newSub.id);\n      const normalizedSub: Subscriber = {\n        ...newSub,\n        code: newSub.code || newSub.subscriberCode || generateUniqueSubscriberCode(prev),\n        subscriberCode: newSub.subscriberCode || newSub.code || generateUniqueSubscriberCode(prev),\n        line: newSub.line || newSub.lineName,\n        lineName: newSub.lineName || newSub.line,\n      };\n      const updated = exists ? prev.map(s => (s.id === normalizedSub.id ? normalizedSub : s)) : [normalizedSub, ...prev];\n      try {\n        localStorage.setItem(getStorageKey('moldatk_subscribers'), JSON.stringify(updated));\n        window.dispatchEvent(new Event('moldatk-local-sync'));\n      } catch (e) {}\n      return updated;\n    });\n    setSubscriberToEdit(newSub);\n    showToast('تم حفظ بيانات المشترك بنجاح');\n  };`;
+
+const newSave = `  const handleSaveSubscriber = async (newSub: Subscriber) => {\n    const normalizedSub: Subscriber = {\n      ...newSub,\n      code: newSub.code || newSub.subscriberCode || generateUniqueSubscriberCode(subscribers),\n      subscriberCode: newSub.subscriberCode || newSub.code || generateUniqueSubscriberCode(subscribers),\n      line: newSub.line || newSub.lineName,\n      lineName: newSub.lineName || newSub.line,\n    };\n\n    // للحسابات المرتبطة بمولدة، Supabase هو المصدر الرئيسي للحفظ.\n    // لا نعرض نجاحاً للمستخدم إلا بعد تأكيد قاعدة البيانات للحفظ.\n    if ((userSession?.role === 'generator_admin' || userSession?.role === 'collector') && userSession.generatorId) {\n      try {\n        await persistCollectorSubscriber(userSession.generatorId, normalizedSub);\n      } catch (error: any) {\n        console.error('Subscriber cloud save failed:', error);\n        showToast(error?.message ? `تعذر حفظ المشترك: ${error.message}` : 'تعذر حفظ المشترك على الخادم');\n        return;\n      }\n    }\n\n    setSubscribers(prev => {\n      const exists = prev.some(s => s.id === normalizedSub.id);\n      const updated = exists ? prev.map(s => (s.id === normalizedSub.id ? normalizedSub : s)) : [normalizedSub, ...prev];\n      try {\n        localStorage.setItem(getStorageKey('moldatk_subscribers'), JSON.stringify(updated));\n        window.dispatchEvent(new Event('moldatk-local-sync'));\n      } catch (e) {}\n      return updated;\n    });\n    setSubscriberToEdit(normalizedSub);\n    showToast('تم حفظ بيانات المشترك ومزامنتها بنجاح');\n  };`;
+
+if (source.includes(oldSave)) {
+  source = source.replace(oldSave, newSave);
+  changed = true;
+} else if (!source.includes("const handleSaveSubscriber = async (newSub: Subscriber)")) {
+  throw new Error('Subscriber save handler marker not found in src/App.tsx');
+}
+
 if (changed) {
   fs.writeFileSync(appPath, source);
-  console.log('Applied safe realtime subscriber/cloud sync hook to src/App.tsx');
+  console.log('Applied safe realtime subscriber sync and cloud-first save to src/App.tsx');
 } else {
-  console.log('Realtime subscriber/cloud sync hook already applied');
+  console.log('Realtime subscriber/cloud sync already applied');
 }
