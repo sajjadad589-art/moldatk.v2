@@ -3,6 +3,28 @@ import fs from 'node:fs';
 const appFile = 'src/App.tsx';
 if (fs.existsSync(appFile)) {
   let app = fs.readFileSync(appFile, 'utf8');
+
+  if (!app.includes("import { loadCloudCollectors, syncCloudCollectorRoster } from './lib/collectorCloud';")) {
+    app = app.replace(
+      "import { supabase } from './lib/supabase';",
+      "import { supabase } from './lib/supabase';\nimport { loadCloudCollectors, syncCloudCollectorRoster } from './lib/collectorCloud';"
+    );
+  }
+
+  if (!app.includes('void loadCloudCollectors(userSession.generatorId)')) {
+    app = app.replace(
+      "  const [pricingModalOpen, setPricingModalOpen] = useState(false);",
+      `  // حسابات الجباة مصدرها Supabase، وليس localStorage فقط.\n  // هذا يمنع ظهور جابي وهمي بالواجهة بدون Auth/Profile حقيقي في السيرفر.\n  useEffect(() => {\n    if (userSession?.role !== 'generator_admin' || !userSession.generatorId) return;\n    let cancelled = false;\n    void loadCloudCollectors(userSession.generatorId)\n      .then(remoteCollectors => {\n        if (cancelled) return;\n        const scopedCollectors = remoteCollectors.map(c => ({ ...c, generatorId: userSession.generatorId }));\n        setCollectors(scopedCollectors);\n        try {\n          localStorage.setItem(getStorageKey('moldatk_collectors'), JSON.stringify(scopedCollectors));\n          window.dispatchEvent(new Event('moldatk-local-sync'));\n        } catch (e) {}\n      })\n      .catch(error => {\n        console.error('Failed to load cloud collectors:', error);\n        showToast('تعذر تحميل حسابات الجباة من السيرفر');\n      });\n    return () => { cancelled = true; };\n  }, [userSession?.role, userSession?.generatorId]);\n\n  const [pricingModalOpen, setPricingModalOpen] = useState(false);`
+    );
+  }
+
+  const cloudCollectorCallback = `onUpdateCollectors={newCollectors => {\n                const scopedCollectors = newCollectors.map(c => ({ ...c, generatorId: userSession?.generatorId || c.generatorId || null }));\n                void syncCloudCollectorRoster(scopedCollectors)\n                  .then(savedCollectors => {\n                    const persistedCollectors = savedCollectors.map(c => ({ ...c, generatorId: userSession?.generatorId || c.generatorId || null }));\n                    setCollectors(persistedCollectors);\n                    try {\n                      localStorage.setItem(getStorageKey('moldatk_collectors'), JSON.stringify(persistedCollectors));\n                      window.dispatchEvent(new Event('moldatk-local-sync'));\n                    } catch (e) {}\n                    showToast('تم إنشاء وحفظ حسابات الجباة بنجاح');\n                  })\n                  .catch(error => {\n                    console.error('Collector account sync failed:', error);\n                    showToast('فشل إنشاء حساب الجابي على السيرفر. تأكد من رقم الهاتف والرمز السري ثم أعد المحاولة');\n                  });\n              }}\n              onUpdateInvoiceTemplate`;
+
+  app = app.replace(
+    /onUpdateCollectors=\{(?:\(newCollectors\)|newCollectors) => \{[\s\S]*?\}\}\n\s*onUpdateInvoiceTemplate/g,
+    cloudCollectorCallback
+  );
+
   if (!app.includes('collectorPermissions={userSession.collectorPermissions}')) {
     app = app.replace(
       "          collectorName={userSession.collectorName || 'جابي ميداني'}\n          collectors={collectors}",
@@ -10,6 +32,20 @@ if (fs.existsSync(appFile)) {
     );
   }
   fs.writeFileSync(appFile, app);
+}
+
+const folderFile = 'src/components/FolderDetailModal.tsx';
+if (fs.existsSync(folderFile)) {
+  let folder = fs.readFileSync(folderFile, 'utf8');
+  folder = folder.replace("      phone: '07700000000',", "      phone: '',");
+
+  if (!folder.includes('أدخل رقم هاتف صحيح لكل جابي قبل الحفظ')) {
+    folder = folder.replace(
+      "  const handleSave = () => {\n    if (folderKey === 'generator_specs') {",
+      `  const handleSave = () => {\n    if (folderKey === 'collectors') {\n      const normalizedPhones = currentCollectors.map(c => String(c.phone || '').replace(/\\D/g, ''));\n      if (normalizedPhones.some(phone => phone.length < 10)) {\n        alert('أدخل رقم هاتف صحيح لكل جابي قبل الحفظ');\n        return;\n      }\n      if (new Set(normalizedPhones).size !== normalizedPhones.length) {\n        alert('لا يمكن استخدام نفس رقم الهاتف لأكثر من جابي');\n        return;\n      }\n      const invalidNewPin = currentCollectors.some(c => String(c.id || '').startsWith('col-') && !/^\\d{4,8}$/.test(String(c.passcode || '').trim()));\n      if (invalidNewPin) {\n        alert('الرمز السري للجابي الجديد يجب أن يكون من 4 إلى 8 أرقام');\n        return;\n      }\n    }\n\n    if (folderKey === 'generator_specs') {`
+    );
+  }
+  fs.writeFileSync(folderFile, folder);
 }
 
 const cloudFile = 'src/lib/useGeneratorCloudSync.ts';
