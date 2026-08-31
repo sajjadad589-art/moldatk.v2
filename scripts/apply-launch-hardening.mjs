@@ -23,6 +23,10 @@ if (fs.existsSync(cloudFile)) {
     "        await replaceMissingRows('generator_invoices', generatorId, invoices.map(i => i.id));",
     "        if (session?.role === 'generator_admin') await replaceMissingRows('generator_invoices', generatorId, invoices.map(i => i.id));"
   );
+  cloud = cloud.replace(
+    "          const { error } = await supabase.from('generator_audit_logs').upsert(rows, { onConflict: 'generator_id,id' });",
+    "          const { error } = await supabase.from('generator_audit_logs').upsert(rows, { onConflict: 'generator_id,id', ignoreDuplicates: session?.role === 'collector' });"
+  );
   fs.writeFileSync(cloudFile, cloud);
 }
 
