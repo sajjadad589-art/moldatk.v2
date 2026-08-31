@@ -36,12 +36,17 @@ const oldSave = `  const handleSaveSubscriber = (newSub: Subscriber) => {\n    s
 
 const newSave = [
   '  const handleSaveSubscriber = async (newSub: Subscriber) => {',
+  '    const matchedTier = pricingTiers.find(t => t.id === newSub.tier || t.type === newSub.tier);',
+  '    const matchedLine = lines.find(l => l.id === newSub.lineId || l.name === newSub.lineName || l.name === newSub.line);',
+  '    const normalizedTier = (matchedTier?.type || (newSub.tier === \'standard\' ? \'normal\' : String(newSub.tier || \'normal\').replace(/^tier-/, \'\'))) as Subscriber[\'tier\'];',
   '    const normalizedSub: Subscriber = {',
   '      ...newSub,',
   '      code: newSub.code || newSub.subscriberCode || generateUniqueSubscriberCode(subscribers),',
   '      subscriberCode: newSub.subscriberCode || newSub.code || generateUniqueSubscriberCode(subscribers),',
-  '      line: newSub.line || newSub.lineName,',
-  '      lineName: newSub.lineName || newSub.line,',
+  '      tier: normalizedTier,',
+  '      lineId: matchedLine?.id || newSub.lineId,',
+  '      line: matchedLine?.name || newSub.line || newSub.lineName,',
+  '      lineName: matchedLine?.name || newSub.lineName || newSub.line,',
   '    };',
   '',
   '    if ((userSession?.role === \'generator_admin\' || userSession?.role === \'collector\') && userSession.generatorId) {',
@@ -71,13 +76,20 @@ const newSave = [
 if (source.includes(oldSave)) {
   source = source.replace(oldSave, newSave);
   changed = true;
-} else if (!source.includes('const handleSaveSubscriber = async (newSub: Subscriber)')) {
+} else if (source.includes('const handleSaveSubscriber = async (newSub: Subscriber)')) {
+  const start = source.indexOf('  const handleSaveSubscriber = async (newSub: Subscriber) => {');
+  const end = source.indexOf('\n\n  const addAuditLog =', start);
+  if (start >= 0 && end > start) {
+    source = source.slice(0, start) + newSave + source.slice(end);
+    changed = true;
+  }
+} else {
   throw new Error('Subscriber save handler marker not found in src/App.tsx');
 }
 
 if (changed) {
   fs.writeFileSync(appPath, source);
-  console.log('Applied safe realtime subscriber sync and cloud-first save to src/App.tsx');
+  console.log('Applied realtime sync, cloud-first save, tier normalization, and line-id mapping to src/App.tsx');
 } else {
   console.log('Realtime subscriber/cloud sync already applied');
 }
