@@ -1,9 +1,9 @@
 {
-  "enabled": true,
+  "enabled": false,
   "versionCode": 3,
   "versionName": "1.2.0",
   "minimumVersionCode": 2,
   "force": false,
   "apkUrl": "https://github.com/sajjadad589-art/moldatk.v2/releases/download/v1.2.0/Moldatk-Android.apk",
-  "notes": "تحديث 1.2.0: مزامنة سحابية بين التطبيق والموقع، تحديث تلقائي، وتحسينات طباعة SUNMI."
+  "notes": "التحديث التلقائي موقوف مؤقتاً أثناء فحص ما قبل الإطلاق إلى أن يتم اعتماد مفتاح توقيع Release ثابت."
 }
