@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from './supabase';
-import type { ActiveUserSession, Subscriber, LineDistribution, MonthlyTariffRecord, GeneratorSpecs, InvoiceTemplateSettings, AuditLogEntry } from '../types';
+import type { ActiveUserSession, Subscriber, SubscriberInvoice, LineDistribution, MonthlyTariffRecord, GeneratorSpecs, InvoiceTemplateSettings, AuditLogEntry } from '../types';
 
 const key = (base: string, generatorId: string) => `${base}_${generatorId}`;
 
@@ -62,6 +62,54 @@ const rowToSubscriber = (r: any): Subscriber => ({
   exemptReason: r.exempt_reason || undefined,
   joiningDate: r.joining_date || undefined,
   createdAt: r.created_at || undefined,
+});
+
+const invoiceToRow = (generatorId: string, i: SubscriberInvoice) => ({
+  id: i.id,
+  generator_id: generatorId,
+  subscriber_id: i.subscriberId,
+  month_id: i.monthId,
+  month_name_ar: i.monthNameAr,
+  issue_date: i.issueDate,
+  payment_date: i.paymentDate || null,
+  amperes: Number(i.amperes || 0),
+  tier: i.tier,
+  price_per_ampere: Number(i.pricePerAmpere || 0),
+  fixed_fee: Number(i.fixedFee || 0),
+  total_amount: Number(i.totalAmount || 0),
+  paid_amount: Number(i.paidAmount || 0),
+  remaining_amount: Number(i.remainingAmount || 0),
+  status: i.status,
+  cancellation_reason: i.cancellationReason || null,
+  cancelled_at: i.cancelledAt || null,
+  cancelled_by: i.cancelledBy || null,
+  collector_name: i.collectorName || null,
+  notes: i.notes || null,
+  receipt_number: i.receiptNumber || null,
+  updated_at: new Date().toISOString(),
+});
+
+const rowToInvoice = (r: any): SubscriberInvoice => ({
+  id: r.id,
+  subscriberId: r.subscriber_id,
+  monthId: r.month_id,
+  monthNameAr: r.month_name_ar,
+  issueDate: r.issue_date,
+  paymentDate: r.payment_date || undefined,
+  amperes: Number(r.amperes || 0),
+  tier: r.tier,
+  pricePerAmpere: Number(r.price_per_ampere || 0),
+  fixedFee: Number(r.fixed_fee || 0),
+  totalAmount: Number(r.total_amount || 0),
+  paidAmount: Number(r.paid_amount || 0),
+  remainingAmount: Number(r.remaining_amount || 0),
+  status: r.status,
+  cancellationReason: r.cancellation_reason || undefined,
+  cancelledAt: r.cancelled_at || undefined,
+  cancelledBy: r.cancelled_by || undefined,
+  collectorName: r.collector_name || undefined,
+  notes: r.notes || undefined,
+  receiptNumber: r.receipt_number || undefined,
 });
 
 const lineToRow = (generatorId: string, l: LineDistribution) => ({
@@ -132,7 +180,8 @@ export function useGeneratorCloudSync(session: ActiveUserSession | null) {
 
   useEffect(() => {
     const generatorId = session?.generatorId || '';
-    if (!generatorId || session?.role !== 'generator_admin') return;
+    const isGeneratorUser = session?.role === 'generator_admin' || session?.role === 'collector';
+    if (!generatorId || !isGeneratorUser) return;
 
     let disposed = false;
     ready.current = false;
@@ -147,18 +196,97 @@ export function useGeneratorCloudSync(session: ActiveUserSession | null) {
       audit: key('moldatk_audit_logs', generatorId),
     };
 
+    const snapshot = () => JSON.stringify({
+      subscribers: readLocal<Subscriber[]>(localKeys.subscribers, []),
+      lines: readLocal<LineDistribution[]>(localKeys.lines, []),
+      tariffs: readLocal<MonthlyTariffRecord[]>(localKeys.tariffs, []),
+      specs: readLocal<GeneratorSpecs | null>(localKeys.specs, null),
+      invoice: readLocal<InvoiceTemplateSettings | null>(localKeys.invoice, null),
+      invoiceCustom: readLocal<any>(localKeys.invoiceCustom, null),
+      audit: readLocal<AuditLogEntry[]>(localKeys.audit, []),
+    });
+
+    const push = async () => {
+      if (!ready.current || pushing.current || disposed) return;
+      pushing.current = true;
+      try {
+        const subscribers = readLocal<Subscriber[]>(localKeys.subscribers, []);
+        const lines = readLocal<LineDistribution[]>(localKeys.lines, []);
+        const tariffs = readLocal<MonthlyTariffRecord[]>(localKeys.tariffs, []);
+        const specs = readLocal<GeneratorSpecs | null>(localKeys.specs, null);
+        const invoiceTemplate = readLocal<InvoiceTemplateSettings | null>(localKeys.invoice, null);
+        const invoiceCustom = readLocal<any>(localKeys.invoiceCustom, null);
+        const audit = readLocal<AuditLogEntry[]>(localKeys.audit, []);
+        const invoices = subscribers.flatMap(s => s.invoicesHistory || []);
+
+        if (subscribers.length) {
+          const { error } = await supabase.from('generator_subscribers').upsert(subscribers.map(s => subscriberToRow(generatorId, s)), { onConflict: 'generator_id,id' });
+          if (error) throw error;
+        }
+        await replaceMissingRows('generator_subscribers', generatorId, subscribers.map(s => s.id));
+
+        if (invoices.length) {
+          const { error } = await supabase.from('generator_invoices').upsert(invoices.map(i => invoiceToRow(generatorId, i)), { onConflict: 'generator_id,id' });
+          if (error) throw error;
+        }
+        await replaceMissingRows('generator_invoices', generatorId, invoices.map(i => i.id));
+
+        // الجابي يحتاج مزامنة المشتركين والفواتير فقط. إعدادات المولدة تبقى بيد الإدارة.
+        if (session?.role === 'generator_admin') {
+          if (lines.length) {
+            const { error } = await supabase.from('generator_lines').upsert(lines.map(l => lineToRow(generatorId, l)), { onConflict: 'generator_id,id' });
+            if (error) throw error;
+          }
+          await replaceMissingRows('generator_lines', generatorId, lines.map(l => l.id));
+
+          if (tariffs.length) {
+            const { error } = await supabase.from('generator_monthly_tariffs').upsert(tariffs.map(t => tariffToRow(generatorId, t)), { onConflict: 'generator_id,id' });
+            if (error) throw error;
+          }
+          await replaceMissingRows('generator_monthly_tariffs', generatorId, tariffs.map(t => t.id));
+
+          if (specs || invoiceTemplate || invoiceCustom) {
+            const { error } = await supabase.from('generator_settings').upsert({
+              generator_id: generatorId,
+              specs: specs || {},
+              invoice_settings: { template: invoiceTemplate || {}, custom: invoiceCustom || {} },
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'generator_id' });
+            if (error) throw error;
+          }
+        }
+
+        if (audit.length) {
+          const rows = audit.map(a => ({
+            id: a.id, generator_id: generatorId, timestamp: a.timestamp, category: a.category,
+            title: a.title, details: a.details, entity_id: a.entityId || null, entity_name: a.entityName || null,
+            actor_name: a.actorName, previous_value: a.previousValue || null, new_value: a.newValue || null,
+            cancellation_reason: a.cancellationReason || null, amount: a.amount ?? null,
+          }));
+          const { error } = await supabase.from('generator_audit_logs').upsert(rows, { onConflict: 'generator_id,id' });
+          if (error) throw error;
+        }
+        lastSnapshot.current = snapshot();
+      } catch (e) {
+        console.error('Moldatk cloud sync push failed:', e);
+      } finally {
+        pushing.current = false;
+      }
+    };
+
     const pull = async (bootstrap = false) => {
       if (refreshing.current) return;
       refreshing.current = true;
       try {
-        const [subs, lines, tariffs, settings, logs] = await Promise.all([
+        const [subs, invoices, lines, tariffs, settings, logs] = await Promise.all([
           supabase.from('generator_subscribers').select('*').eq('generator_id', generatorId).order('created_at'),
+          supabase.from('generator_invoices').select('*').eq('generator_id', generatorId).order('issue_date', { ascending: false }),
           supabase.from('generator_lines').select('*').eq('generator_id', generatorId).order('created_at'),
           supabase.from('generator_monthly_tariffs').select('*').eq('generator_id', generatorId).order('year', { ascending: false }).order('month', { ascending: false }),
           supabase.from('generator_settings').select('*').eq('generator_id', generatorId).maybeSingle(),
           supabase.from('generator_audit_logs').select('*').eq('generator_id', generatorId).order('timestamp', { ascending: false }).limit(1000),
         ]);
-        const firstError = subs.error || lines.error || tariffs.error || settings.error || logs.error;
+        const firstError = subs.error || invoices.error || lines.error || tariffs.error || settings.error || logs.error;
         if (firstError) throw firstError;
 
         const localSubs = readLocal<Subscriber[]>(localKeys.subscribers, []);
@@ -166,7 +294,7 @@ export function useGeneratorCloudSync(session: ActiveUserSession | null) {
         const localTariffs = readLocal<MonthlyTariffRecord[]>(localKeys.tariffs, []);
         const localAudit = readLocal<AuditLogEntry[]>(localKeys.audit, []);
 
-        const remoteIsEmpty = !(subs.data?.length || lines.data?.length || tariffs.data?.length || settings.data || logs.data?.length);
+        const remoteIsEmpty = !(subs.data?.length || invoices.data?.length || lines.data?.length || tariffs.data?.length || settings.data || logs.data?.length);
         const localHasData = Boolean(localSubs.length || localLines.length || localTariffs.length || localAudit.length || localStorage.getItem(localKeys.specs));
 
         if (bootstrap && remoteIsEmpty && localHasData) {
@@ -175,7 +303,17 @@ export function useGeneratorCloudSync(session: ActiveUserSession | null) {
           return;
         }
 
-        writeLocal(localKeys.subscribers, (subs.data || []).map(rowToSubscriber));
+        const invoiceMap = new Map<string, SubscriberInvoice[]>();
+        for (const row of invoices.data || []) {
+          const item = rowToInvoice(row);
+          const list = invoiceMap.get(item.subscriberId) || [];
+          list.push(item);
+          invoiceMap.set(item.subscriberId, list);
+        }
+        writeLocal(localKeys.subscribers, (subs.data || []).map((row: any) => {
+          const subscriber = rowToSubscriber(row);
+          return { ...subscriber, invoicesHistory: invoiceMap.get(subscriber.id) || [] };
+        }));
         writeLocal(localKeys.lines, (lines.data || []).map(rowToLine));
         writeLocal(localKeys.tariffs, (tariffs.data || []).map(rowToTariff));
         writeLocal(localKeys.audit, (logs.data || []).map((r: any) => ({
@@ -199,74 +337,6 @@ export function useGeneratorCloudSync(session: ActiveUserSession | null) {
       }
     };
 
-    const snapshot = () => JSON.stringify({
-      subscribers: readLocal<Subscriber[]>(localKeys.subscribers, []),
-      lines: readLocal<LineDistribution[]>(localKeys.lines, []),
-      tariffs: readLocal<MonthlyTariffRecord[]>(localKeys.tariffs, []),
-      specs: readLocal<GeneratorSpecs | null>(localKeys.specs, null),
-      invoice: readLocal<InvoiceTemplateSettings | null>(localKeys.invoice, null),
-      invoiceCustom: readLocal<any>(localKeys.invoiceCustom, null),
-      audit: readLocal<AuditLogEntry[]>(localKeys.audit, []),
-    });
-
-    const push = async () => {
-      if (!ready.current || pushing.current || disposed) return;
-      pushing.current = true;
-      try {
-        const subscribers = readLocal<Subscriber[]>(localKeys.subscribers, []);
-        const lines = readLocal<LineDistribution[]>(localKeys.lines, []);
-        const tariffs = readLocal<MonthlyTariffRecord[]>(localKeys.tariffs, []);
-        const specs = readLocal<GeneratorSpecs | null>(localKeys.specs, null);
-        const invoice = readLocal<InvoiceTemplateSettings | null>(localKeys.invoice, null);
-        const invoiceCustom = readLocal<any>(localKeys.invoiceCustom, null);
-        const audit = readLocal<AuditLogEntry[]>(localKeys.audit, []);
-
-        if (subscribers.length) {
-          const { error } = await supabase.from('generator_subscribers').upsert(subscribers.map(s => subscriberToRow(generatorId, s)), { onConflict: 'generator_id,id' });
-          if (error) throw error;
-        }
-        await replaceMissingRows('generator_subscribers', generatorId, subscribers.map(s => s.id));
-
-        if (lines.length) {
-          const { error } = await supabase.from('generator_lines').upsert(lines.map(l => lineToRow(generatorId, l)), { onConflict: 'generator_id,id' });
-          if (error) throw error;
-        }
-        await replaceMissingRows('generator_lines', generatorId, lines.map(l => l.id));
-
-        if (tariffs.length) {
-          const { error } = await supabase.from('generator_monthly_tariffs').upsert(tariffs.map(t => tariffToRow(generatorId, t)), { onConflict: 'generator_id,id' });
-          if (error) throw error;
-        }
-        await replaceMissingRows('generator_monthly_tariffs', generatorId, tariffs.map(t => t.id));
-
-        if (specs || invoice || invoiceCustom) {
-          const { error } = await supabase.from('generator_settings').upsert({
-            generator_id: generatorId,
-            specs: specs || {},
-            invoice_settings: { template: invoice || {}, custom: invoiceCustom || {} },
-            updated_at: new Date().toISOString(),
-          }, { onConflict: 'generator_id' });
-          if (error) throw error;
-        }
-
-        if (audit.length) {
-          const rows = audit.map(a => ({
-            id: a.id, generator_id: generatorId, timestamp: a.timestamp, category: a.category,
-            title: a.title, details: a.details, entity_id: a.entityId || null, entity_name: a.entityName || null,
-            actor_name: a.actorName, previous_value: a.previousValue || null, new_value: a.newValue || null,
-            cancellation_reason: a.cancellationReason || null, amount: a.amount ?? null,
-          }));
-          const { error } = await supabase.from('generator_audit_logs').upsert(rows, { onConflict: 'generator_id,id' });
-          if (error) throw error;
-        }
-        lastSnapshot.current = snapshot();
-      } catch (e) {
-        console.error('Moldatk cloud sync push failed:', e);
-      } finally {
-        pushing.current = false;
-      }
-    };
-
     const onLocalChange = () => {
       if (!ready.current || refreshing.current) return;
       const next = snapshot();
@@ -277,6 +347,7 @@ export function useGeneratorCloudSync(session: ActiveUserSession | null) {
 
     const channel = supabase.channel(`generator-sync-${generatorId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'generator_subscribers', filter: `generator_id=eq.${generatorId}` }, () => void pull())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'generator_invoices', filter: `generator_id=eq.${generatorId}` }, () => void pull())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'generator_lines', filter: `generator_id=eq.${generatorId}` }, () => void pull())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'generator_monthly_tariffs', filter: `generator_id=eq.${generatorId}` }, () => void pull())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'generator_settings', filter: `generator_id=eq.${generatorId}` }, () => void pull())
