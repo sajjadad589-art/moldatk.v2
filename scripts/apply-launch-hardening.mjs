@@ -67,6 +67,13 @@ if (fs.existsSync(posFile)) {
     );
   }
 
+  if (!pos.includes("const cancellationTime = new Date().toISOString();")) {
+    pos = pos.replace(
+      /    if \(data\.method === 'unpaid'\) \{[\s\S]*?      setPaymentSubscriber\(null\);\n      return;\n    \}/,
+      `    if (data.method === 'unpaid') {\n      const cancellationTime = new Date().toISOString();\n      let cancelledOne = false;\n      const invoicesHistory = (sub.invoicesHistory || []).map(invoice => {\n        if (!cancelledOne && (invoice.status === 'paid' || invoice.status === 'partial' || invoice.status === 'free')) {\n          cancelledOne = true;\n          return {\n            ...invoice,\n            status: 'cancelled' as const,\n            cancellationReason: data.cancellationReason || 'إلغاء التسديد',\n            cancelledAt: cancellationTime,\n            cancelledBy: data.collectorName || collectorName || 'المحاسب',\n          };\n        }\n        return invoice;\n      });\n      const updated: Subscriber = {\n        ...sub,\n        paymentStatus: 'unpaid',\n        amountPaid: 0,\n        amountDue: totalAmount,\n        invoicesHistory,\n      };\n      onSaveSubscriber(updated);\n      onAddAuditLog({\n        category: 'cancellation',\n        title: 'إلغاء تسديد',\n        details: \`إرجاع المشترك "\${sub.fullName}" (\${sub.code || sub.subscriberCode}) إلى غير مسدد\`,\n        entityId: sub.id,\n        entityName: \`\${sub.fullName} (\${sub.code || sub.subscriberCode})\`,\n        actorName: data.collectorName || collectorName || 'المحاسب',\n        cancellationReason: data.cancellationReason || 'إلغاء التسديد',\n      });\n      setPaymentSubscriber(null);\n      return;\n    }`
+    );
+  }
+
   pos = pos.replace(
     "    if (data.autoPrintReceipt) {",
     "    if (data.autoPrintReceipt && permissions.canPrintReceipts) {"
