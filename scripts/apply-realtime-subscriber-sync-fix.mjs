@@ -1,22 +1,36 @@
 import fs from 'node:fs';
 
 const appPath = 'src/App.tsx';
-let app = fs.readFileSync(appPath, 'utf8');
+let source = fs.readFileSync(appPath, 'utf8');
+let changed = false;
 
-if (!app.includes("import { useGeneratorCloudSync } from './lib/useGeneratorCloudSync';")) {
-  app = app.replace(
-    "import { supabase } from './lib/supabase';",
-    "import { supabase } from './lib/supabase';\nimport { useGeneratorCloudSync } from './lib/useGeneratorCloudSync';"
-  );
+const syncImport = "import { useGeneratorCloudSync } from './lib/useGeneratorCloudSync';";
+if (!source.includes(syncImport)) {
+  const importMarker = "import { supabase } from './lib/supabase';";
+  if (!source.includes(importMarker)) throw new Error('Supabase import marker not found in src/App.tsx');
+  source = source.replace(importMarker, `${importMarker}\n${syncImport}`);
+  changed = true;
 }
 
-const hookAnchor = "export default function App({ forceSuperAdmin = false }: AppProps) {";
-if (app.includes(hookAnchor) && !app.includes('useGeneratorCloudSync(userSession);')) {
-  app = app.replace(
-    hookAnchor,
-    `${hookAnchor}\n  // تشغيل مزامنة Supabase المركزية لكل حساب مولدة/جابي.\n  // أي إضافة/تعديل/حذف محلي يتم دفعه للسحابة، وأي تغيير من جهاز آخر يتم سحبه فوراً.\n  useGeneratorCloudSync(userSession);`
+// Remove an older unsafe placement if a previous patch inserted the hook before userSession exists.
+source = source.replace(
+  /export default function App\(\{ forceSuperAdmin = false \}: AppProps\) \{\n\s*\/\/ تشغيل مزامنة Supabase المركزية[^\n]*\n\s*\/\/ أي إضافة\/تعديل\/حذف[^\n]*\n\s*useGeneratorCloudSync\(userSession\);/,
+  'export default function App({ forceSuperAdmin = false }: AppProps) {'
+);
+
+if (!source.includes('useGeneratorCloudSync(userSession);')) {
+  const hookMarker = "\n\n  const getStorageKey = (baseKey: string, session: ActiveUserSession | null = userSession) => {";
+  if (!source.includes(hookMarker)) throw new Error('Safe sync hook marker not found in src/App.tsx');
+  source = source.replace(
+    hookMarker,
+    `\n\n  // مزامنة مركزية: أي إضافة/تعديل/حذف للمشتركين تنتقل بين كل الأجهزة التابعة لنفس المولدة.\n  useGeneratorCloudSync(userSession);${hookMarker}`
   );
+  changed = true;
 }
 
-fs.writeFileSync(appPath, app);
-console.log('Realtime subscriber sync hook connected to App.tsx');
+if (changed) {
+  fs.writeFileSync(appPath, source);
+  console.log('Applied safe realtime subscriber/cloud sync hook to src/App.tsx');
+} else {
+  console.log('Realtime subscriber/cloud sync hook already applied');
+}
