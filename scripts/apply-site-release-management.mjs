@@ -34,6 +34,36 @@ if (!app.includes('useGeneratorCloudSync(userSession);')) {
   const anchor = "  const settingsFolders: SettingsFolderItem[] = INITIAL_SETTINGS_FOLDERS;";
   app = app.replace(anchor, `${anchor}\n\n  // مزامنة فورية بين نسخة الويب وتطبيق Android لنفس حساب المولدة.\n  useGeneratorCloudSync(userSession);`);
 }
+
+// الجابي يتبع حالة اشتراك وحالة حساب المولدة نفسها؛ لا يبقى الـPOS فعالاً بعد الإيقاف أو الانتهاء.
+app = app.replace(
+  "userSession.role === 'generator_admin'\n          ? supabase.from('subscriptions').select('starts_at,ends_at,status').eq('generator_id', userSession.generatorId).order('ends_at', { ascending: false }).limit(1).maybeSingle()\n          : Promise.resolve({ error: null, data: null } as any),",
+  "supabase.from('subscriptions').select('starts_at,ends_at,status').eq('generator_id', userSession.generatorId).order('ends_at', { ascending: false }).limit(1).maybeSingle(),"
+);
+app = app.replace(
+  "if (!g.error && g.data && (userSession.role === 'collector' || (!sub.error && sub.data))) {",
+  "if (!g.error && g.data && !sub.error && sub.data) {"
+);
+app = app.replace(
+  "if (userSession.role === 'generator_admin' && sub.data) {",
+  "if (sub.data) {"
+);
+app = app.replace(
+  "} else {\n            setSubscriptionInfo(null);\n          }\n\n          setGeneratorSpecs(prev => {",
+  "}\n\n          setGeneratorSpecs(prev => {"
+);
+app = app.replace(
+  "if (userSession.role === 'generator_admin' && !subscriptionLoading && subscriptionInfo?.accountStatus === 'suspended') {",
+  "if ((userSession.role === 'generator_admin' || userSession.role === 'collector') && !subscriptionLoading && subscriptionInfo?.accountStatus === 'suspended') {"
+);
+app = app.replace(
+  "if (userSession.role === 'generator_admin' && !subscriptionLoading && (!subscriptionInfo || subscriptionInfo.subscriptionStatus !== 'active' || daysUntilExpiry(subscriptionInfo.endsAt) <= 0)) {",
+  "if ((userSession.role === 'generator_admin' || userSession.role === 'collector') && !subscriptionLoading && (!subscriptionInfo || subscriptionInfo.subscriptionStatus !== 'active' || daysUntilExpiry(subscriptionInfo.endsAt) <= 0)) {"
+);
+app = app.replace(
+  "setSubscriptionLoading(userSession.role === 'generator_admin');",
+  "setSubscriptionLoading(true);"
+);
 fs.writeFileSync(appFile, app);
 
 // إصلاح زر التسديد في واجهة الهاتف: كان مرتبطاً بهاندلر فارغ من App.
@@ -83,4 +113,4 @@ if (landing.includes(releaseWhatsapp) && !landing.includes('activeRelease?.apk_u
 landing = landing.replace(/<a href=\{whatsappUrl\} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1\.5 text-emerald-400 hover:text-emerald-300 font-bold"><MessageCircle className="w-4 h-4" \/> 07766334555<\/a>/, '<a href={whatsappUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 font-bold"><MessageCircle className="w-4 h-4" /> {siteSettings.whatsapp_phone}</a>');
 fs.writeFileSync(landingFile, landing);
 
-console.log('Website/release management, cloud sync, mobile payment fixes, and Android stability guards applied');
+console.log('Website/release management, cloud sync, subscription enforcement, mobile payment fixes, and Android stability guards applied');
