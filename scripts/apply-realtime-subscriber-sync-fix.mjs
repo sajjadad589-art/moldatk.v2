@@ -17,7 +17,6 @@ if (!source.includes(syncImport) || !source.includes(persistImport)) {
   changed = true;
 }
 
-// Remove an older unsafe placement if a previous patch inserted the hook before userSession exists.
 source = source.replace(
   /export default function App\(\{ forceSuperAdmin = false \}: AppProps\) \{\n\s*\/\/ تشغيل مزامنة Supabase المركزية[^\n]*\n\s*\/\/ أي إضافة\/تعديل\/حذف[^\n]*\n\s*useGeneratorCloudSync\(userSession\);/,
   'export default function App({ forceSuperAdmin = false }: AppProps) {'
@@ -35,12 +34,44 @@ if (!source.includes('useGeneratorCloudSync(userSession);')) {
 
 const oldSave = `  const handleSaveSubscriber = (newSub: Subscriber) => {\n    setSubscribers(prev => {\n      const exists = prev.some(s => s.id === newSub.id);\n      const normalizedSub: Subscriber = {\n        ...newSub,\n        code: newSub.code || newSub.subscriberCode || generateUniqueSubscriberCode(prev),\n        subscriberCode: newSub.subscriberCode || newSub.code || generateUniqueSubscriberCode(prev),\n        line: newSub.line || newSub.lineName,\n        lineName: newSub.lineName || newSub.line,\n      };\n      const updated = exists ? prev.map(s => (s.id === normalizedSub.id ? normalizedSub : s)) : [normalizedSub, ...prev];\n      try {\n        localStorage.setItem(getStorageKey('moldatk_subscribers'), JSON.stringify(updated));\n        window.dispatchEvent(new Event('moldatk-local-sync'));\n      } catch (e) {}\n      return updated;\n    });\n    setSubscriberToEdit(newSub);\n    showToast('تم حفظ بيانات المشترك بنجاح');\n  };`;
 
-const newSave = `  const handleSaveSubscriber = async (newSub: Subscriber) => {\n    const normalizedSub: Subscriber = {\n      ...newSub,\n      code: newSub.code || newSub.subscriberCode || generateUniqueSubscriberCode(subscribers),\n      subscriberCode: newSub.subscriberCode || newSub.code || generateUniqueSubscriberCode(subscribers),\n      line: newSub.line || newSub.lineName,\n      lineName: newSub.lineName || newSub.line,\n    };\n\n    // للحسابات المرتبطة بمولدة، Supabase هو المصدر الرئيسي للحفظ.\n    // لا نعرض نجاحاً للمستخدم إلا بعد تأكيد قاعدة البيانات للحفظ.\n    if ((userSession?.role === 'generator_admin' || userSession?.role === 'collector') && userSession.generatorId) {\n      try {\n        await persistCollectorSubscriber(userSession.generatorId, normalizedSub);\n      } catch (error: any) {\n        console.error('Subscriber cloud save failed:', error);\n        showToast(error?.message ? `تعذر حفظ المشترك: ${error.message}` : 'تعذر حفظ المشترك على الخادم');\n        return;\n      }\n    }\n\n    setSubscribers(prev => {\n      const exists = prev.some(s => s.id === normalizedSub.id);\n      const updated = exists ? prev.map(s => (s.id === normalizedSub.id ? normalizedSub : s)) : [normalizedSub, ...prev];\n      try {\n        localStorage.setItem(getStorageKey('moldatk_subscribers'), JSON.stringify(updated));\n        window.dispatchEvent(new Event('moldatk-local-sync'));\n      } catch (e) {}\n      return updated;\n    });\n    setSubscriberToEdit(normalizedSub);\n    showToast('تم حفظ بيانات المشترك ومزامنتها بنجاح');\n  };`;
+const newSave = [
+  '  const handleSaveSubscriber = async (newSub: Subscriber) => {',
+  '    const normalizedSub: Subscriber = {',
+  '      ...newSub,',
+  '      code: newSub.code || newSub.subscriberCode || generateUniqueSubscriberCode(subscribers),',
+  '      subscriberCode: newSub.subscriberCode || newSub.code || generateUniqueSubscriberCode(subscribers),',
+  '      line: newSub.line || newSub.lineName,',
+  '      lineName: newSub.lineName || newSub.line,',
+  '    };',
+  '',
+  '    if ((userSession?.role === \'generator_admin\' || userSession?.role === \'collector\') && userSession.generatorId) {',
+  '      try {',
+  '        await persistCollectorSubscriber(userSession.generatorId, normalizedSub);',
+  '      } catch (error: any) {',
+  "        console.error('Subscriber cloud save failed:', error);",
+  "        showToast(error?.message ? 'تعذر حفظ المشترك: ' + error.message : 'تعذر حفظ المشترك على الخادم');",
+  '        return;',
+  '      }',
+  '    }',
+  '',
+  '    setSubscribers(prev => {',
+  '      const exists = prev.some(s => s.id === normalizedSub.id);',
+  '      const updated = exists ? prev.map(s => (s.id === normalizedSub.id ? normalizedSub : s)) : [normalizedSub, ...prev];',
+  '      try {',
+  "        localStorage.setItem(getStorageKey('moldatk_subscribers'), JSON.stringify(updated));",
+  "        window.dispatchEvent(new Event('moldatk-local-sync'));",
+  '      } catch (e) {}',
+  '      return updated;',
+  '    });',
+  '    setSubscriberToEdit(normalizedSub);',
+  "    showToast('تم حفظ بيانات المشترك ومزامنتها بنجاح');",
+  '  };',
+].join('\n');
 
 if (source.includes(oldSave)) {
   source = source.replace(oldSave, newSave);
   changed = true;
-} else if (!source.includes("const handleSaveSubscriber = async (newSub: Subscriber)")) {
+} else if (!source.includes('const handleSaveSubscriber = async (newSub: Subscriber)')) {
   throw new Error('Subscriber save handler marker not found in src/App.tsx');
 }
 
