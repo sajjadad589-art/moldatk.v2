@@ -7,51 +7,91 @@ type SyncDetail = {
   pending?: boolean;
 };
 
+type StatusState = {
+  online: boolean;
+  syncing: boolean;
+  progress: number;
+  pending: boolean;
+};
+
 export const SyncProgressIndicator: React.FC = () => {
-  const [state, setState] = useState({ active: false, progress: 0, message: '', pending: false });
+  const [state, setState] = useState<StatusState>(() => ({
+    online: typeof navigator !== 'undefined' ? navigator.onLine : true,
+    syncing: false,
+    progress: 0,
+    pending: false,
+  }));
 
   useEffect(() => {
-    let hideTimer: number | undefined;
+    let settleTimer: number | undefined;
+
+    const markOnline = () => {
+      setState(current => ({ ...current, online: true, pending: false }));
+    };
+
+    const markOffline = () => {
+      if (settleTimer) window.clearTimeout(settleTimer);
+      setState({ online: false, syncing: false, progress: 0, pending: true });
+    };
+
     const onSync = (event: Event) => {
       const detail = (event as CustomEvent<SyncDetail>).detail || {};
-      if (hideTimer) window.clearTimeout(hideTimer);
+      if (settleTimer) window.clearTimeout(settleTimer);
+
+      const online = typeof navigator !== 'undefined' ? navigator.onLine : true;
       const progress = Math.max(0, Math.min(100, Number(detail.progress || 0)));
-      setState({
-        active: Boolean(detail.active),
-        progress,
-        message: detail.message || (detail.pending ? 'بانتظار الاتصال للمزامنة' : 'جاري المزامنة'),
-        pending: Boolean(detail.pending),
-      });
-      if (!detail.active && !detail.pending && progress >= 100) {
-        hideTimer = window.setTimeout(() => setState(s => ({ ...s, active: false, message: '' })), 1400);
+      const syncing = Boolean(detail.active) || (online && progress > 0 && progress < 100);
+      const pending = Boolean(detail.pending) || !online;
+
+      setState({ online, syncing, progress, pending });
+
+      if (online && !pending && progress >= 100) {
+        settleTimer = window.setTimeout(() => {
+          setState({ online: true, syncing: false, progress: 0, pending: false });
+        }, 900);
       }
     };
+
+    window.addEventListener('online', markOnline);
+    window.addEventListener('offline', markOffline);
     window.addEventListener('moldatk-sync-progress', onSync as EventListener);
+
     return () => {
+      window.removeEventListener('online', markOnline);
+      window.removeEventListener('offline', markOffline);
       window.removeEventListener('moldatk-sync-progress', onSync as EventListener);
-      if (hideTimer) window.clearTimeout(hideTimer);
+      if (settleTimer) window.clearTimeout(settleTimer);
     };
   }, []);
 
-  if (!state.active && !state.pending && !state.message) return null;
+  const completed = state.online && !state.pending && state.progress >= 100;
+  const label = !state.online || state.pending
+    ? 'غير متصل بالإنترنت'
+    : state.syncing || completed
+      ? `جاري المزامنة ${Math.max(1, state.progress)}%`
+      : 'متصل بالإنترنت';
+
+  const tone = !state.online || state.pending
+    ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-950/80 dark:text-red-300'
+    : state.syncing || completed
+      ? 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/50 dark:bg-blue-950/80 dark:text-blue-300'
+      : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/80 dark:text-emerald-300';
+
+  const dotTone = !state.online || state.pending
+    ? 'bg-red-500'
+    : state.syncing || completed
+      ? 'bg-blue-500 animate-pulse'
+      : 'bg-emerald-500';
 
   return (
     <div
       dir="rtl"
-      className="fixed z-[160] left-1/2 -translate-x-1/2 bottom-3 w-[min(92vw,360px)] rounded-xl border border-slate-200 bg-white/95 dark:bg-slate-950/95 dark:border-slate-700 shadow-lg px-3 py-2 backdrop-blur"
+      className={`fixed z-[160] left-3 bottom-3 max-w-[calc(100vw-24px)] rounded-full border px-2.5 py-1.5 shadow-sm backdrop-blur text-[10px] sm:text-[11px] font-black flex items-center gap-1.5 ${tone}`}
       style={{ pointerEvents: 'none' }}
       aria-live="polite"
     >
-      <div className="flex items-center justify-between gap-3 text-[11px] font-black text-slate-700 dark:text-slate-200 mb-1.5">
-        <span className="truncate">{state.message || 'جاري المزامنة'}</span>
-        <span>{state.pending ? '—' : `${state.progress}%`}</span>
-      </div>
-      <div className="h-1.5 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800">
-        <div
-          className="h-full bg-blue-600 transition-[width] duration-300"
-          style={{ width: `${state.pending ? 18 : state.progress}%` }}
-        />
-      </div>
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotTone}`} />
+      <span className="whitespace-nowrap">{label}</span>
     </div>
   );
 };
