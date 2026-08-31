@@ -4,10 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node scripts/apply-site-release-management.mjs && vite --port=3000 --host=0.0.0.0",
-    "build": "node scripts/apply-site-release-management.mjs && vite build",
+    "dev": "node scripts/apply-site-release-management.mjs && node scripts/apply-launch-hardening.mjs && vite --port=3000 --host=0.0.0.0",
+    "build": "node scripts/apply-site-release-management.mjs && node scripts/apply-launch-hardening.mjs && vite build",
     "preview": "vite preview",
-    "lint": "node scripts/apply-site-release-management.mjs && tsc --noEmit"
+    "lint": "node scripts/apply-site-release-management.mjs && node scripts/apply-launch-hardening.mjs && tsc --noEmit"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",
@@ -24,6 +24,7 @@
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "recharts": "^3.10.1",
+    "vite": "^6.2.3",
     "@supabase/supabase-js": "2.112.4",
     "@capacitor/push-notifications": "^8.0.0",
     "xlsx": "^0.18.5"
