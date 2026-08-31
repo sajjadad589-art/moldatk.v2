@@ -24,8 +24,8 @@ jobs:
     env:
       VITE_SUPABASE_URL: https://adluynhkikoodjljoxeu.supabase.co
       VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CObjK2Uua18kVkXCkxdRog_keQLIDiE
-      CURRENT_VERSION: 1.3.0
-      CURRENT_VERSION_CODE: 4
+      CURRENT_VERSION: 1.3.1
+      CURRENT_VERSION_CODE: 5
 
     steps:
       - name: Checkout
@@ -149,10 +149,10 @@ jobs:
             enabled: true,
             versionCode,
             versionName: version,
-            minimumVersionCode: 3,
+            minimumVersionCode: 4,
             force: false,
             apkUrl: `https://github.com/sajjadad589-art/moldatk.v2/releases/download/v${version}/Moldatk-Android.apk`,
-            notes: 'تحسين مزامنة المشتركين بين الحاسبة وأجهزة SUNMI وتفعيل نظام التحديث الداخلي.'
+            notes: 'تصحيح حالة انتهاء الاشتراك، تحسين زر الرجوع في Android، تحسين مزامنة المشتركين، ورفع وضوح وسماكة طباعة إيصال 58 مم.'
           };
           fs.writeFileSync('public/app-version.json', JSON.stringify(manifest, null, 2) + '\n');
           NODE
