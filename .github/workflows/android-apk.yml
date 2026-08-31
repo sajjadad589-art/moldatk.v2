@@ -9,6 +9,7 @@ on:
       - 'public/**'
       - 'android/**'
       - 'capacitor.config.ts'
+      - 'tsconfig.json'
       - 'package.json'
       - '.github/workflows/android-apk.yml'
       - 'scripts/**'
