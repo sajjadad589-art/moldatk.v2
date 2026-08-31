@@ -50,16 +50,20 @@ const newSave = [
   '      lineName: matchedLine?.name || newSub.lineName || newSub.line,',
   '    };',
   '',
-  '    if ((userSession?.role === \'generator_admin\' || userSession?.role === \'collector\') && userSession.generatorId) {',
+  "    const shouldSyncCloud = (userSession?.role === 'generator_admin' || userSession?.role === 'collector') && Boolean(userSession.generatorId);",
+  "    const onlineNow = typeof navigator === 'undefined' ? true : navigator.onLine;",
+  '    let cloudSynced = false;',
+  '',
+  '    if (shouldSyncCloud && onlineNow && userSession?.generatorId) {',
   '      try {',
   '        await persistCollectorSubscriber(userSession.generatorId, normalizedSub);',
+  '        cloudSynced = true;',
   '      } catch (error: any) {',
-  "        console.error('Subscriber cloud save failed:', error);",
-  "        showToast(error?.message ? 'تعذر حفظ المشترك: ' + error.message : 'تعذر حفظ المشترك على الخادم');",
-  '        return;',
+  "        console.error('Subscriber cloud save deferred:', error);",
   '      }',
   '    }',
   '',
+  '    // مهم: الحفظ المحلي يتم دائماً. إذا كان الجهاز أوفلاين تبقى العملية بانتظار محرك المزامنة.',
   '    setSubscribers(prev => {',
   '      const exists = prev.some(s => s.id === normalizedSub.id);',
   '      const updated = exists ? prev.map(s => (s.id === normalizedSub.id ? normalizedSub : s)) : [normalizedSub, ...prev];',
@@ -70,7 +74,15 @@ const newSave = [
   '      return updated;',
   '    });',
   '    setSubscriberToEdit(normalizedSub);',
-  "    showToast('تم حفظ بيانات المشترك ومزامنتها بنجاح');",
+  '',
+  '    if (shouldSyncCloud && !cloudSynced) {',
+  '      try {',
+  "        window.dispatchEvent(new CustomEvent('moldatk-sync-progress', { detail: { active: false, progress: 0, pending: true, message: 'محفوظ محلياً — بانتظار المزامنة' } }));",
+  '      } catch (e) {}',
+  "      showToast(onlineNow ? 'تم الحفظ محلياً وستتم إعادة المزامنة تلقائياً' : 'تم الحفظ بدون إنترنت وسيتم رفعه عند رجوع الاتصال');",
+  '    } else {',
+  "      showToast('تم حفظ بيانات المشترك ومزامنتها بنجاح');",
+  '    }',
   '  };',
 ].join('\n');
 
@@ -90,7 +102,7 @@ if (source.includes(oldSave)) {
 
 if (changed) {
   fs.writeFileSync(appPath, source);
-  console.log('Applied realtime sync, cloud-first save, tier normalization, and line-id mapping to src/App.tsx');
+  console.log('Applied realtime sync with offline-first subscriber/payment persistence');
 } else {
   console.log('Realtime subscriber/cloud sync already applied');
 }
