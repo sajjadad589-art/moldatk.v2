@@ -42,8 +42,6 @@ const patch = (c, from, to, label, optional = false) => {
   c = c.replaceAll('grid grid-cols-4 gap-5', 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-5');
   c = c.replaceAll('grid grid-cols-3 gap-5', 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-5');
   c = c.replaceAll('grid grid-cols-[420px_1fr] gap-5', 'grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-5');
-  // Keep JSX balanced: make tables horizontally scrollable through their own width
-  // without injecting wrapper <div> tags that require matching closers in many layouts.
   c = c.replaceAll('<table className="w-full text-sm">', '<table className="w-full min-w-[760px] text-sm">');
   save(p, c);
 }
@@ -159,10 +157,15 @@ const patch = (c, from, to, label, optional = false) => {
     "        const audit = readLocal<AuditLogEntry[]>(localKeys.audit, []);\n        const invoices = subscribers.flatMap(s => s.invoicesHistory || []);",
     "        const audit = readLocal<AuditLogEntry[]>(localKeys.audit, []);\n        const deletedSubscribers = readLocal<string[]>(localKeys.deletedSubscribers, []);\n        const invoices = subscribers.flatMap(s => s.invoicesHistory || []);\n\n        if (deletedSubscribers.length) {\n          const { error: invoiceDeleteError } = await supabase.from('generator_invoices').delete().eq('generator_id', generatorId).in('subscriber_id', deletedSubscribers);\n          if (invoiceDeleteError) throw invoiceDeleteError;\n          const { error: subscriberDeleteError } = await supabase.from('generator_subscribers').delete().eq('generator_id', generatorId).in('id', deletedSubscribers);\n          if (subscriberDeleteError) throw subscriberDeleteError;\n          writeLocal(localKeys.deletedSubscribers, []);\n        }",
     'sync process subscriber tombstones', true);
-  c = patch(c,
-    "        const localAudit = readLocal<AuditLogEntry[]>(localKeys.audit, []);",
-    "        const localAudit = readLocal<AuditLogEntry[]>(localKeys.audit, []);\n        const deletedSubscribers = new Set(readLocal<string[]>(localKeys.deletedSubscribers, []));",
-    'sync pull tombstone set', true);
+  const tombstoneDecl = "        const deletedSubscribers = new Set(readLocal<string[]>(localKeys.deletedSubscribers, []));";
+  if (!c.includes(tombstoneDecl)) {
+    c = patch(c,
+      "        const localAudit = readLocal<AuditLogEntry[]>(localKeys.audit, []);",
+      "        const localAudit = readLocal<AuditLogEntry[]>(localKeys.audit, []);\n" + tombstoneDecl,
+      'sync pull tombstone set', true);
+  } else {
+    console.log('skip sync pull tombstone set');
+  }
   c = patch(c,
     "        const subscribers = (subsData || []).map((row: any) => {",
     "        const subscribers = (subsData || []).filter((row: any) => !deletedSubscribers.has(row.id)).map((row: any) => {",
