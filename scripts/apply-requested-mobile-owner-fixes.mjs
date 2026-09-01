@@ -42,8 +42,9 @@ const patch = (c, from, to, label, optional = false) => {
   c = c.replaceAll('grid grid-cols-4 gap-5', 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-5');
   c = c.replaceAll('grid grid-cols-3 gap-5', 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-5');
   c = c.replaceAll('grid grid-cols-[420px_1fr] gap-5', 'grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-5');
-  c = c.replaceAll('<table className="w-full text-sm">', '<div className="overflow-x-auto"><table className="w-full min-w-[760px] text-sm">');
-  c = c.replaceAll('</tbody></table>}', '</tbody></table></div>}');
+  // Keep JSX balanced: make tables horizontally scrollable through their own width
+  // without injecting wrapper <div> tags that require matching closers in many layouts.
+  c = c.replaceAll('<table className="w-full text-sm">', '<table className="w-full min-w-[760px] text-sm">');
   save(p, c);
 }
 
@@ -160,37 +161,23 @@ const patch = (c, from, to, label, optional = false) => {
     'sync process subscriber tombstones', true);
   c = patch(c,
     "        const localAudit = readLocal<AuditLogEntry[]>(localKeys.audit, []);",
-    "        const localAudit = readLocal<AuditLogEntry[]>(localKeys.audit, []);\n        const deletedSubscriberIds = new Set(readLocal<string[]>(localKeys.deletedSubscribers, []));",
-    'sync read tombstones on pull', true);
+    "        const localAudit = readLocal<AuditLogEntry[]>(localKeys.audit, []);\n        const deletedSubscribers = new Set(readLocal<string[]>(localKeys.deletedSubscribers, []));",
+    'sync pull tombstone set', true);
   c = patch(c,
-    "        for (const row of invoices.data || []) {\n          const item = rowToInvoice(row);",
-    "        for (const row of invoices.data || []) {\n          if (deletedSubscriberIds.has(row.subscriber_id)) continue;\n          const item = rowToInvoice(row);",
-    'sync filter deleted invoices', true);
-  c = patch(c,
-    "        writeLocal(localKeys.subscribers, (subs.data || []).map((row: any) => {",
-    "        writeLocal(localKeys.subscribers, (subs.data || []).filter((row: any) => !deletedSubscriberIds.has(row.id)).map((row: any) => {",
+    "        const subscribers = (subsData || []).map((row: any) => {",
+    "        const subscribers = (subsData || []).filter((row: any) => !deletedSubscribers.has(row.id)).map((row: any) => {",
     'sync filter deleted subscribers', true);
   save(p, c);
 }
 
-// App: centralize subscriber deletion tombstone and feed mobile wallet data.
+// App-level deletion: record the tombstone before removing locally.
 {
   const p = 'src/App.tsx';
   let c = load(p);
-  if (!c.includes('const handleDeleteSubscriber = (subId: string) =>')) {
-    const marker = "  const handleSaveSubscriber = (newSub: Subscriber) => {";
-    const helper = `  const handleDeleteSubscriber = (subId: string) => {\n    setSubscribers(prev => {\n      const updated = prev.filter(s => s.id !== subId);\n      try {\n        localStorage.setItem(getStorageKey('moldatk_subscribers'), JSON.stringify(updated));\n        const tombstoneKey = getStorageKey('moldatk_deleted_subscribers');\n        const previousDeleted = JSON.parse(localStorage.getItem(tombstoneKey) || '[]') as string[];\n        if (!previousDeleted.includes(subId)) localStorage.setItem(tombstoneKey, JSON.stringify([...previousDeleted, subId]));\n        window.dispatchEvent(new Event('moldatk-local-sync'));\n      } catch (e) {}\n      return updated;\n    });\n    setIsSubscriberModalOpen(false);\n    setSubscriberToEdit(null);\n    showToast('تم حذف المشترك بنجاح');\n  };\n\n`;
-    c = c.replace(marker, helper + marker);
-  }
-  // Replace inline deletion implementations in mobile/desktop with the centralized tombstone handler.
-  c = c.replace(/onDeleteSubscriber=\{subId => \{[\s\S]*?showToast\('تم حذف المشترك بنجاح'\);\n          \}\}/g, 'onDeleteSubscriber={handleDeleteSubscriber}');
-  c = c.replace(/onDeleteSubscriber=\{isAdmin \? \(subId\) => \{[\s\S]*?showToast\('تم حذف المشترك بنجاح'\);\n              \} : undefined\}/g, 'onDeleteSubscriber={isAdmin ? handleDeleteSubscriber : undefined}');
-  c = c.replace(/onDeleteSubscriber=\{\(subId\) => \{[\s\S]*?setIsSubscriberModalOpen\(false\);\n          \}\}/g, 'onDeleteSubscriber={handleDeleteSubscriber}');
-  c = patch(c,
-    '          subscriptionInfo={subscriptionInfo}\n          subscriptionLoading={subscriptionLoading}\n        />',
-    '          subscriptionInfo={subscriptionInfo}\n          subscriptionLoading={subscriptionLoading}\n          collectors={collectors}\n          auditLogs={auditLogs}\n          walletResetTimestamp={walletResetTimestamp}\n          onClearWalletLogs={() => {\n            const resetAt = new Date().toISOString();\n            setWalletResetTimestamp(resetAt);\n            try { localStorage.setItem(getStorageKey(\'moldatk_wallet_reset_timestamp\'), resetAt); } catch (e) {}\n            showToast(\'تم تصفير القاصة بنجاح\');\n          }}\n        />',
-    'mobile layout wallet wiring', true);
+  const old = `  const handleDeleteSubscriber = (id: string) => {\n    setSubscribers(prev => prev.filter(s => s.id !== id));\n  };`;
+  const fresh = `  const handleDeleteSubscriber = (id: string) => {\n    if (userSession?.generatorId) {\n      const key = \`moldatk_deleted_subscribers:\${userSession.generatorId}\`;\n      try {\n        const current = JSON.parse(localStorage.getItem(key) || '[]') as string[];\n        if (!current.includes(id)) localStorage.setItem(key, JSON.stringify([...current, id]));\n      } catch {\n        localStorage.setItem(key, JSON.stringify([id]));\n      }\n    }\n    setSubscribers(prev => prev.filter(s => s.id !== id));\n  };`;
+  c = patch(c, old, fresh, 'subscriber deletion tombstone', true);
   save(p, c);
 }
 
-console.log('Requested mobile owner fixes staged successfully.');
+console.log('Requested mobile/owner fixes applied.');
