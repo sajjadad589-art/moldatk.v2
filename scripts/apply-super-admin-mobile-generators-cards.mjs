@@ -2,10 +2,10 @@ import fs from 'node:fs';
 
 const file = 'src/components/SuperAdminDashboard.tsx';
 let source = fs.readFileSync(file, 'utf8');
-const marker = 'super-admin-mobile-generator-cards-v2';
+const marker = 'super-admin-mobile-generator-cards-v3';
 
 if (source.includes(marker)) {
-  console.log('Super Admin mobile generator cards v2 already applied');
+  console.log('Super Admin mobile generator cards v3 already applied');
   process.exit(0);
 }
 
@@ -15,17 +15,22 @@ if (tabStart < 0 || financeStart < 0) throw new Error('Could not locate generato
 
 let section = source.slice(tabStart, financeStart);
 const tableStart = section.indexOf('<table');
-if (tableStart < 0) throw new Error('Could not locate generators table start');
-
 const tableClose = section.indexOf('</table>', tableStart);
-if (tableClose < 0) throw new Error('Could not locate generators table end');
+if (tableStart < 0 || tableClose < 0) throw new Error('Could not locate generators table');
 
 const tableOnly = section.slice(tableStart, tableClose + '</table>'.length);
+const beforeTable = section.slice(0, tableStart);
 const afterTable = section.slice(tableClose + '</table>'.length);
-const firstBrace = afterTable.indexOf('}');
-if (firstBrace < 0) throw new Error('Could not locate generators table ternary close');
 
-const mobileCards = `{/* ${marker} */}
+// The original table sits inside the final arm of a ternary:
+// loading ? ... : generators.length === 0 ? ... : <table>...</table>}
+// Remove only the single brace that closes that ternary expression, preserving all surrounding JSX.
+const ternaryClose = afterTable.match(/^\s*}/);
+if (!ternaryClose) throw new Error('Could not locate generators table ternary close');
+const remainder = afterTable.slice(ternaryClose[0].length);
+
+const mobileAndDesktop = `<>
+              {/* ${marker} */}
               <div className="md:hidden space-y-3 p-3 bg-slate-50">
                 {generators.map(g => {
                   const sub = latestSubscriptionFor(g.id);
@@ -58,9 +63,10 @@ const mobileCards = `{/* ${marker} */}
                   );
                 })}
               </div>
-              <div className="hidden md:block overflow-x-auto">${tableOnly}</div>}`;
+              <div className="hidden md:block overflow-x-auto">${tableOnly}</div>
+            </>}`;
 
-section = section.slice(0, tableStart) + mobileCards + afterTable.slice(firstBrace + 1);
+section = beforeTable + mobileAndDesktop + '}' + remainder;
 source = source.slice(0, tabStart) + section + source.slice(financeStart);
 fs.writeFileSync(file, source);
-console.log('Applied compact Super Admin mobile generator cards v2');
+console.log('Applied compact Super Admin mobile generator cards v3');
