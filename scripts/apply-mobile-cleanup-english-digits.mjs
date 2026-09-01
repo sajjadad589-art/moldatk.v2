@@ -72,4 +72,6 @@ if (fs.existsSync(mobileSubscribersFile)) {
   fs.writeFileSync(mobileSubscribersFile, text);
 }
 
-console.log('Mobile payment strip removed safely and English digits enforced');
+await import('./apply-mobile-subscriber-filter-row-cleanup.mjs');
+
+console.log('Mobile payment strip removed safely, mobile legend removed, filters enlarged, and English digits enforced');
