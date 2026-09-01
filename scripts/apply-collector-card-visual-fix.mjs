@@ -2,45 +2,23 @@ import fs from 'node:fs';
 
 const path = 'src/components/POSQuickView.tsx';
 let c = fs.readFileSync(path, 'utf8');
-let changed = false;
 
-const replacements = [
-  [
-    'className="text-sm font-black text-amber-400 tabular-nums" dir="ltr"',
-    'className="text-xl sm:text-2xl font-black text-white tabular-nums leading-none" dir="ltr"'
-  ],
-  [
-    'className="relative overflow-hidden flex items-center justify-between gap-2 p-3.5 sm:p-4 rounded-3xl',
-    'className="relative overflow-hidden grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 p-3.5 sm:p-4 rounded-3xl'
-  ],
-  [
-    'className="flex items-center gap-2 sm:gap-4 shrink-0"',
-    'className="contents"'
-  ],
-  [
-    '<span>{sub.amperes} أمبير</span>',
-    '<span className="font-black text-white">{sub.amperes} أمبير</span>'
-  ],
-];
-
-for (const [from, to] of replacements) {
-  if (c.includes(from)) {
-    c = c.replace(from, to);
-    changed = true;
-  }
+const marker = 'collector-approved-card-v2';
+if (c.includes(marker)) {
+  console.log('Collector approved mobile card design already applied');
+  process.exit(0);
 }
 
-if (!c.includes('collector-card-amount-label')) {
-  c = c.replace(
-    `{dueAmount.toLocaleString()} {generatorSpecs.currency || 'د.ع'}`,
-    `{dueAmount.toLocaleString()} <span className="collector-card-amount-label text-xs sm:text-sm font-bold text-slate-200">{generatorSpecs.currency || 'د.ع'}</span>`
-  );
-  changed = true;
-}
+const startNeedle = `                <div\n                  key={sub.id}\n                  onClick={() => setPaymentSubscriber(sub)}`;
+const start = c.indexOf(startNeedle);
+if (start === -1) throw new Error('Could not locate collector subscriber card start');
 
-if (changed) {
-  fs.writeFileSync(path, c);
-  console.log('Applied collector card visual fix');
-} else {
-  console.log('Collector card visual fix already applied');
-}
+const endNeedle = `                </div>\n              );`;
+const end = c.indexOf(endNeedle, start);
+if (end === -1) throw new Error('Could not locate collector subscriber card end');
+
+const approvedCard = `                <div\n                  key={sub.id}\n                  data-design="${marker}"\n                  onClick={() => setPaymentSubscriber(sub)}\n                  className="relative overflow-hidden rounded-[28px] border border-rose-400/45 bg-gradient-to-br from-[#b41529] via-[#8d1025] to-[#56081a] px-5 py-4 sm:px-6 sm:py-5 shadow-[0_12px_35px_rgba(90,8,26,0.35)] active:scale-[0.99] transition-transform cursor-pointer"\n                  role="button"\n                  tabIndex={0}\n                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setPaymentSubscriber(sub); }}\n                  aria-label={\`فتح تسديد المشترك \${sub.fullName}\`}\n                >\n                  <div className="grid grid-cols-[minmax(0,1.25fr)_0.75fr_0.9fr] items-center gap-4" dir="rtl">\n                    <div className="min-w-0 text-right">\n                      <div className="inline-flex max-w-full items-center gap-2 rounded-xl border border-blue-400/25 bg-[#12327a]/90 px-3 py-1.5 text-[11px] font-bold text-blue-100 shadow-sm">\n                        <span>كود :</span>\n                        <span className="font-mono text-sm tracking-wide" dir="ltr">{sub.subscriberCode || sub.code || 'MW-000'}</span>\n                      </div>\n                      <div className="mt-3 flex items-center gap-2 min-w-0">\n                        <MapPin className="h-5 w-5 shrink-0 text-blue-400" />\n                        <span className="truncate text-xl sm:text-2xl font-black text-white leading-tight">{sub.fullName}</span>\n                      </div>\n                    </div>\n\n                    <div className="text-center">\n                      <div className="flex items-center justify-center gap-1.5 text-2xl sm:text-3xl font-black text-white leading-none">\n                        <span>{sub.amperes}</span>\n                        <Zap className="h-6 w-6 fill-amber-400 text-amber-400" />\n                      </div>\n                      <span className="mt-2 block text-base sm:text-lg font-black text-white">أمبير</span>\n                    </div>\n\n                    <div className="text-left" dir="ltr">\n                      <span className="block text-2xl sm:text-3xl font-black leading-none text-white tabular-nums">{dueAmount.toLocaleString('en-US')}</span>\n                      <span className="mt-2 block text-base sm:text-lg font-black text-white">{generatorSpecs.currency || 'د.ع'}</span>\n                    </div>\n                  </div>\n                </div>\n              );`;
+
+c = c.slice(0, start) + approvedCard + c.slice(end + endNeedle.length);
+fs.writeFileSync(path, c);
+console.log('Applied approved collector mobile subscriber card design');
