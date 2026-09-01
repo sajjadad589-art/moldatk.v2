@@ -2,10 +2,10 @@ import fs from 'node:fs';
 
 const file = 'src/components/SuperAdminDashboard.tsx';
 let source = fs.readFileSync(file, 'utf8');
-const marker = 'super-admin-mobile-generator-cards-v4';
+const marker = 'super-admin-mobile-generator-cards-v5';
 
 if (source.includes(marker)) {
-  console.log('Super Admin mobile generator cards v4 already applied');
+  console.log('Super Admin mobile generator cards v5 already applied');
   process.exit(0);
 }
 
@@ -24,8 +24,8 @@ const tableOnly = section.slice(tableStart, tableClose + '</table>'.length);
 const beforeTable = section.slice(0, tableStart);
 const afterTable = section.slice(tableClose + '</table>'.length);
 
-const mobileCards = `{/* ${marker} */}
-              <>
+const mobileCards = `<>
+                {/* ${marker} */}
                 <div className="md:hidden space-y-3 p-3 bg-slate-50">
                   {generators.map(g => {
                     const sub = latestSubscriptionFor(g.id);
@@ -66,4 +66,4 @@ const mobileCards = `{/* ${marker} */}
 section = beforeTable + mobileCards + afterTable;
 source = source.slice(0, tabStart) + section + source.slice(financeStart);
 fs.writeFileSync(file, source);
-console.log('Applied compact Super Admin mobile generator cards v4');
+console.log('Applied compact Super Admin mobile generator cards v5');
