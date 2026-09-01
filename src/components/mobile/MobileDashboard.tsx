@@ -1,17 +1,10 @@
 import React from 'react';
 import {
-  Users,
   CheckCircle2,
   AlertCircle,
-  HeartHandshake,
   DollarSign,
   Zap,
-  Sliders,
   Plus,
-  ArrowRight,
-  TrendingUp,
-  Fuel,
-  Activity,
   ChevronLeft,
 } from 'lucide-react';
 import { Subscriber, SubscriptionTierPricing, GeneratorSpecs, LineDistribution } from '../../types';
@@ -38,24 +31,26 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
 }) => {
   const totalSubscribers = subscribers.length;
   const paidSubs = subscribers.filter(s => s.paymentStatus === 'paid');
-  const unpaidSubs = subscribers.filter(s => s.paymentStatus === 'unpaid');
-  const freeSubs = subscribers.filter(s => s.paymentStatus === 'free' || s.tier === 'free');
+  const unpaidSubs = subscribers.filter(s => s.paymentStatus === 'unpaid' || s.paymentStatus === 'partial');
 
   const totalCollectedRevenue = paidSubs.reduce(
-    (acc, s) => acc + (s.amountPaid || s.amountDue),
+    (acc, s) => acc + (Number(s.amountPaid) || 0),
     0
   );
-  const totalUnpaidDebt = unpaidSubs.reduce((acc, s) => acc + s.amountDue, 0);
-  const totalExpectedRevenue = totalCollectedRevenue + totalUnpaidDebt;
-  const collectionRate =
-    totalExpectedRevenue > 0
-      ? Math.round((totalCollectedRevenue / totalExpectedRevenue) * 100)
-      : 0;
+  const totalUnpaidDebt = unpaidSubs.reduce((acc, s) => {
+    const due = Number(s.amountDue) || 0;
+    const paid = Number(s.amountPaid) || 0;
+    return acc + Math.max(0, due - paid);
+  }, 0);
 
   const totalAmperesLoad = subscribers.reduce((acc, s) => acc + s.amperes, 0);
   const totalNormalAmps = subscribers.filter(s => s.tier === 'normal').reduce((acc, s) => acc + s.amperes, 0);
   const totalCommercialAmps = subscribers.filter(s => s.tier === 'commercial').reduce((acc, s) => acc + s.amperes, 0);
   const totalGoldenAmps = subscribers.filter(s => s.tier === 'golden').reduce((acc, s) => acc + s.amperes, 0);
+
+  const circleLength = 251.2;
+  const paidOffset = circleLength - (circleLength * Math.min(paidSubs.length, totalSubscribers)) / (totalSubscribers || 1);
+  const unpaidOffset = circleLength - (circleLength * Math.min(unpaidSubs.length, totalSubscribers)) / (totalSubscribers || 1);
 
   return (
     <div className="p-3.5 space-y-3.5 max-w-lg mx-auto">
@@ -78,102 +73,95 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
         </button>
       </div>
 
-      {/* 2. Primary Financial Collection Card */}
-      <div className="bg-gradient-to-br from-[#1E3A8A] to-indigo-950 text-white rounded-3xl p-4 sm:p-5 shadow-lg border border-blue-800/80 relative overflow-hidden">
-        <div className="relative z-10 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-blue-200">ملخص الإيرادات الشهرية</span>
-            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-white/10 text-emerald-300 border border-emerald-400/30">
-              نسبة التحصيل: {formatNumberArabic(collectionRate)}%
-            </span>
-          </div>
+      {/* 2. Paid / Unpaid collection wheels */}
+      <section className="space-y-2.5">
+        <div className="flex items-center justify-between px-1">
+          <h2 className="text-sm font-black text-slate-900 dark:text-white">حالة تسديد المشتركين</h2>
+          <span className="text-[10px] font-bold text-slate-400">إجمالي {formatNumberArabic(totalSubscribers)} مشترك</span>
+        </div>
 
-          <div className="flex items-baseline justify-between">
-            <div>
-              <span className="text-2xl font-black text-white tabular-nums tracking-tight">
+        <div className="grid grid-cols-2 gap-2.5">
+          <button
+            type="button"
+            onClick={() => onNavigateToTab('subscribers')}
+            className="min-w-0 rounded-3xl bg-white dark:bg-[#111c38] border border-emerald-200/80 dark:border-emerald-900/60 p-3.5 shadow-sm active:scale-[0.99] transition-transform"
+          >
+            <div className="flex items-center justify-center gap-1.5 mb-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              <span className="text-xs font-black text-slate-900 dark:text-white">المسددين</span>
+            </div>
+
+            <div className="relative w-28 h-28 mx-auto flex items-center justify-center">
+              <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100" aria-hidden="true">
+                <circle cx="50" cy="50" r="40" className="stroke-slate-100 dark:stroke-slate-800" strokeWidth="10" fill="transparent" />
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="40"
+                  className="stroke-emerald-500 transition-all duration-500"
+                  strokeWidth="10"
+                  strokeDasharray={circleLength}
+                  strokeDashoffset={paidOffset}
+                  strokeLinecap="round"
+                  fill="transparent"
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center" dir="ltr">
+                <span className="text-3xl font-black text-emerald-500 tabular-nums leading-none">{formatNumberArabic(paidSubs.length)}</span>
+                <span className="text-[10px] font-bold text-slate-400 mt-1">مشترك</span>
+              </div>
+            </div>
+
+            <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-center">
+              <span className="block text-[9px] font-bold text-slate-400 mb-0.5">المبلغ المستحصل</span>
+              <span className="block text-sm font-black text-emerald-500 tabular-nums truncate" dir="ltr">
                 {formatCurrency(totalCollectedRevenue)}
               </span>
-              <span className="text-xs text-blue-200 block mt-0.5">تم تحصيله من المسددين</span>
             </div>
-            <div className="text-left">
-              <span className="text-base font-bold text-rose-300 tabular-nums">
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavigateToTab('subscribers')}
+            className="min-w-0 rounded-3xl bg-white dark:bg-[#111c38] border border-rose-200/80 dark:border-rose-900/60 p-3.5 shadow-sm active:scale-[0.99] transition-transform"
+          >
+            <div className="flex items-center justify-center gap-1.5 mb-2">
+              <AlertCircle className="w-4 h-4 text-rose-500" />
+              <span className="text-xs font-black text-slate-900 dark:text-white">غير المسددين</span>
+            </div>
+
+            <div className="relative w-28 h-28 mx-auto flex items-center justify-center">
+              <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100" aria-hidden="true">
+                <circle cx="50" cy="50" r="40" className="stroke-slate-100 dark:stroke-slate-800" strokeWidth="10" fill="transparent" />
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="40"
+                  className="stroke-rose-500 transition-all duration-500"
+                  strokeWidth="10"
+                  strokeDasharray={circleLength}
+                  strokeDashoffset={unpaidOffset}
+                  strokeLinecap="round"
+                  fill="transparent"
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center" dir="ltr">
+                <span className="text-3xl font-black text-rose-500 tabular-nums leading-none">{formatNumberArabic(unpaidSubs.length)}</span>
+                <span className="text-[10px] font-bold text-slate-400 mt-1">مشترك</span>
+              </div>
+            </div>
+
+            <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-center">
+              <span className="block text-[9px] font-bold text-slate-400 mb-0.5">المبلغ غير المسدد</span>
+              <span className="block text-sm font-black text-rose-500 tabular-nums truncate" dir="ltr">
                 {formatCurrency(totalUnpaidDebt)}
               </span>
-              <span className="text-[11px] text-rose-200/80 block mt-0.5">ذمة غير مسددة</span>
             </div>
-          </div>
-
-          {/* Collection Progress Bar */}
-          <div className="space-y-1 pt-1">
-            <div className="w-full h-2.5 bg-black/30 rounded-full overflow-hidden flex">
-              <div
-                className="bg-emerald-400 h-full rounded-full transition-all duration-500"
-                style={{ width: `${collectionRate}%` }}
-              />
-            </div>
-            <div className="flex justify-between text-[10px] text-blue-300 font-medium">
-              <span>المجموع المتوقع: {formatCurrency(totalExpectedRevenue)}</span>
-              <span>{formatNumberArabic(paidSubs.length)} من {formatNumberArabic(totalSubscribers)} مشترك مسدد</span>
-            </div>
-          </div>
+          </button>
         </div>
-      </div>
+      </section>
 
-      {/* 3. Triple Status Bento Cards (Paid, Unpaid, Free) */}
-      <div className="grid grid-cols-3 gap-2">
-        {/* Paid Card */}
-        <div
-          onClick={() => onNavigateToTab('subscribers')}
-          className="p-3 rounded-2xl bg-white dark:bg-[#111c38] border border-slate-200/80 dark:border-slate-800 text-center cursor-pointer active:scale-98 transition-all shadow-xs"
-        >
-          <div className="w-7 h-7 mx-auto mb-1.5 rounded-xl bg-emerald-100 dark:bg-emerald-950/70 text-emerald-600 dark:text-emerald-300 flex items-center justify-center">
-            <CheckCircle2 className="w-4 h-4" />
-          </div>
-          <span className="text-[11px] text-slate-500 dark:text-slate-400 block font-semibold">المسددون</span>
-          <span className="text-base font-black text-emerald-600 dark:text-emerald-400 tabular-nums block mt-0.5">
-            {formatNumberArabic(paidSubs.length)}
-          </span>
-          <span className="text-[9px] text-slate-400 block truncate">
-            {formatCurrency(totalCollectedRevenue)}
-          </span>
-        </div>
-
-        {/* Unpaid Card */}
-        <div
-          onClick={() => onNavigateToTab('subscribers')}
-          className="p-3 rounded-2xl bg-white dark:bg-[#111c38] border border-slate-200/80 dark:border-slate-800 text-center cursor-pointer active:scale-98 transition-all shadow-xs"
-        >
-          <div className="w-7 h-7 mx-auto mb-1.5 rounded-xl bg-rose-100 dark:bg-rose-950/70 text-rose-600 dark:text-rose-300 flex items-center justify-center">
-            <AlertCircle className="w-4 h-4" />
-          </div>
-          <span className="text-[11px] text-slate-500 dark:text-slate-400 block font-semibold">غير المسددين</span>
-          <span className="text-base font-black text-rose-600 dark:text-rose-400 tabular-nums block mt-0.5">
-            {formatNumberArabic(unpaidSubs.length)}
-          </span>
-          <span className="text-[9px] text-slate-400 block truncate">
-            {formatCurrency(totalUnpaidDebt)}
-          </span>
-        </div>
-
-        {/* Free Card */}
-        <div
-          onClick={() => onNavigateToTab('subscribers')}
-          className="p-3 rounded-2xl bg-white dark:bg-[#111c38] border border-slate-200/80 dark:border-slate-800 text-center cursor-pointer active:scale-98 transition-all shadow-xs"
-        >
-          <div className="w-7 h-7 mx-auto mb-1.5 rounded-xl bg-purple-100 dark:bg-purple-950/70 text-purple-600 dark:text-purple-300 flex items-center justify-center">
-            <HeartHandshake className="w-4 h-4" />
-          </div>
-          <span className="text-[11px] text-slate-500 dark:text-slate-400 block font-semibold">إعفاء مجاني</span>
-          <span className="text-base font-black text-purple-600 dark:text-purple-400 tabular-nums block mt-0.5">
-            {formatNumberArabic(freeSubs.length)}
-          </span>
-          <span className="text-[9px] text-slate-400 block truncate">
-            إنساني ومساجد
-          </span>
-        </div>
-      </div>
-
-      {/* 4. Active Electrical Load Summary Card */}
+      {/* 3. Active Electrical Load Summary Card */}
       <div className="p-4 rounded-2xl bg-white dark:bg-[#111c38] border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -194,7 +182,6 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
           </div>
         </div>
 
-        {/* Breakdown by Tier */}
         <div className="grid grid-cols-3 gap-1.5 p-2 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 text-center">
           <div>
             <span className="text-[10px] text-slate-400 block">سكني عادي</span>
@@ -217,7 +204,7 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
         </div>
       </div>
 
-      {/* 5. Distribution Lines Quick Status */}
+      {/* 4. Distribution Lines Quick Status */}
       <div className="p-4 rounded-2xl bg-white dark:bg-[#111c38] border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-bold text-slate-900 dark:text-white">خطوط التوزيع والقواطع الرئيسية</h3>
