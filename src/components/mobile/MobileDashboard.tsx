@@ -3,8 +3,8 @@ import {
   CheckCircle2,
   AlertCircle,
   DollarSign,
-  Zap,
   Plus,
+  Wallet,
   ChevronLeft,
 } from 'lucide-react';
 import { Subscriber, SubscriptionTierPricing, GeneratorSpecs, LineDistribution } from '../../types';
@@ -18,6 +18,7 @@ interface MobileDashboardProps {
   onOpenPricingModal: () => void;
   onOpenNewSubscriberModal: () => void;
   onNavigateToTab: (tab: string) => void;
+  cashboxAmount?: number;
 }
 
 export const MobileDashboard: React.FC<MobileDashboardProps> = ({
@@ -28,6 +29,7 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
   onOpenPricingModal,
   onOpenNewSubscriberModal,
   onNavigateToTab,
+  cashboxAmount = 0,
 }) => {
   const totalSubscribers = subscribers.length;
   const paidSubs = subscribers.filter(s => s.paymentStatus === 'paid');
@@ -42,11 +44,6 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
     const paid = Number(s.amountPaid) || 0;
     return acc + Math.max(0, due - paid);
   }, 0);
-
-  const totalAmperesLoad = subscribers.reduce((acc, s) => acc + s.amperes, 0);
-  const totalNormalAmps = subscribers.filter(s => s.tier === 'normal').reduce((acc, s) => acc + s.amperes, 0);
-  const totalCommercialAmps = subscribers.filter(s => s.tier === 'commercial').reduce((acc, s) => acc + s.amperes, 0);
-  const totalGoldenAmps = subscribers.filter(s => s.tier === 'golden').reduce((acc, s) => acc + s.amperes, 0);
 
   const circleLength = 251.2;
   const paidOffset = circleLength - (circleLength * Math.min(paidSubs.length, totalSubscribers)) / (totalSubscribers || 1);
@@ -161,90 +158,34 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
         </div>
       </section>
 
-      {/* 3. Active Electrical Load Summary Card */}
-      <div className="p-4 rounded-2xl bg-white dark:bg-[#111c38] border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-500">
-              <Zap className="w-4 h-4" />
+      {/* 3. Cashbox */}
+      <button
+        type="button"
+        onClick={() => onNavigateToTab('wallet')}
+        className="w-full overflow-hidden rounded-3xl bg-gradient-to-r from-emerald-600 via-teal-700 to-slate-900 border border-emerald-500/40 p-4 text-right text-white shadow-lg active:scale-[0.99] transition-all"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center shrink-0">
+              <Wallet className="w-6 h-6 text-emerald-300" />
             </div>
-            <div>
-              <h3 className="text-xs font-bold text-slate-900 dark:text-white">الأحمال وتوزيع الأمبيرات</h3>
-              <span className="text-[10px] text-slate-400">إجمالي الطاقة المشترك بها</span>
+            <div className="min-w-0">
+              <h3 className="text-sm font-black text-white">القاصة</h3>
+              <p className="text-[10px] text-emerald-100/90 mt-0.5">إجمالي المبالغ المستحصلة بعد آخر تصفير</p>
             </div>
           </div>
 
-          <div className="text-left">
-            <span className="text-base font-black text-blue-700 dark:text-blue-400 tabular-nums">
-              {formatNumberArabic(totalAmperesLoad)} A
+          <div className="text-left shrink-0">
+            <span className="block text-lg font-black text-white tabular-nums" dir="ltr">
+              {formatCurrency(cashboxAmount)}
             </span>
-            <span className="text-[10px] text-slate-400 block">من سعة {generatorSpecs.maxAmperes}A</span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-1.5 p-2 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 text-center">
-          <div>
-            <span className="text-[10px] text-slate-400 block">سكني عادي</span>
-            <span className="text-xs font-black text-slate-800 dark:text-slate-200">
-              {formatNumberArabic(totalNormalAmps)} A
-            </span>
-          </div>
-          <div>
-            <span className="text-[10px] text-slate-400 block">تجاري</span>
-            <span className="text-xs font-black text-blue-600 dark:text-blue-400">
-              {formatNumberArabic(totalCommercialAmps)} A
-            </span>
-          </div>
-          <div>
-            <span className="text-[10px] text-slate-400 block">ذهبي VIP</span>
-            <span className="text-xs font-black text-amber-600 dark:text-amber-400">
-              {formatNumberArabic(totalGoldenAmps)} A
+            <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-black text-emerald-200">
+              فتح القاصة
+              <ChevronLeft className="w-3 h-3" />
             </span>
           </div>
         </div>
-      </div>
-
-      {/* 4. Distribution Lines Quick Status */}
-      <div className="p-4 rounded-2xl bg-white dark:bg-[#111c38] border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xs font-bold text-slate-900 dark:text-white">خطوط التوزيع والقواطع الرئيسية</h3>
-          <button
-            onClick={() => onNavigateToTab('settings')}
-            className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5"
-          >
-            <span>التفاصيل</span>
-            <ChevronLeft className="w-3 h-3" />
-          </button>
-        </div>
-
-        <div className="space-y-2.5">
-          {lines.slice(0, 3).map(line => {
-            const loadPercent = Math.min(100, Math.round((line.currentLoadAmperes / line.maxCapacityAmperes) * 100));
-            return (
-              <div key={line.id} className="space-y-1">
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span className="text-slate-800 dark:text-slate-200 truncate">{line.name}</span>
-                  <span className="text-slate-500 dark:text-slate-400 text-[11px] tabular-nums">
-                    {formatNumberArabic(line.currentLoadAmperes)} / {formatNumberArabic(line.maxCapacityAmperes)} A
-                  </span>
-                </div>
-                <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${
-                      loadPercent > 90
-                        ? 'bg-rose-500'
-                        : loadPercent > 75
-                        ? 'bg-amber-500'
-                        : 'bg-blue-600'
-                    }`}
-                    style={{ width: `${loadPercent}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      </button>
     </div>
   );
 };
