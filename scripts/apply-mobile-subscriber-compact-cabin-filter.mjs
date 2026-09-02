@@ -135,13 +135,27 @@ export const MobileSubscribers: React.FC<MobileSubscribersProps> = ({
         <div className="space-y-1.5">
           {filteredSubscribers.map(sub => {
             const isPartial = sub.paymentStatus === 'partial';
+            const isPaid = sub.paymentStatus === 'paid';
             const isFree = sub.paymentStatus === 'free' || sub.tier === 'free';
             const styles = getSubscriberStyleByStatus(isFree ? 'free' : sub.paymentStatus);
+
+            // amountDue يمثل المتبقي بعد التسديد، لذلك يصبح صفراً عند السداد الكامل.
+            // في بطاقة المشترك نعرض قيمة العملية/الاشتراك للمسدد، والمتبقي لغير المسدد والجزئي.
+            const latestInvoice = [...(sub.invoicesHistory || [])]
+              .filter(inv => inv.status !== 'cancelled')
+              .sort((a, b) => String(b.monthId || '').localeCompare(String(a.monthId || '')))[0];
+            const paidDisplayAmount = Math.max(
+              0,
+              Number(sub.amountPaid || 0),
+              Number(latestInvoice?.paidAmount || 0),
+              latestInvoice?.status === 'paid' ? Number(latestInvoice?.totalAmount || 0) : 0
+            );
+            const remainingDisplayAmount = Math.max(0, Number(sub.amountDue || 0));
             const visibleAmount = isFree
               ? 'إعفاء'
-              : isPartial
-              ? formatCurrency(Math.max(0, Number(sub.amountDue || 0) - Number(sub.amountPaid || 0)))
-              : formatCurrency(Number(sub.amountDue || 0));
+              : isPaid
+              ? formatCurrency(paidDisplayAmount)
+              : formatCurrency(remainingDisplayAmount);
 
             return (
               <button
@@ -191,4 +205,4 @@ export const MobileSubscribers: React.FC<MobileSubscribersProps> = ({
 `;
 
 fs.writeFileSync(target, content);
-console.log('Applied ultra-compact mobile subscriber cards: name, ampere and amount only, with cabin filter retained');
+console.log('Applied ultra-compact mobile subscriber cards with correct paid and remaining amounts');
