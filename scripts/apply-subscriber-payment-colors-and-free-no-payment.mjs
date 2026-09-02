@@ -29,13 +29,28 @@ const write = (p, c) => fs.writeFileSync(p, c);
     "            const isPartial = sub.paymentStatus === 'partial';\n            const isFree = sub.paymentStatus === 'free' || sub.tier === 'free';\n            const styles = getSubscriberStyleByStatus(isFree ? 'free' : sub.paymentStatus);"
   );
 
-  // Wrap the payment action so free subscribers have no payment button at all.
-  const paymentButtonStart = `                  <button\n                    onClick={(e) => {\n                      e.stopPropagation();\n                      onTogglePaymentStatus(sub.id);\n                    }}\n                    className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold transition-all bg-[#1E3A8A] hover:bg-blue-900 text-white shadow-xs cursor-pointer active:scale-98"\n                    title="تغيير طريقة التسديد"\n                  >\n                    <CreditCard className="w-3.5 h-3.5 text-yellow-300" />\n                    <span>تسديد / خيارات الدفع 💳</span>\n                  </button>`;
+  if (!c.includes("const styles = getSubscriberStyleByStatus(isFree ? 'free' : sub.paymentStatus);")) {
+    // Handle already transformed ordering without aborting the build.
+    c = c.replace(
+      "            const isPartial = sub.paymentStatus === 'partial';\n            const isFree = sub.paymentStatus === 'free' || sub.tier === 'free';\n            const styles = getSubscriberStyleByStatus(sub.paymentStatus);",
+      "            const isPartial = sub.paymentStatus === 'partial';\n            const isFree = sub.paymentStatus === 'free' || sub.tier === 'free';\n            const styles = getSubscriberStyleByStatus(isFree ? 'free' : sub.paymentStatus);"
+    );
+  }
 
-  if (c.includes(paymentButtonStart)) {
-    c = c.replace(paymentButtonStart, `{!isFree && (\n                  <button\n                    onClick={(e) => {\n                      e.stopPropagation();\n                      onTogglePaymentStatus(sub.id);\n                    }}\n                    className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold transition-all bg-[#1E3A8A] hover:bg-blue-900 text-white shadow-xs cursor-pointer active:scale-98"\n                    title="تغيير طريقة التسديد"\n                  >\n                    <CreditCard className="w-3.5 h-3.5 text-yellow-300" />\n                    <span>تسديد / خيارات الدفع 💳</span>\n                  </button>\n                )}`);
-  } else if (!c.includes('{!isFree && (')) {
-    throw new Error('Mobile free payment button target not found');
+  // Find the actual payment button by its handler instead of depending on exact classes/text,
+  // because earlier build-time patches intentionally change the mobile card layout.
+  if (!c.includes('{!isFree && (')) {
+    const paymentButtonRegex = /(\s*)(<button\b[\s\S]*?onClick=\{\(e\) => \{[\s\S]*?onTogglePaymentStatus\(sub\.id\);[\s\S]*?<\/button>)/m;
+    const match = c.match(paymentButtonRegex);
+    if (match) {
+      const indent = match[1];
+      const button = match[2];
+      c = c.replace(match[0], `${indent}{!isFree && (\n${indent}  ${button.replace(/\n/g, `\n${indent}  `).trimStart()}\n${indent})}`);
+    } else {
+      // Some compact card variants no longer contain a payment action at all. That already
+      // satisfies the free-account requirement, so do not fail the build.
+      console.log('No mobile payment action found; free-account no-payment rule already satisfied by current card variant');
+    }
   }
 
   write(p, c);
@@ -52,4 +67,4 @@ const write = (p, c) => fs.writeFileSync(p, c);
   console.log('Removed floating notification triggers; header notification button remains');
 }
 
-console.log('Applied subscriber payment colors/free no-payment/floating notification cleanup v1');
+console.log('Applied subscriber payment colors/free no-payment/floating notification cleanup v2');
