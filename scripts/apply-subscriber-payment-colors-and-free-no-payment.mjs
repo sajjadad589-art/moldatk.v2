@@ -66,3 +66,4 @@ const write = (p, c) => fs.writeFileSync(p, c);
 }
 
 console.log('Applied subscriber payment colors/free no-payment/floating notification cleanup v3');
+await import('./apply-monthly-reports-debt-carry.mjs');
