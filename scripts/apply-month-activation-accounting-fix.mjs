@@ -43,9 +43,9 @@ const replacement = `  const handleSaveMonthlyTariffs = (updatedTariffs: Monthly
               : 0;
             const previousRemaining = Math.max(0, previousTotal - previousPaid);
             history.push({
-              id: \`inv-\${previousActiveRecord.id}-\${sub.id}\`,
+              id: `inv-${previousActiveRecord.id}-${sub.id}`,
               subscriberId: sub.id,
-              receiptNumber: \`ACC-\${previousActiveRecord.id}-\${sub.code || sub.subscriberCode || sub.id}\`,
+              receiptNumber: `ACC-${previousActiveRecord.id}-${sub.code || sub.subscriberCode || sub.id}`,
               monthId: previousActiveRecord.id,
               monthNameAr: previousActiveRecord.monthNameAr,
               issueDate: previousActiveRecord.createdAt || new Date().toISOString().slice(0, 10),
@@ -69,9 +69,9 @@ const replacement = `  const handleSaveMonthlyTariffs = (updatedTariffs: Monthly
               .filter(inv => inv.monthId < activeRecord.id)
               .reduce((sum, inv) => sum + getInvoiceRemaining(inv), 0);
             currentInvoice = {
-              id: \`inv-\${activeRecord.id}-\${sub.id}\`,
+              id: `inv-${activeRecord.id}-${sub.id}`,
               subscriberId: sub.id,
-              receiptNumber: \`ACC-\${activeRecord.id}-\${sub.code || sub.subscriberCode || sub.id}\`,
+              receiptNumber: `ACC-${activeRecord.id}-${sub.code || sub.subscriberCode || sub.id}`,
               monthId: activeRecord.id,
               monthNameAr: activeRecord.monthNameAr,
               issueDate: new Date().toISOString().slice(0, 10),
@@ -83,7 +83,7 @@ const replacement = `  const handleSaveMonthlyTariffs = (updatedTariffs: Monthly
               paidAmount: 0,
               remainingAmount: isFree ? 0 : charge.total,
               status: isFree ? 'free' : 'unpaid',
-              notes: previousDebt > 0 ? \`دين مرحل من أشهر سابقة: \${previousDebt}\` : undefined,
+              notes: previousDebt > 0 ? `دين مرحل من أشهر سابقة: ${previousDebt}` : undefined,
             };
             history.push(currentInvoice);
           } else if (currentInvoice.status !== 'paid' && currentInvoice.status !== 'free') {
@@ -128,7 +128,7 @@ const replacement = `  const handleSaveMonthlyTariffs = (updatedTariffs: Monthly
     addAuditLog({
       category: 'pricing',
       title: 'تعديل تسعيرة الأمبير',
-      details: \`تم حفظ وتطبيق تسعيرة \${activeRecord?.monthNameAr || 'الشهر الحالي'} على حسابات المشتركين\`,
+      details: `تم حفظ وتطبيق تسعيرة ${activeRecord?.monthNameAr || 'الشهر الحالي'} على حسابات المشتركين`,
       entityName: activeRecord?.monthNameAr || 'تسعيرة الشهر',
       actorName: userSession?.username || userSession?.collectorName || 'مدير المنظومة',
     });
@@ -148,3 +148,4 @@ await import('./apply-sync-status-stability-fix.mjs');
 await import('./apply-offline-pending-local-first-fix.mjs');
 await import('./apply-tariff-sync-dedupe-fix.mjs');
 await import('./apply-wallet-authoritative-sync-fix.mjs');
+await import('./apply-collector-account-save-login-fix.mjs');
