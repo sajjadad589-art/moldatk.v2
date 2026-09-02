@@ -12,6 +12,14 @@ if (navbar.includes("  const [isOnline, setIsOnline] = useState<boolean>(true);\
   navbar = navbar.replace("  const [isOnline, setIsOnline] = useState<boolean>(true);\n", '');
   navbarChanged = true;
 }
+
+// احذف أي useEffect قديم ما زال يستعمل setIsOnline بعد إزالة الـ state.
+const staleOnlineEffect = /\n\s*useEffect\(\(\) => \{\s*if \(typeof window !== 'undefined'\) \{\s*setIsOnline\(navigator\.onLine\);[\s\S]*?\n\s*\}, \[\]\);\n?/;
+if (staleOnlineEffect.test(navbar)) {
+  navbar = navbar.replace(staleOnlineEffect, '\n');
+  navbarChanged = true;
+}
+
 const mobileOldBadge = `            <div className={\`px-2.5 py-1 rounded-full border flex items-center gap-1 text-[10px] font-bold \${\n              isOnline ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-rose-500/20 text-rose-300 border-rose-500/40'\n            }\`}>\n              <Activity className="w-3 h-3 shrink-0" />\n              <span>{isOnline ? 'متصل' : 'غير متصل'}</span>\n            </div>`;
 const desktopOldBadge = `            <div className={\`px-3 py-1.5 rounded-full border flex items-center gap-1.5 text-xs font-bold transition-all shadow-sm \${\n              isOnline ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-rose-500/20 text-rose-300 border-rose-500/40'\n            }\`}>\n              <Activity className="w-3.5 h-3.5 shrink-0" />\n              <span>{isOnline ? 'متصل بالإنترنت' : 'غير متصل بالإنترنت'}</span>\n            </div>`;
 const syncSlot = '            <div id="moldatk-sync-status-slot" className="flex items-center shrink-0" />';
