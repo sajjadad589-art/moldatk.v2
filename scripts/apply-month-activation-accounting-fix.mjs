@@ -31,7 +31,6 @@ const replacement = `  const handleSaveMonthlyTariffs = (updatedTariffs: Monthly
           const isFree = sub.paymentStatus === 'free' || sub.tier === 'free' || sub.isExempted;
           const history = [...(sub.invoicesHistory || [])].map(inv => ({ ...inv }));
 
-          // قبل فتح الشهر الجديد نحفظ وضع الشهر السابق كما كان، حتى لا تضيع حالة المسدد/غير المسدد تاريخياً.
           if (previousActiveRecord && previousActiveRecord.id !== activeRecord.id && !history.some(inv => inv.monthId === previousActiveRecord.id && inv.status !== 'cancelled')) {
             const previousCharge = calculateMonthlyCharge(sub, previousActiveRecord.tiers);
             const previousTotal = isFree ? 0 : previousCharge.total;
@@ -88,7 +87,6 @@ const replacement = `  const handleSaveMonthlyTariffs = (updatedTariffs: Monthly
             };
             history.push(currentInvoice);
           } else if (currentInvoice.status !== 'paid' && currentInvoice.status !== 'free') {
-            // تعديل تسعيرة الشهر نفسه يعيد حساب استحقاقه مع الحفاظ على ما دُفع منه.
             const alreadyPaid = Math.max(0, Number(currentInvoice.paidAmount || 0));
             currentInvoice.pricePerAmpere = charge.pricePerAmpere;
             currentInvoice.fixedFee = charge.fixedFee;
@@ -145,3 +143,5 @@ app = app.replace(pattern, replacement + '\n  const handleOpenFolderModal');
 
 fs.writeFileSync(appFile, app);
 console.log('Applied active monthly tariff to subscriber balances, statuses, history, and carried debt');
+
+await import('./apply-sync-status-stability-fix.mjs');
