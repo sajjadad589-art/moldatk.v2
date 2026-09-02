@@ -3,7 +3,9 @@ import fs from 'node:fs';
 const read = p => fs.readFileSync(p, 'utf8');
 const write = (p, c) => fs.writeFileSync(p, c);
 
-// 1) Keep the reset timestamp synchronized through generator_settings.
+// 1) Keep cashbox reset timestamp synchronized through generator_settings.
+// Cloud is authoritative on pull, INCLUDING null. This clears stale device-only reset timestamps
+// left by older builds which caused the cashbox to show only the newest payment.
 {
   const p = 'src/lib/useGeneratorCloudSync.ts';
   let c = read(p);
@@ -41,41 +43,53 @@ const write = (p, c) => fs.writeFileSync(p, c);
     );
   }
 
-  if (!c.includes('settings.data.wallet_reset_timestamp')) {
+  // Replace either the old conditional pull or an already-patched version with authoritative pull.
+  c = c.replace(
+    /\s*if \(settings\.data\.wallet_reset_timestamp\) \{\s*localStorage\.setItem\(localKeys\.walletReset, String\(settings\.data\.wallet_reset_timestamp\)\);\s*\}/,
+    `\n          if (settings.data.wallet_reset_timestamp) {\n            localStorage.setItem(localKeys.walletReset, String(settings.data.wallet_reset_timestamp));\n          } else {\n            localStorage.removeItem(localKeys.walletReset);\n          }`
+  );
+
+  // If the reset pull code is not present at all, inject it after invoice settings pull.
+  if (!c.includes('localStorage.removeItem(localKeys.walletReset)')) {
     c = c.replace(
       "          if (inv.custom) writeLocal(localKeys.invoiceCustom, inv.custom);",
-      "          if (inv.custom) writeLocal(localKeys.invoiceCustom, inv.custom);\n          if (settings.data.wallet_reset_timestamp) {\n            localStorage.setItem(localKeys.walletReset, String(settings.data.wallet_reset_timestamp));\n          }"
+      "          if (inv.custom) writeLocal(localKeys.invoiceCustom, inv.custom);\n          if (settings.data.wallet_reset_timestamp) {\n            localStorage.setItem(localKeys.walletReset, String(settings.data.wallet_reset_timestamp));\n          } else {\n            localStorage.removeItem(localKeys.walletReset);\n          }"
     );
   }
 
   write(p, c);
 }
 
-// 2) Reset must immediately mark local state dirty and trigger cloud sync.
+// 2) Reset must update React state + local storage + cloud sync immediately.
 {
   const p = 'src/App.tsx';
   let c = read(p);
+
+  // Normalize the callback body even if an older patch already added the event dispatch.
   c = c.replace(
-    "            try { localStorage.setItem(getStorageKey('moldatk_wallet_reset_timestamp'), resetAt); } catch (e) {}\n            showToast('تم تصفير القاصة بنجاح');",
-    "            try {\n              localStorage.setItem(getStorageKey('moldatk_wallet_reset_timestamp'), resetAt);\n              window.dispatchEvent(new Event('moldatk-local-sync'));\n            } catch (e) {}\n            showToast('تم تصفير القاصة بنجاح');"
+    /onClearWalletLogs=\{\(\) => \{[\s\S]*?showToast\('تم تصفير القاصة بنجاح'\);\s*\}\}/,
+    `onClearWalletLogs={() => {\n            const resetAt = new Date().toISOString();\n            setWalletResetTimestamp(resetAt);\n            try {\n              localStorage.setItem(getStorageKey('moldatk_wallet_reset_timestamp'), resetAt);\n              window.dispatchEvent(new Event('moldatk-local-sync'));\n            } catch (e) {}\n            showToast('تم تصفير القاصة بنجاح');\n          }}`
   );
+
   write(p, c);
 }
 
-// 3) Cashbox balance = successful payments - cancellations after the last reset.
-// Old cancellation rows may not have amount, so reverse the latest unmatched payment for the same subscriber.
+// 3) Cashbox = payment cash-in - cancelled/refunded payment cash-out, after last synchronized reset.
+// Old cancellation rows may have null amount, so pair them to the latest unmatched payment for the same subscriber.
 {
   const p = 'src/components/WalletView.tsx';
   let c = read(p);
-  const old = `  const totalCollected = financialLogs\r\n    .filter(log => log.category === 'payment')\r\n    .reduce((acc, log) => acc + (Number(log.amount) || 0), 0);`;
-  const next = `  const totalCollected = (() => {\r\n    const ordered = [...financialLogs].sort((a, b) =>\r\n      new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime()\r\n    );\r\n    const unmatchedPayments = new Map<string, number[]>();\r\n    let balance = 0;\r\n\r\n    for (const log of ordered) {\r\n      const entityKey = String(log.entityId || 'unknown');\r\n      if (log.category === 'payment') {\r\n        const amount = Math.max(0, Number(log.amount) || 0);\r\n        balance += amount;\r\n        const stack = unmatchedPayments.get(entityKey) || [];\r\n        stack.push(amount);\r\n        unmatchedPayments.set(entityKey, stack);\r\n        continue;\r\n      }\r\n\r\n      if (log.category === 'cancellation') {\r\n        let amount = Math.max(0, Number(log.amount) || 0);\r\n        const stack = unmatchedPayments.get(entityKey) || [];\r\n        if (!amount && stack.length) amount = stack.pop() || 0;\r\n        else if (amount && stack.length) stack.pop();\r\n        unmatchedPayments.set(entityKey, stack);\r\n        balance -= amount;\r\n      }\r\n    }\r\n\r\n    return balance;\r\n  })();`;
 
-  if (c.includes(old)) c = c.replace(old, next);
-  else {
-    const unixOld = old.replaceAll('\r\n', '\n');
-    if (c.includes(unixOld)) c = c.replace(unixOld, next.replaceAll('\r\n', '\n'));
-  }
+  const replacement = `  const totalCollected = (() => {\n    const ordered = [...financialLogs].sort((a, b) =>\n      new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime()\n    );\n    const unmatchedPayments = new Map<string, number[]>();\n    let balance = 0;\n\n    for (const log of ordered) {\n      const entityKey = String(log.entityId || 'unknown');\n      if (log.category === 'payment') {\n        const amount = Math.max(0, Number(log.amount) || 0);\n        if (amount <= 0) continue;\n        balance += amount;\n        const stack = unmatchedPayments.get(entityKey) || [];\n        stack.push(amount);\n        unmatchedPayments.set(entityKey, stack);\n        continue;\n      }\n\n      if (log.category === 'cancellation') {\n        let amount = Math.max(0, Number(log.amount) || 0);\n        const stack = unmatchedPayments.get(entityKey) || [];\n        if (!amount && stack.length) amount = stack.pop() || 0;\n        else if (amount && stack.length) stack.pop();\n        unmatchedPayments.set(entityKey, stack);\n        balance -= amount;\n      }\n    }\n\n    return Math.max(0, balance);\n  })();`;
+
+  // Replace simple original OR previous patched IIFE deterministically.
+  const simple = /  const totalCollected = financialLogs[\s\S]*?\.reduce\(\(acc, log\) => acc \+ \(Number\(log\.amount\) \|\| 0\), 0\);/;
+  const patched = /  const totalCollected = \(\(\) => \{[\s\S]*?\n  \}\)\(\);/;
+  if (simple.test(c)) c = c.replace(simple, replacement);
+  else if (patched.test(c)) c = c.replace(patched, replacement);
+  else throw new Error('Wallet totalCollected block not found');
+
   write(p, c);
 }
 
-console.log('Applied authoritative synchronized cashbox balance and reset state');
+console.log('Applied synchronized cashbox repair: cloud-authoritative reset + net cashflow balance');
