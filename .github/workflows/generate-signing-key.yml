@@ -1,0 +1,60 @@
+name: Generate Android Signing Key
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  generate-key:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Validate input secrets
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.MOLDATK_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.MOLDATK_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.MOLDATK_KEY_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE_PASSWORD" || (echo "Missing MOLDATK_KEYSTORE_PASSWORD" && exit 1)
+          test -n "$KEY_ALIAS" || (echo "Missing MOLDATK_KEY_ALIAS" && exit 1)
+          test -n "$KEY_PASSWORD" || (echo "Missing MOLDATK_KEY_PASSWORD" && exit 1)
+
+      - name: Generate keystore and base64 secret
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.MOLDATK_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.MOLDATK_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.MOLDATK_KEY_PASSWORD }}
+        run: |
+          mkdir -p signing-kit
+          keytool -genkeypair \
+            -v \
+            -keystore signing-kit/moldatk-release-key.jks \
+            -storepass "$KEYSTORE_PASSWORD" \
+            -alias "$KEY_ALIAS" \
+            -keypass "$KEY_PASSWORD" \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 9125 \
+            -dname "CN=moldatk, OU=moldatk, O=moldatk, L=Babylon, S=Babylon, C=IQ"
+          base64 -w 0 signing-kit/moldatk-release-key.jks > signing-kit/MOLDATK_KEYSTORE_BASE64.txt
+          cat > signing-kit/READ_ME_FIRST.txt <<'TXT'
+          1) افتح ملف MOLDATK_KEYSTORE_BASE64.txt وانسخ النص كله.
+          2) أضفه في GitHub Secrets باسم MOLDATK_KEYSTORE_BASE64.
+          3) احتفظ بملف moldatk-release-key.jks بمكان آمن جداً، ولا تشاركه مع أحد.
+          4) بعدها شغل Workflow اسمه Build Android APK حتى تحصل APK و AAB موقعين.
+          TXT
+
+      - name: Upload signing kit
+        uses: actions/upload-artifact@v4
+        with:
+          name: moldatk-signing-kit
+          path: signing-kit
+          retention-days: 1
