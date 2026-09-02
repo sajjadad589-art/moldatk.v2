@@ -30,20 +30,15 @@ const write = (p, c) => fs.writeFileSync(p, c);
   const p = 'src/App.tsx';
   let c = read(p);
 
-  // Normalize every collectorCloud import into a single import to avoid duplicate identifiers
-  // after earlier patch scripts add loadCloudCollectors/syncCloudCollectorRoster independently.
-  const collectorImportRe = /^import\s*\{([^}]*)\}\s*from\s*['"]\.\/lib\/collectorCloud['"];?\s*$/gm;
-  const importedNames = new Set();
-  let match;
-  while ((match = collectorImportRe.exec(c)) !== null) {
-    match[1].split(',').map(x => x.trim()).filter(Boolean).forEach(x => importedNames.add(x));
-  }
-  importedNames.add('syncCloudCollectorRoster');
-  c = c.replace(collectorImportRe, '');
-  const collectorImport = `import { ${Array.from(importedNames).join(', ')} } from './lib/collectorCloud';`;
+  // Earlier build patches can add collectorCloud imports independently. Remove all single-line
+  // collectorCloud imports, then add one canonical import so TypeScript never sees duplicates.
+  c = c
+    .split('\n')
+    .filter(line => !line.includes("./lib/collectorCloud"))
+    .join('\n');
   c = c.replace(
     "import { supabase } from './lib/supabase';",
-    "import { supabase } from './lib/supabase';\n" + collectorImport
+    "import { supabase } from './lib/supabase';\nimport { loadCloudCollectors, syncCloudCollectorRoster } from './lib/collectorCloud';"
   );
 
   const marker = "  const handleOpenFolderModal = (folderKey: string) => setActiveSettingsFolderKey(folderKey);";
@@ -59,4 +54,4 @@ const write = (p, c) => fs.writeFileSync(p, c);
   write(p, c);
 }
 
-console.log('Applied collector cloud-save, real PIN display, login synchronization, and import de-duplication fix');
+console.log('Applied collector cloud-save, real PIN display, login synchronization, and canonical import fix');
