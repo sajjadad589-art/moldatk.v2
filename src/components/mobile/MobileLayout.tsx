@@ -2,6 +2,7 @@ import React from 'react';
 import { MobileHeader } from './MobileHeader';
 import { MobileDashboard } from './MobileDashboard';
 import { MobileSubscribers } from './MobileSubscribers';
+import { MobileMonthlyReports } from './MobileMonthlyReports';
 import { MobileMonitor } from './MobileMonitor';
 import { MobileSettings } from './MobileSettings';
 import { MobileBottomNav } from '../MobileBottomNav';
@@ -70,7 +71,6 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
 }) => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#070d1e] text-slate-900 dark:text-slate-100 flex flex-col font-['Cairo',sans-serif] selection:bg-blue-600 selection:text-white pb-16">
-      {/* 1. Dedicated Mobile Header */}
       <MobileHeader
         generatorSpecs={generatorSpecs}
         darkMode={darkMode}
@@ -79,7 +79,6 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
         onOpenPricingModal={onOpenPricingModal}
       />
 
-      {/* 2. Active Screen Body */}
       <main className="flex-1 w-full max-w-lg mx-auto">
         {activeTab === 'dashboard' && (
           <MobileDashboard
@@ -102,6 +101,13 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
             onOpenSubscriberModal={onOpenSubscriberModal}
             onOpenReceiptModal={onOpenReceiptModal}
             onDeleteSubscriber={onDeleteSubscriber}
+          />
+        )}
+
+        {activeTab === 'reports' && (
+          <MobileMonthlyReports
+            subscribers={subscribers}
+            currency={generatorSpecs.currency || 'د.ع'}
           />
         )}
 
@@ -132,7 +138,6 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
         )}
       </main>
 
-      {/* 3. Dedicated Fixed Mobile Bottom Navigation */}
       <MobileBottomNav
         activeTab={activeTab}
         onTabChange={onTabChange}
