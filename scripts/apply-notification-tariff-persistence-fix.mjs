@@ -3,21 +3,22 @@ import fs from 'node:fs';
 const read = p => fs.readFileSync(p, 'utf8');
 const write = (p, c) => fs.writeFileSync(p, c);
 
-// 1) Save a newly-created month immediately instead of leaving it only in modal state.
+// 1) Save and ACTIVATE a newly-created month immediately.
 {
   const p = 'src/components/PricingModal.tsx';
   let c = read(p);
   const old = `    setTariffs(updatedTariffs);\n    setSelectedMonthId(monthId);\n    setIsAddingNewMonth(false);\n  };`;
-  const next = `    setTariffs(updatedTariffs);\n    setSelectedMonthId(monthId);\n    // احفظ الشهر فوراً حتى لا يختفي عند المزامنة قبل الضغط على حفظ مرة ثانية.\n    onSaveMonthlyTariffs(updatedTariffs, monthId, false);\n    setIsAddingNewMonth(false);\n  };`;
+  const next = `    setTariffs(updatedTariffs);\n    setSelectedMonthId(monthId);\n    // الشهر الجديد ليس شكلياً: احفظه وابدأ دورة الحساب الجديدة فوراً.\n    onSaveMonthlyTariffs(updatedTariffs, monthId, true);\n    setIsAddingNewMonth(false);\n  };`;
   if (c.includes(old)) c = c.replace(old, next);
-  else if (!c.includes('onSaveMonthlyTariffs(updatedTariffs, monthId, false);')) {
+  else if (c.includes('onSaveMonthlyTariffs(updatedTariffs, monthId, false);')) {
+    c = c.replace('onSaveMonthlyTariffs(updatedTariffs, monthId, false);', 'onSaveMonthlyTariffs(updatedTariffs, monthId, true);');
+  } else if (!c.includes('onSaveMonthlyTariffs(updatedTariffs, monthId, true);')) {
     throw new Error('PricingModal create-month block not found');
   }
   write(p, c);
 }
 
 // 2) Monthly tariff history is append/update history, not a mirror-delete table.
-//    Never delete historical months merely because a local snapshot is temporarily stale.
 {
   const p = 'src/lib/useGeneratorCloudSync.ts';
   let c = read(p);
@@ -35,7 +36,7 @@ const write = (p, c) => fs.writeFileSync(p, c);
   }
 
   const oldTail = `        window.dispatchEvent(new Event('moldatk-local-sync'));\n        lastSnapshot.current = snapshot();\n        ready.current = true;`;
-  const nextTail = `        window.dispatchEvent(new Event('moldatk-local-sync'));\n        ready.current = true;\n        // إذا كان عندنا شهر محلي جديد لم يصل للسحابة بعد، ارفعه فوراً قبل اعتماد Snapshot.\n        if (hasPendingLocalTariffs && session?.role === 'generator_admin') {\n          await push();\n        }\n        lastSnapshot.current = snapshot();`;
+  const nextTail = `        window.dispatchEvent(new Event('moldatk-local-sync'));\n        ready.current = true;\n        if (hasPendingLocalTariffs && session?.role === 'generator_admin') {\n          await push();\n        }\n        lastSnapshot.current = snapshot();`;
   if (c.includes(oldTail)) c = c.replace(oldTail, nextTail);
   else if (!c.includes("if (hasPendingLocalTariffs && session?.role === 'generator_admin')")) {
     throw new Error('Cloud pull completion block not found');
@@ -44,4 +45,4 @@ const write = (p, c) => fs.writeFileSync(p, c);
   write(p, c);
 }
 
-console.log('Applied notification/tariff persistence hardening: immediate month save + non-destructive monthly history sync');
+console.log('Applied tariff persistence: immediate month activation + non-destructive history sync');
