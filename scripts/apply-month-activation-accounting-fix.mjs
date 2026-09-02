@@ -146,3 +146,4 @@ console.log('Applied active monthly tariff to subscriber balances, statuses, his
 
 await import('./apply-sync-status-stability-fix.mjs');
 await import('./apply-offline-pending-local-first-fix.mjs');
+await import('./apply-tariff-sync-dedupe-fix.mjs');
