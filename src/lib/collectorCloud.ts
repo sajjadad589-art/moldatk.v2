@@ -26,8 +26,7 @@ const fromRow = (row: any): Collector => ({
   id: row.id,
   generatorId: row.generator_id,
   name: row.name,
-  phone: row.phone,
-  // PIN is never downloaded from the server. Empty means "keep current PIN" when saving.
+  phone: normalizePhone(row.phone),
   passcode: '',
   permissions: normalizePermissions(row.permissions),
   assignedLineId: row.assigned_line_id || undefined,
@@ -36,6 +35,33 @@ const fromRow = (row: any): Collector => ({
   notes: row.notes || '',
   isActive: row.is_active !== false,
 });
+
+const mergeKnownLocalPins = (generatorId: string, incoming: Collector[], preferred: Collector[] = []) => {
+  const pinsById = new Map<string, string>();
+  const pinsByPhone = new Map<string, string>();
+
+  const remember = (items: Collector[]) => {
+    for (const item of items || []) {
+      const pin = String(item?.passcode || '').trim();
+      if (!/^\d{4,8}$/.test(pin)) continue;
+      if (item?.id) pinsById.set(String(item.id), pin);
+      const phone = normalizePhone(item?.phone || '');
+      if (phone) pinsByPhone.set(phone, pin);
+    }
+  };
+
+  remember(preferred);
+  try {
+    const raw = localStorage.getItem(`moldatk_collectors_${generatorId}`);
+    const cached = raw ? JSON.parse(raw) : [];
+    if (Array.isArray(cached)) remember(cached);
+  } catch (e) {}
+
+  return incoming.map(item => ({
+    ...item,
+    passcode: pinsById.get(String(item.id)) || pinsByPhone.get(normalizePhone(item.phone)) || '',
+  }));
+};
 
 export async function loginCollectorWithCloud(phoneInput: string, pinInput: string): Promise<ActiveUserSession> {
   const phone = normalizePhone(phoneInput);
@@ -87,14 +113,27 @@ export async function loadCloudCollectors(generatorId: string): Promise<Collecto
     .eq('generator_id', generatorId)
     .order('created_at');
   if (error) throw error;
-  return (data || []).map(fromRow);
+  return mergeKnownLocalPins(generatorId, (data || []).map(fromRow));
 }
 
 export async function syncCloudCollectorRoster(collectors: Collector[]): Promise<Collector[]> {
+  const normalized = collectors.map(item => ({
+    ...item,
+    phone: normalizePhone(item.phone),
+    passcode: String(item.passcode || '').trim(),
+  }));
+
   const { data, error } = await supabase.functions.invoke('manage-collector-account', {
-    body: { action: 'sync', collectors },
+    body: { action: 'sync', collectors: normalized },
   });
   if (error) throw error;
   if (data?.error) throw new Error(data.error);
-  return Array.isArray(data?.collectors) ? data.collectors : [];
+
+  const saved = Array.isArray(data?.collectors) ? data.collectors.map((row: any) => ({
+    ...row,
+    phone: normalizePhone(row.phone),
+    permissions: normalizePermissions(row.permissions),
+  })) as Collector[] : [];
+  const generatorId = String(saved[0]?.generatorId || normalized[0]?.generatorId || '');
+  return generatorId ? mergeKnownLocalPins(generatorId, saved, normalized) : saved;
 }
