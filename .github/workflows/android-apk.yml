@@ -1,7 +1,16 @@
-name: Build Android APK
+name: Build Android APK / AAB
 
 on:
   workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'release = signed APK + AAB, debug = install test APK only'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - release
+          - debug
   push:
     branches: [main]
     paths:
@@ -18,14 +27,15 @@ permissions:
   contents: write
 
 jobs:
-  build-apk:
+  build-android:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     env:
       VITE_SUPABASE_URL: https://adluynhkikoodjljoxeu.supabase.co
-      VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CObjK2Uua18kVkXCkxdRog_keQLIDiE
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
       CURRENT_VERSION: 1.3.3
       CURRENT_VERSION_CODE: 7
+      SHOULD_RELEASE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release' }}
 
     steps:
       - name: Checkout
@@ -56,45 +66,50 @@ jobs:
         run: npx cap sync android
 
       - name: Build debug APK
-        if: github.event_name != 'workflow_dispatch'
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.build_type == 'debug'
         run: |
           chmod +x android/gradlew
           cd android
           ./gradlew assembleDebug --no-daemon
 
       - name: Prepare debug APK
-        if: github.event_name != 'workflow_dispatch'
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.build_type == 'debug'
         run: |
           mkdir -p release
           cp android/app/build/outputs/apk/debug/app-debug.apk release/Moldatk-Android-Debug.apk
 
       - name: Upload debug artifact
-        if: github.event_name != 'workflow_dispatch'
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.build_type == 'debug'
         uses: actions/upload-artifact@v4
         with:
           name: Moldatk-Android-Debug
           path: release/Moldatk-Android-Debug.apk
           retention-days: 14
 
-      - name: Validate signing secrets
+      - name: Validate release signing secrets
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release'
         env:
           KEYSTORE_BASE64: ${{ secrets.MOLDATK_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.MOLDATK_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.MOLDATK_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.MOLDATK_KEY_PASSWORD }}
+          SUPABASE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
         run: |
+          test -n "$SUPABASE_KEY" || (echo "Missing VITE_SUPABASE_PUBLISHABLE_KEY" && exit 1)
           test -n "$KEYSTORE_BASE64" || (echo "Missing MOLDATK_KEYSTORE_BASE64" && exit 1)
           test -n "$KEYSTORE_PASSWORD" || (echo "Missing MOLDATK_KEYSTORE_PASSWORD" && exit 1)
           test -n "$KEY_ALIAS" || (echo "Missing MOLDATK_KEY_ALIAS" && exit 1)
           test -n "$KEY_PASSWORD" || (echo "Missing MOLDATK_KEY_PASSWORD" && exit 1)
 
       - name: Restore release signing key
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release'
         env:
           KEYSTORE_BASE64: ${{ secrets.MOLDATK_KEYSTORE_BASE64 }}
         run: |
           echo "$KEYSTORE_BASE64" | base64 --decode > android/app/moldatk-release.keystore
 
-      - name: Build signed release APK
+      - name: Build signed release APK and AAB
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release'
         env:
           MOLDATK_SIGNING_STORE_FILE: ${{ github.workspace }}/android/app/moldatk-release.keystore
           MOLDATK_SIGNING_STORE_PASSWORD: ${{ secrets.MOLDATK_KEYSTORE_PASSWORD }}
@@ -103,34 +118,41 @@ jobs:
         run: |
           chmod +x android/gradlew
           cd android
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleRelease bundleRelease --no-daemon
 
-      - name: Prepare signed release APK
+      - name: Prepare signed release files
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release'
         run: |
           mkdir -p release
-          cp android/app/build/outputs/apk/release/app-release.apk release/Moldatk-Android.apk
+          cp android/app/build/outputs/apk/release/app-release.apk release/Moldatk-Android-Release.apk
+          cp android/app/build/outputs/bundle/release/app-release.aab release/Moldatk-Android-Release.aab
 
-      - name: Upload signed release artifact
+      - name: Upload signed release artifacts
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release'
         uses: actions/upload-artifact@v4
         with:
-          name: Moldatk-Android-Release
-          path: release/Moldatk-Android.apk
+          name: Moldatk-Android-Signed-Release
+          path: |
+            release/Moldatk-Android-Release.apk
+            release/Moldatk-Android-Release.aab
           retention-days: 30
 
       - name: Publish approved GitHub release
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="v${CURRENT_VERSION}"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" release/Moldatk-Android.apk --clobber
+            gh release upload "$TAG" release/Moldatk-Android-Release.apk release/Moldatk-Android-Release.aab --clobber
           else
-            gh release create "$TAG" release/Moldatk-Android.apk \
+            gh release create "$TAG" release/Moldatk-Android-Release.apk release/Moldatk-Android-Release.aab \
               --title "Moldatk ${CURRENT_VERSION}" \
-              --notes "نسخة Android Release موقعة ومعتمدة للتحديث من داخل تطبيق مولدتك."
+              --notes "نسخة Android Release موقعة: APK للتثبيت المباشر و AAB للرفع على Google Play."
           fi
 
       - name: Activate in-app update manifest
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release'
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
@@ -142,7 +164,7 @@ jobs:
             versionName: version,
             minimumVersionCode: 5,
             force: false,
-            apkUrl: `https://github.com/sajjadad589-art/moldatk.v2/releases/download/v${version}/Moldatk-Android.apk`,
+            apkUrl: `https://github.com/sajjadad589-art/moldatk.v2/releases/download/v${version}/Moldatk-Android-Release.apk`,
             notes: 'تحديث واجهة الجابي بالتصميم الجديد وتحسين استقرار المزامنة والتسديد والطباعة.'
           };
           fs.writeFileSync('public/app-version.json', JSON.stringify(manifest, null, 2) + '\n');
