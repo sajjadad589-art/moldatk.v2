@@ -43,14 +43,15 @@ const write = (p, c) => fs.writeFileSync(p, c);
     );
   }
 
-  // Replace either the old conditional pull or an already-patched version with authoritative pull.
-  c = c.replace(
-    /\s*if \(settings\.data\.wallet_reset_timestamp\) \{\s*localStorage\.setItem\(localKeys\.walletReset, String\(settings\.data\.wallet_reset_timestamp\)\);\s*\}/,
-    `\n          if (settings.data.wallet_reset_timestamp) {\n            localStorage.setItem(localKeys.walletReset, String(settings.data.wallet_reset_timestamp));\n          } else {\n            localStorage.removeItem(localKeys.walletReset);\n          }`
-  );
-
-  // If the reset pull code is not present at all, inject it after invoice settings pull.
-  if (!c.includes('localStorage.removeItem(localKeys.walletReset)')) {
+  // Normalize the whole pull block (with or without an existing else) so this script is safe
+  // to run more than once in the same CI job (lint, then build).
+  const resetPullBlock = /\s*if \(settings\.data\.wallet_reset_timestamp\) \{\s*localStorage\.setItem\(localKeys\.walletReset, String\(settings\.data\.wallet_reset_timestamp\)\);\s*\}(?:\s*else\s*\{\s*localStorage\.removeItem\(localKeys\.walletReset\);\s*\})?/;
+  if (resetPullBlock.test(c)) {
+    c = c.replace(
+      resetPullBlock,
+      `\n          if (settings.data.wallet_reset_timestamp) {\n            localStorage.setItem(localKeys.walletReset, String(settings.data.wallet_reset_timestamp));\n          } else {\n            localStorage.removeItem(localKeys.walletReset);\n          }`
+    );
+  } else {
     c = c.replace(
       "          if (inv.custom) writeLocal(localKeys.invoiceCustom, inv.custom);",
       "          if (inv.custom) writeLocal(localKeys.invoiceCustom, inv.custom);\n          if (settings.data.wallet_reset_timestamp) {\n            localStorage.setItem(localKeys.walletReset, String(settings.data.wallet_reset_timestamp));\n          } else {\n            localStorage.removeItem(localKeys.walletReset);\n          }"
@@ -65,7 +66,6 @@ const write = (p, c) => fs.writeFileSync(p, c);
   const p = 'src/App.tsx';
   let c = read(p);
 
-  // Normalize the callback body even if an older patch already added the event dispatch.
   c = c.replace(
     /onClearWalletLogs=\{\(\) => \{[\s\S]*?showToast\('تم تصفير القاصة بنجاح'\);\s*\}\}/,
     `onClearWalletLogs={() => {\n            const resetAt = new Date().toISOString();\n            setWalletResetTimestamp(resetAt);\n            try {\n              localStorage.setItem(getStorageKey('moldatk_wallet_reset_timestamp'), resetAt);\n              window.dispatchEvent(new Event('moldatk-local-sync'));\n            } catch (e) {}\n            showToast('تم تصفير القاصة بنجاح');\n          }}`
@@ -82,7 +82,6 @@ const write = (p, c) => fs.writeFileSync(p, c);
 
   const replacement = `  const totalCollected = (() => {\n    const ordered = [...financialLogs].sort((a, b) =>\n      new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime()\n    );\n    const unmatchedPayments = new Map<string, number[]>();\n    let balance = 0;\n\n    for (const log of ordered) {\n      const entityKey = String(log.entityId || 'unknown');\n      if (log.category === 'payment') {\n        const amount = Math.max(0, Number(log.amount) || 0);\n        if (amount <= 0) continue;\n        balance += amount;\n        const stack = unmatchedPayments.get(entityKey) || [];\n        stack.push(amount);\n        unmatchedPayments.set(entityKey, stack);\n        continue;\n      }\n\n      if (log.category === 'cancellation') {\n        let amount = Math.max(0, Number(log.amount) || 0);\n        const stack = unmatchedPayments.get(entityKey) || [];\n        if (!amount && stack.length) amount = stack.pop() || 0;\n        else if (amount && stack.length) stack.pop();\n        unmatchedPayments.set(entityKey, stack);\n        balance -= amount;\n      }\n    }\n\n    return Math.max(0, balance);\n  })();`;
 
-  // Replace simple original OR previous patched IIFE deterministically.
   const simple = /  const totalCollected = financialLogs[\s\S]*?\.reduce\(\(acc, log\) => acc \+ \(Number\(log\.amount\) \|\| 0\), 0\);/;
   const patched = /  const totalCollected = \(\(\) => \{[\s\S]*?\n  \}\)\(\);/;
   if (simple.test(c)) c = c.replace(simple, replacement);
