@@ -108,4 +108,24 @@ const write = (p, c) => fs.writeFileSync(p, c);
   write(p, c);
 }
 
-console.log('Applied synchronized cashbox repair and filter-aware wallet total');
+// 4) Calendar/filter dates must use the device local calendar date, not UTC.
+// Using toISOString() on local midnight in Iraq (+03:00) shifts the value to the previous UTC day
+// (e.g. selecting 2026-09-02 becomes 2026-09-01). This keeps both display and filtering on local dates.
+{
+  const p = 'src/components/WalletView.tsx';
+  let c = read(p);
+
+  if (!c.includes('const toLocalDateKey = (value: Date | string)')) {
+    c = c.replace(
+      '  const resetTimeMs = walletResetTimestamp ? new Date(walletResetTimestamp).getTime() : 0;',
+      `  const toLocalDateKey = (value: Date | string) => {\n    const date = value instanceof Date ? value : new Date(value);\n    if (Number.isNaN(date.getTime())) return '';\n    const year = date.getFullYear();\n    const month = String(date.getMonth() + 1).padStart(2, '0');\n    const day = String(date.getDate()).padStart(2, '0');\n    return \`${'${'}year}-${'${'}month}-${'${'}day}\`;\n  };\n\n  const resetTimeMs = walletResetTimestamp ? new Date(walletResetTimestamp).getTime() : 0;`
+    );
+  }
+
+  c = c.replaceAll("log.timestamp.split('T')[0]", 'toLocalDateKey(log.timestamp)');
+  c = c.replace("const dateString = d.toISOString().split('T')[0];", 'const dateString = toLocalDateKey(d);');
+
+  write(p, c);
+}
+
+console.log('Applied synchronized cashbox repair, filter-aware wallet total, and local calendar date fix');
