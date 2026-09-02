@@ -3,16 +3,17 @@ import fs from 'node:fs';
 const read = p => fs.readFileSync(p, 'utf8');
 const write = (p, c) => fs.writeFileSync(p, c);
 
-// 1) Save and ACTIVATE a newly-created month immediately.
+// 1) A newly-created month must be persisted immediately, but subscriber balances
+// are recalculated only after the user presses Save with the final prices.
 {
   const p = 'src/components/PricingModal.tsx';
   let c = read(p);
   const old = `    setTariffs(updatedTariffs);\n    setSelectedMonthId(monthId);\n    setIsAddingNewMonth(false);\n  };`;
-  const next = `    setTariffs(updatedTariffs);\n    setSelectedMonthId(monthId);\n    // الشهر الجديد ليس شكلياً: احفظه وابدأ دورة الحساب الجديدة فوراً.\n    onSaveMonthlyTariffs(updatedTariffs, monthId, true);\n    setIsAddingNewMonth(false);\n  };`;
+  const next = `    setTariffs(updatedTariffs);\n    setSelectedMonthId(monthId);\n    // ثبّت الشهر الجديد فوراً حتى لا يختفي مع أي Pull، لكن لا تحسب المشتركين قبل حفظ الأسعار النهائية.\n    onSaveMonthlyTariffs(updatedTariffs, monthId, false);\n    setIsAddingNewMonth(false);\n  };`;
   if (c.includes(old)) c = c.replace(old, next);
-  else if (c.includes('onSaveMonthlyTariffs(updatedTariffs, monthId, false);')) {
-    c = c.replace('onSaveMonthlyTariffs(updatedTariffs, monthId, false);', 'onSaveMonthlyTariffs(updatedTariffs, monthId, true);');
-  } else if (!c.includes('onSaveMonthlyTariffs(updatedTariffs, monthId, true);')) {
+  else if (c.includes('onSaveMonthlyTariffs(updatedTariffs, monthId, true);')) {
+    c = c.replace('onSaveMonthlyTariffs(updatedTariffs, monthId, true);', 'onSaveMonthlyTariffs(updatedTariffs, monthId, false);');
+  } else if (!c.includes('onSaveMonthlyTariffs(updatedTariffs, monthId, false);')) {
     throw new Error('PricingModal create-month block not found');
   }
   write(p, c);
@@ -29,7 +30,7 @@ const write = (p, c) => fs.writeFileSync(p, c);
   );
 
   const oldWrite = "        writeLocal(localKeys.tariffs, (tariffs.data || []).map(rowToTariff));";
-  const mergedWrite = `        const remoteTariffs = (tariffs.data || []).map(rowToTariff);\n        const remoteTariffIds = new Set(remoteTariffs.map(t => t.id));\n        const pendingLocalTariffs = localTariffs.filter(t => !remoteTariffIds.has(t.id));\n        const hasPendingLocalTariffs = pendingLocalTariffs.length > 0;\n        const localPendingActive = pendingLocalTariffs.some(t => t.isCurrentActive);\n        const mergedTariffs = [\n          ...pendingLocalTariffs,\n          ...remoteTariffs.map(t => localPendingActive ? { ...t, isCurrentActive: false } : t),\n        ].sort((a, b) => (b.year - a.year) || (b.month - a.month));\n        writeLocal(localKeys.tariffs, mergedTariffs);`;
+  const mergedWrite = `        const remoteTariffs = (tariffs.data || []).map(rowToTariff);\n        const remoteTariffIds = new Set(remoteTariffs.map(t => t.id));\n        const pendingLocalTariffs = localTariffs.filter(t => !remoteTariffIds.has(t.id));\n        const hasPendingLocalTariffs = pendingLocalTariffs.length > 0;\n        const localPendingActive = pendingLocalTariffs.some(t => t.isCurrentActive);\n        const mergedTariffMap = new Map<string, MonthlyTariffRecord>();\n        for (const remote of remoteTariffs) mergedTariffMap.set(remote.id, localPendingActive ? { ...remote, isCurrentActive: false } : remote);\n        // النسخة المحلية غير الموجودة في السحابة أولوية، ولا يجوز للـPull أن يمسحها.\n        for (const local of pendingLocalTariffs) mergedTariffMap.set(local.id, local);\n        const mergedTariffs = Array.from(mergedTariffMap.values())\n          .sort((a, b) => (b.year - a.year) || (b.month - a.month));\n        writeLocal(localKeys.tariffs, mergedTariffs);`;
   if (c.includes(oldWrite)) c = c.replace(oldWrite, mergedWrite);
   else if (!c.includes('const pendingLocalTariffs = localTariffs.filter')) {
     throw new Error('Cloud tariff pull block not found');
@@ -45,4 +46,4 @@ const write = (p, c) => fs.writeFileSync(p, c);
   write(p, c);
 }
 
-console.log('Applied tariff persistence: immediate month activation + non-destructive history sync');
+console.log('Applied tariff persistence: durable month creation + non-destructive history sync');
