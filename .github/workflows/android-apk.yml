@@ -59,6 +59,9 @@ jobs:
       - name: Typecheck launch build
         run: npm run lint
 
+      - name: Monthly ledger smoke test
+        run: npx tsx scripts/monthly-ledger-smoke-test.ts
+
       - name: Build web app
         run: npm run build
 
@@ -66,20 +69,17 @@ jobs:
         run: npx cap sync android
 
       - name: Build debug APK
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'debug'
         run: |
           chmod +x android/gradlew
           cd android
           ./gradlew assembleDebug --no-daemon
 
       - name: Prepare debug APK
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'debug'
         run: |
           mkdir -p release
           cp android/app/build/outputs/apk/debug/app-debug.apk release/Moldatk-Android-Debug.apk
 
       - name: Upload debug artifact
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'debug'
         uses: actions/upload-artifact@v4
         with:
           name: Moldatk-Android-Debug
@@ -163,7 +163,7 @@ jobs:
             minimumVersionCode: 5,
             force: false,
             apkUrl: `https://github.com/sajjadad589-art/moldatk.v2/releases/download/v${version}/Moldatk-Android-Release.apk`,
-            notes: 'تحديث واجهة الجابي بالتصميم الجديد وتحسين استقرار المزامنة والتسديد والطباعة.'
+            notes: 'تحديث السجل الشهري والديون والتقارير والإيصال مع الحفاظ على المزامنة والطباعة.'
           };
           fs.writeFileSync('public/app-version.json', JSON.stringify(manifest, null, 2) + '\n');
           NODE
