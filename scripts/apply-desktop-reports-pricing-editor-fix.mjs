@@ -67,13 +67,11 @@ const write = (p, c) => fs.writeFileSync(p, c);
     '        setTariffs(monthlyTariffs.map(month => ({ ...month, tiers: normalizeTierNames(month.tiers || []) })));',
     '        setTariffs(monthlyTariffs.map(month => ({ ...month, monthNameAr: numericMonthLabel(month.month, month.year), tiers: normalizeTierNames(month.tiers || []) })));'
   );
+
+  c = c.replace(/          monthNameAr: 'شهر 8 \([^\n]*\)',/, '          monthNameAr: numericMonthLabel(8, 2026),');
   c = c.replace(
     '          tiers: pricingTiers.map(t => ({ ...t, fixedFee: 0 })),',
-    "          monthNameAr: numericMonthLabel(8, 2026),\n          tiers: normalizeTierNames(pricingTiers).map(t => ({ ...t, fixedFee: 0 })),"
-  );
-  c = c.replace(
-    "          tiers: normalizeTierNames(pricingTiers).map(t => ({ ...t, fixedFee: 0 })), ",
-    "          monthNameAr: numericMonthLabel(8, 2026),\n          tiers: normalizeTierNames(pricingTiers).map(t => ({ ...t, fixedFee: 0 })),"
+    '          tiers: normalizeTierNames(pricingTiers).map(t => ({ ...t, fixedFee: 0 })), '
   );
 
   c = c.replace(
@@ -85,13 +83,10 @@ const write = (p, c) => fs.writeFileSync(p, c);
     "    const baseTiers = normalizeTierNames(currentTiers).map(t => ({ ...t, fixedFee: 0, description: '' }));"
   );
 
-  // New month labels and the iOS/Android picker use 1..12 only, no Arabic month names.
+  // New month labels and the iOS/Android picker use 1..12 only, no month names.
+  c = c.replace(/    const monthLabel = [^\n]*;/, '    const monthLabel = numericMonthLabel(newMonthNumber, newYearNumber);');
   c = c.replace(
-    /    const monthLabel = [`'\"]?[^\n;]*;?/,
-    '    const monthLabel = numericMonthLabel(newMonthNumber, newYearNumber);'
-  );
-  c = c.replace(
-    /\{monthNamesArabic\.map\(\(name, i\) => \([\s\S]*?<option key=\{i \+ 1\} value=\{i \+ 1\}>[\s\S]*?<\/option>[\s\S]*?\)\)\}/,
+    /\{monthNamesArabic\.map\(\(name, i\) => \(\s*<option key=\{i \+ 1\} value=\{i \+ 1\}>\s*\{name\}\s*<\/option>\s*\)\)\}/m,
     `{monthNamesArabic.map((name, i) => (\n                      <option key={i + 1} value={i + 1}>\n                        {i + 1}\n                      </option>\n                    ))}`
   );
 
@@ -101,8 +96,7 @@ const write = (p, c) => fs.writeFileSync(p, c);
   c = c.replace('{isEditable && (\n                <button\n                  onClick={handleAddNewTier}', '{false && isEditable && (\n                <button\n                  onClick={handleAddNewTier}');
   c = c.replace('{isEditable && currentTiers.length > 1 && (', '{false && isEditable && currentTiers.length > 1 && (');
 
-  // The final ledger patch used to persist the new month without creating accounts. Force activation here,
-  // after every other pricing patch, so a new month immediately creates current-month invoices for everyone.
+  // The ledger finalizer persists a new month first; force full month activation here after all patches.
   c = c.replace(
     'onSaveMonthlyTariffs(updatedTariffs, monthId, false);',
     'onSaveMonthlyTariffs(updatedTariffs, monthId, true);'
