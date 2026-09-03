@@ -14,7 +14,7 @@ assert(reset.includes('useState(10)'), 'Destructive reset must have a 10-second 
 assert(reset.includes('password.length > 0'), 'Password entry is required before arming reset');
 assert(app.includes("supabase.auth.signInWithPassword({ email, password })"), 'Owner password must be re-authenticated by Supabase');
 assert(app.includes("userSession?.role !== 'generator_admin'"), 'Full reset must be owner-only');
-assert(app.includes("moldatk_emergency_backup_last_"), 'Emergency local backup must be retained');
+assert(app.includes('moldatk_emergency_backup_last_'), 'Emergency local backup must be retained');
 assert(app.includes("a.download = 'moldatk-backup-before-reset-'"), 'Automatic downloadable backup must be created');
 assert(app.includes(".delete().eq('generator_id', generatorId)"), 'Cloud deletes must be generator-scoped');
 assert(sync.includes('moldatk_factory_reset_in_progress'), 'Cloud sync must pause during destructive reset');
@@ -39,10 +39,11 @@ assert(reports.includes('تصفير حسابات سنة'), 'Annual reset control
 assert(app.includes("title: 'تصفير تقارير السنة'"), 'Annual reset must be persisted in audit history');
 assert(app.includes('بدون حذف الديون أو الفواتير الأصلية'), 'Annual reset must explicitly preserve source debts/invoices');
 
-// Any tariff may be removed, but paid ledger history is preserved.
-assert(pricing.includes("title=\"حذف تسعيرة هذا الشهر\""), 'Every tariff must expose a delete control');
+// Any tariff may be removed. Deleting the tariff record is metadata-only: accounting invoices/debts remain.
+assert(pricing.includes('title="حذف تسعيرة هذا الشهر"'), 'Every tariff must expose a delete control');
 assert(pricing.includes('tariffs.length > 1 && ('), 'Delete icon should be available on all tariff records when another record exists');
-assert(app.includes('removedActiveMonthHasPayments'), 'Active paid tariff deletion must preserve accounting history');
-assert(app.includes('removedActiveMonthId && !removedActiveMonthHasPayments'), 'Only unpaid deleted active months may have their generated ledger rolled back');
+assert(pricing.includes('onSaveMonthlyTariffs(updated, nextActive.id, false);'), 'Tariff deletion must save metadata without recalculating/removing ledgers');
+assert(pricing.includes('الفواتير والتسديدات والديون'), 'Tariff delete warning must explicitly preserve accounting history');
+assert(!pricing.includes("onSaveMonthlyTariffs(updated, nextActive.id, true);"), 'Deleting a tariff must never regenerate subscriber bills');
 
-console.log('Secure destructive controls audit passed: owner re-auth, typed phrase, timer, backups, scoped reset, annual reports reset, and delete-any-tariff ledger protection.');
+console.log('Secure destructive controls audit passed: owner re-auth, typed phrase, timer, backups, scoped reset, annual reports reset, and metadata-only delete-any-tariff protection.');
