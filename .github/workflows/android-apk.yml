@@ -62,6 +62,9 @@ jobs:
       - name: Accountant monthly regression test
         run: npx tsx scripts/monthly-ledger-smoke-test.ts
 
+      - name: Accountant tariff deletion test
+        run: npx tsx scripts/monthly-tariff-deletion-smoke-test.ts
+
       - name: Accountant full app audit
         run: npx tsx scripts/accountant-app-audit.ts
 
