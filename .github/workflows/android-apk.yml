@@ -33,8 +33,8 @@ jobs:
     env:
       VITE_SUPABASE_URL: https://adluynhkikoodjljoxeu.supabase.co
       VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CObjK2Uua18kVkXCkxdRog_keQLIDiE
-      CURRENT_VERSION: 1.3.5
-      CURRENT_VERSION_CODE: 9
+      CURRENT_VERSION: 1.3.6
+      CURRENT_VERSION_CODE: 10
       SHOULD_RELEASE: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release') }}
 
     steps:
@@ -67,6 +67,9 @@ jobs:
 
       - name: Accountant full app audit
         run: npx tsx scripts/accountant-app-audit.ts
+
+      - name: Destructive controls safety audit
+        run: npx tsx scripts/secure-destructive-controls-audit.ts
 
       - name: Build web app
         run: npm run build
@@ -169,7 +172,7 @@ jobs:
             minimumVersionCode: 5,
             force: false,
             apkUrl: `https://github.com/sajjadad589-art/moldatk.v2/releases/download/v${version}/Moldatk-Android-Release.apk`,
-            notes: 'تحديث الأشهر الرقمية، تفعيل التسعيرة الشهرية الفوري، ترحيل الديون، التقارير، وفحص محاسبي شامل.'
+            notes: 'إضافة تصفير سنوي للتقارير، حذف أي تسعيرة مع حفظ السجل المحاسبي، وتصفير آمن للنظام بكلمة المرور وعبارة تأكيد وعدّاد ونسخة احتياطية.'
           };
           fs.writeFileSync('public/app-version.json', JSON.stringify(manifest, null, 2) + '\n');
           NODE
