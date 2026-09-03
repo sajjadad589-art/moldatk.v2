@@ -152,3 +152,4 @@ await import('./apply-collector-account-save-login-fix.mjs');
 await import('./apply-monthly-ledger-finalization.mjs');
 await import('./apply-monthly-ledger-typecheck-fixes.mjs');
 await import('./apply-dashboard-current-month-status-fix.mjs');
+await import('./apply-desktop-reports-pricing-editor-fix.mjs');
