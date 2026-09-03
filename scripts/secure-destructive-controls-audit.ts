@@ -39,11 +39,15 @@ assert(reports.includes('تصفير حسابات سنة'), 'Annual reset control
 assert(app.includes("title: 'تصفير تقارير السنة'"), 'Annual reset must be persisted in audit history');
 assert(app.includes('بدون حذف الديون أو الفواتير الأصلية'), 'Annual reset must explicitly preserve source debts/invoices');
 
-// Any tariff may be removed. Deleting the tariff record is metadata-only: accounting invoices/debts remain.
+// Any tariff may be removed, including the active and final tariff. Removing tariff metadata
+// must preserve historical invoices/debts, while an empty list zeros only the live collection state.
 assert(pricing.includes('title="حذف تسعيرة هذا الشهر"'), 'Every tariff must expose a delete control');
-assert(pricing.includes('tariffs.length > 1 && ('), 'Delete icon should be available on all tariff records when another record exists');
-assert(pricing.includes('onSaveMonthlyTariffs(updated, nextActive.id, false);'), 'Tariff deletion must save metadata without recalculating/removing ledgers');
-assert(pricing.includes('الفواتير والتسديدات والديون'), 'Tariff delete warning must explicitly preserve accounting history');
+assert(pricing.includes("onSaveMonthlyTariffs([], '', false);"), 'The final tariff must be deletable');
+assert(pricing.includes('الفواتير والتسديدات والديون السابقة سيبقى محفوظاً'), 'Tariff delete warning must preserve accounting history');
+assert(!pricing.includes('لا يمكن حذف آخر تسعيرة موجودة'), 'No last-tariff deletion guard may remain');
 assert(!pricing.includes("onSaveMonthlyTariffs(updated, nextActive.id, true);"), 'Deleting a tariff must never regenerate subscriber bills');
+assert(app.includes("getStorageKey('moldatk_deleted_tariffs')"), 'Tariff deletion must create durable tombstones');
+assert(app.includes('normalized.length === 0'), 'Empty tariff list must have an explicit live-zero path');
+assert(sync.includes('.filter(t => !deletedTariffSet.has(t.id))'), 'Deleted tariffs must not resurrect from cloud pull');
 
-console.log('Secure destructive controls audit passed: owner re-auth, typed phrase, timer, backups, scoped reset, annual reports reset, and metadata-only delete-any-tariff protection.');
+console.log('Secure destructive controls audit passed: owner re-auth, backups, scoped reset, annual reports reset, delete-all tariffs, live-zero state, and preserved accounting history.');
