@@ -1,9 +1,9 @@
 {
   "enabled": true,
-  "versionCode": 9,
-  "versionName": "1.3.5",
+  "versionCode": 10,
+  "versionName": "1.3.6",
   "minimumVersionCode": 5,
   "force": false,
-  "apkUrl": "https://github.com/sajjadad589-art/moldatk.v2/releases/download/v1.3.5/Moldatk-Android-Release.apk",
-  "notes": "تحديث الأشهر الرقمية، تفعيل التسعيرة الشهرية الفوري، ترحيل الديون، التقارير، وفحص محاسبي شامل."
+  "apkUrl": "https://github.com/sajjadad589-art/moldatk.v2/releases/download/v1.3.6/Moldatk-Android-Release.apk",
+  "notes": "إضافة تصفير سنوي للتقارير، حذف أي تسعيرة مع حفظ السجل المحاسبي، وتصفير آمن للنظام بكلمة المرور وعبارة تأكيد وعدّاد ونسخة احتياطية."
 }
