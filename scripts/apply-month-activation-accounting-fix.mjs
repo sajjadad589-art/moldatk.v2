@@ -51,8 +51,6 @@ const replacement = `  const handleSaveMonthlyTariffs = (updatedTariffs: Monthly
       nextSubscribers = activateMonthlyTariffForSubscribers(subscribers, previousActiveRecord, activeRecord, new Date());
     }
 
-    // اكتب snapshot التسعيرة والحسابات معاً قبل إطلاق أي حدث sync، حتى لا تسحب الواجهة
-    // شهراً جديداً بينما المشتركين بعدهم على عدادات الشهر السابق.
     setMonthlyTariffs(normalized);
     if (nextSubscribers !== subscribers) setSubscribers(nextSubscribers);
     try {
@@ -104,3 +102,4 @@ await import('./apply-monthly-ledger-finalization.mjs');
 await import('./apply-monthly-ledger-typecheck-fixes.mjs');
 await import('./apply-dashboard-current-month-status-fix.mjs');
 await import('./apply-desktop-reports-pricing-editor-fix.mjs');
+await import('./apply-secure-reset-and-report-controls.mjs');
