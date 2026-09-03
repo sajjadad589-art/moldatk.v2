@@ -76,6 +76,8 @@ const pricing = fs.readFileSync('src/components/PricingModal.tsx', 'utf8');
 const app = fs.readFileSync('src/App.tsx', 'utf8');
 const engine = fs.readFileSync('src/utils/monthlyCycleEngine.ts', 'utf8');
 const sync = fs.readFileSync('src/lib/useGeneratorCloudSync.ts', 'utf8');
+const mobileDashboard = fs.readFileSync('src/components/mobile/MobileDashboard.tsx', 'utf8');
+const desktopDashboard = fs.readFileSync('src/components/DashboardView.tsx', 'utf8');
 
 assert(pricing.includes("onSaveMonthlyTariffs(updatedTariffs, monthId, true);"), 'Creating a tariff must activate the monthly cycle immediately');
 assert(pricing.includes("onSaveMonthlyTariffs([], '', false);"), 'The final remaining tariff must be deletable');
@@ -91,8 +93,16 @@ assert(engine.includes('amountDue: 0'), 'Monthly engine must zero live due when 
 assert(engine.includes('amountPaid: 0'), 'Monthly engine must zero live paid counter when there is no active tariff');
 assert(engine.includes("? 'free' : 'unpaid'"), 'Monthly engine must reset billable live status safely');
 
+assert(mobileDashboard.includes('const billingCycleActive = pricingTiers.some'), 'Mobile dashboard must detect whether a live tariff exists');
+assert(mobileDashboard.includes('const paidSubs = billingCycleActive ? subscribers.filter(isPaidThisMonth) : [];'), 'Mobile paid counter must be zero with no tariff');
+assert(mobileDashboard.includes("const unpaidSubs = billingCycleActive"), 'Mobile unpaid counter must be gated by the active tariff');
+assert(mobileDashboard.includes('const currentMonthTotal = billingCycleActive'), 'Mobile monthly total must be zero with no tariff');
+assert(desktopDashboard.includes('const billingCycleActive = pricingTiers.some'), 'Desktop dashboard must detect whether a live tariff exists');
+assert(desktopDashboard.includes('const paidSubscribers = billingCycleActive'), 'Desktop paid counter must be zero with no tariff');
+assert(desktopDashboard.includes('const totalUnpaidDebt = billingCycleActive'), 'Desktop unpaid amount must be zero with no tariff');
+
 assert(sync.includes("deletedTariffs: key('moldatk_deleted_tariffs', generatorId)"), 'Cloud sync must persist tariff deletion tombstones');
 assert(sync.includes(".delete().eq('generator_id', generatorId).in('id', deletedTariffIds)"), 'Cloud sync must delete tombstoned tariffs remotely');
 assert(sync.includes('.filter(t => !deletedTariffSet.has(t.id))'), 'Cloud pull must never resurrect a deleted tariff');
 
-console.log('Monthly cycle lifecycle suite passed: monthly reset, carried debt, delete-all tariffs, zero live state, idempotent activation, and sync-safe deletion.');
+console.log('Monthly cycle lifecycle suite passed: monthly reset, carried debt, delete-all tariffs, zero live state, zero dashboard billing readings, idempotent activation, and sync-safe deletion.');
