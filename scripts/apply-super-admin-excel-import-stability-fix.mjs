@@ -8,8 +8,8 @@ if (!fs.existsSync(p)) {
 
 let c = fs.readFileSync(p, 'utf8');
 
-if (c.includes('SUPER_ADMIN_EXCEL_IMPORT_STABILITY_V2')) {
-  console.log('Super Admin Excel import stability already applied.');
+if (c.includes('SUPER_ADMIN_EXCEL_IMPORT_STABILITY_V3')) {
+  console.log('Super Admin Excel import stability/cabinet auto-link already applied.');
   process.exit(0);
 }
 
@@ -17,11 +17,11 @@ const start = c.indexOf('  const importSubscribersFromExcel = async (e: React.Fo
 const end = c.indexOf('  const sendNotification = async (e: React.FormEvent) => {', start);
 
 if (start === -1 || end === -1) {
-  console.warn('Excel import handler markers not found; skipping stability patch.');
+  console.warn('Excel import handler markers not found; skipping stability/cabinet patch.');
   process.exit(0);
 }
 
-const stableHandler = String.raw`  // SUPER_ADMIN_EXCEL_IMPORT_STABILITY_V2
+const stableHandler = String.raw`  // SUPER_ADMIN_EXCEL_IMPORT_STABILITY_V3
   const importSubscribersFromExcel = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!excelImportForm.generator_id) return setMessage('اختر حساب صاحب المولدة قبل الرفع');
@@ -30,7 +30,30 @@ const stableHandler = String.raw`  // SUPER_ADMIN_EXCEL_IMPORT_STABILITY_V2
     const idle = () => new Promise<void>(resolve => setTimeout(resolve, 0));
     const normalizePhoneKey = (value: unknown) => normalizeText(value)
       .replace(/[٠-٩]/g, d => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+      .replace(/[۰-۹]/g, d => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
       .replace(/\D/g, '');
+    const normalizeLineKey = (value: unknown) => normalizeText(value)
+      .replace(/[ً-ْ]/g, '')
+      .replace(/[أإآ]/g, 'ا')
+      .replace(/ة/g, 'ه')
+      .replace(/ى/g, 'ي')
+      .replace(/[٠-٩]/g, d => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+      .replace(/[۰-۹]/g, d => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
+      .replace(/[ـ_\-.\/\:،,()\[\]]/g, '')
+      .replace(/\s+/g, '')
+      .toLowerCase();
+    const safeLineId = (name: string, index: number) => {
+      const base = normalizeLineKey(name).replace(/[^a-z0-9\u0600-\u06ff]/gi, '').slice(0, 24) || `cabinet${index}`;
+      return `excel-line-${Date.now()}-${index}-${base}`;
+    };
+    const phaseTypes: PhaseType[] = ['phase-R', 'phase-S', 'phase-T', '3-phase'];
+    const phaseNames: Record<PhaseType, string> = {
+      'phase-R': 'فيز R (الأحمر) - 380V',
+      'phase-S': 'فيز S (الأصفر) - 380V',
+      'phase-T': 'فيز T (الأزرق) - 380V',
+      '3-phase': 'ثلاثي الفيز (3-Phase)',
+      'single-phase': 'فيز أحادي (220V)',
+    };
     const cellValue = (sheet: XLSX.WorkSheet, rowIndex: number, colIndex: number) => {
       const cell = sheet[XLSX.utils.encode_cell({ r: rowIndex, c: colIndex })];
       return cell?.w ?? cell?.v ?? '';
@@ -80,6 +103,12 @@ const stableHandler = String.raw`  // SUPER_ADMIN_EXCEL_IMPORT_STABILITY_V2
         const foundHeader = headers.findIndex(h => wanted.includes(normalizeHeader(h)));
         return foundHeader >= 0 ? cellValue(sheet, rowIndex, range.s.c + foundHeader) : '';
       };
+      const readCabinetName = (rowIndex: number) => {
+        const line = normalizeText(readField(rowIndex, 'line'));
+        const box = normalizeText(readField(rowIndex, 'boxNumber'));
+        const explicitCabinet = normalizeText(readAny(rowIndex, ['الكابينة', 'كابينة', 'البورد', 'البورد/الكابينة', 'اسم الكابينة', 'cabinet', 'board']));
+        return explicitCabinet || line || box;
+      };
 
       const dataStartRow = range.s.r + 1;
       const totalRows = Math.max(0, range.e.r - dataStartRow + 1);
@@ -89,7 +118,7 @@ const stableHandler = String.raw`  // SUPER_ADMIN_EXCEL_IMPORT_STABILITY_V2
       setExcelImportReport({
         ...EMPTY_EXCEL_REPORT,
         status: 'processing',
-        title: 'تمت قراءة الملف، جاري تحويل البيانات على دفعات...',
+        title: 'تمت قراءة الملف، جاري إنشاء الكابينات وربط المشتركين...',
         generatorName: generator?.name || excelImportForm.generator_id,
         fileName: excelImportForm.file.name,
         totalRows,
@@ -109,17 +138,56 @@ const stableHandler = String.raw`  // SUPER_ADMIN_EXCEL_IMPORT_STABILITY_V2
       const existing = readJson<Subscriber[]>(subscribersKey, []);
       const tariffs = readJson<MonthlyTariffRecord[]>(tariffsKey, INITIAL_MONTHLY_TARIFFS);
       const activeTariff = tariffs.find(t => t.isCurrentActive) || tariffs[0] || INITIAL_MONTHLY_TARIFFS[0];
-      const lines = readJson<LineDistribution[]>(linesKey, []);
+      const existingLines = readJson<LineDistribution[]>(linesKey, []);
       const now = new Date().toISOString();
       const imported: Subscriber[] = [];
       const warnings: string[] = [];
       const errors: string[] = [];
+      const createdCabinets: string[] = [];
       const usedPhones = new Set(existing.map(s => normalizePhoneKey(s.phone)).filter(Boolean));
       const usedCodes = new Set(existing.map(s => s.code || s.subscriberCode).filter(Boolean));
+      const lineByKey = new Map<string, LineDistribution>();
+
+      existingLines.forEach(line => {
+        [line.id, line.name, line.zone, (line as any).lineName].filter(Boolean).forEach(value => {
+          const key = normalizeLineKey(value);
+          if (key && !lineByKey.has(key)) lineByKey.set(key, line);
+        });
+      });
+
+      const ensureCabinet = (rawName: string): LineDistribution | null => {
+        const name = normalizeText(rawName);
+        if (!name) return null;
+        const key = normalizeLineKey(name);
+        const existingMatch = lineByKey.get(key);
+        if (existingMatch) return existingMatch;
+
+        const nextIndex = existingLines.length + createdCabinets.length + 1;
+        const phaseType = phaseTypes[(nextIndex - 1) % phaseTypes.length];
+        const newLine: LineDistribution = {
+          id: safeLineId(name, nextIndex),
+          name,
+          zone: name,
+          phaseType,
+          phaseNameAr: phaseNames[phaseType],
+          maxCapacityAmperes: 200,
+          currentLoadAmperes: 0,
+          subscribersCount: 0,
+          technicianName: '',
+          breakerNumber: `Q${nextIndex}-250A`,
+        };
+        existingLines.push(newLine);
+        lineByKey.set(key, newLine);
+        lineByKey.set(normalizeLineKey(newLine.id), newLine);
+        createdCabinets.push(name);
+        return newLine;
+      };
+
       const importedCellKeys = ['fullName', 'phone', 'amperes', 'tier', 'line', 'address', 'boxNumber', 'amountPaid', 'amountDue', 'paymentStatus', 'code', 'notes', 'joiningDate'];
       let cellsImported = 0;
       let cellsRead = 0;
       let skippedRows = 0;
+      let rowsWithoutCabinet = 0;
 
       for (let rowIndex = dataStartRow; rowIndex <= range.e.r; rowIndex += 1) {
         try {
@@ -147,8 +215,13 @@ const stableHandler = String.raw`  // SUPER_ADMIN_EXCEL_IMPORT_STABILITY_V2
           const explicitDue = toNumber(readField(rowIndex, 'amountDue'));
           const total = explicitDue > 0 ? explicitDue + paid : calc.total;
           const paymentStatus = parsePaymentStatus(readField(rowIndex, 'paymentStatus'), paid, total);
-          const lineName = normalizeText(readField(rowIndex, 'line'));
-          const lineMatch = lines.find(l => normalizeText(l.name) === lineName || normalizeText(l.zone) === lineName);
+          const cabinetName = readCabinetName(rowIndex);
+          const cabinet = ensureCabinet(cabinetName);
+          if (!cabinet) {
+            rowsWithoutCabinet += 1;
+            if (rowsWithoutCabinet <= 20) warnings.push(`السطر ${rowIndex + 1}: لا يحتوي اسم كابينة/خط، تم رفع المشترك بدون ربط كابينة.`);
+          }
+
           const givenCode = normalizeText(readField(rowIndex, 'code'));
           let code = givenCode && !usedCodes.has(givenCode) ? givenCode : generateImportCode(excelImportForm.generator_id, [...existing, ...imported]);
           while (usedCodes.has(code)) code = generateImportCode(excelImportForm.generator_id, [...existing, ...imported]);
@@ -174,9 +247,9 @@ const stableHandler = String.raw`  // SUPER_ADMIN_EXCEL_IMPORT_STABILITY_V2
             phone,
             tier,
             amperes,
-            lineId: lineMatch?.id,
-            lineName: lineName || lineMatch?.name || '',
-            line: lineName || lineMatch?.name || '',
+            lineId: cabinet?.id,
+            lineName: cabinet?.name || cabinetName || '',
+            line: cabinet?.name || cabinetName || '',
             address,
             boxNumber,
             paymentStatus,
@@ -206,7 +279,7 @@ const stableHandler = String.raw`  // SUPER_ADMIN_EXCEL_IMPORT_STABILITY_V2
           setExcelImportProgress(Math.min(progress, 88));
           setExcelImportReport(prev => ({
             ...prev,
-            title: `جاري تحويل البيانات... ${Math.min(doneRows, totalRows)} / ${totalRows}`,
+            title: `جاري إنشاء الكابينات وربط المشتركين... ${Math.min(doneRows, totalRows)} / ${totalRows}`,
             totalRows,
             importedRows: imported.length,
             skippedRows,
@@ -221,12 +294,24 @@ const stableHandler = String.raw`  // SUPER_ADMIN_EXCEL_IMPORT_STABILITY_V2
 
       if (!imported.length) throw new Error('لم يتم رفع أي مشترك. تأكد من وجود عمود اسم المشترك أو رقم الهاتف وعدم تكرار الأرقام.');
 
+      const totalsByLineId = new Map<string, { count: number; amps: number }>();
+      [...existing, ...imported].forEach(sub => {
+        if (!sub.lineId) return;
+        const prev = totalsByLineId.get(sub.lineId) || { count: 0, amps: 0 };
+        totalsByLineId.set(sub.lineId, { count: prev.count + 1, amps: prev.amps + Number(sub.amperes || 0) });
+      });
+      const nextLines = existingLines.map(line => {
+        const totals = totalsByLineId.get(line.id) || { count: 0, amps: 0 };
+        return { ...line, subscribersCount: totals.count, currentLoadAmperes: totals.amps };
+      });
+
       const nextSubscribers = [...existing, ...imported];
       setExcelImportProgress(92);
-      setExcelImportReport(prev => ({ ...prev, title: 'جاري حفظ البيانات داخل حساب صاحب المولدة...' }));
+      setExcelImportReport(prev => ({ ...prev, title: 'جاري حفظ المشتركين والكابينات داخل حساب صاحب المولدة...' }));
       await idle();
 
       try {
+        localStorage.setItem(linesKey, JSON.stringify(nextLines));
         localStorage.setItem(subscribersKey, JSON.stringify(nextSubscribers));
       } catch (storageError) {
         throw new Error('حجم ملف Excel كبير جداً على تخزين المتصفح. قسّم الملف إلى دفعات أصغر ثم ارفعه من جديد.');
@@ -254,18 +339,21 @@ const stableHandler = String.raw`  // SUPER_ADMIN_EXCEL_IMPORT_STABILITY_V2
           id: `audit-${Date.now()}`,
           timestamp: now,
           category: 'subscriber',
-          title: 'رفع مشتركين من Excel عبر السوبر أدمن',
-          details: `تم رفع ${imported.length} مشترك إلى حساب ${generator?.name || excelImportForm.generator_id}. تم تخطي ${skippedRows} سطر.`,
+          title: 'رفع مشتركين وكابينات من Excel عبر السوبر أدمن',
+          details: `تم رفع ${imported.length} مشترك وربطهم بالكابينات داخل حساب ${generator?.name || excelImportForm.generator_id}. تم إنشاء ${createdCabinets.length} كابينة جديدة وتخطي ${skippedRows} سطر.`,
           entityName: generator?.name || excelImportForm.generator_id,
           actorName: 'Super Admin',
         },
         ...readJson<any[]>(auditKey, []),
       ]));
 
+      const cabinetSummary = createdCabinets.length ? ` وتم إنشاء ${createdCabinets.length} كابينة تلقائياً` : ' بدون إنشاء كابينات جديدة';
+      if (rowsWithoutCabinet > 0) warnings.push(`${rowsWithoutCabinet} مشترك لا يحتوي اسم كابينة/خط وتم رفعه بدون ربط.`);
+
       setExcelImportProgress(100);
       setExcelImportReport({
         status: 'success',
-        title: 'تم رفع ملف Excel بنجاح',
+        title: 'تم رفع ملف Excel وربط الكابينات بنجاح',
         generatorName: generator?.name || excelImportForm.generator_id,
         fileName: excelImportForm.file.name,
         totalRows,
@@ -276,11 +364,11 @@ const stableHandler = String.raw`  // SUPER_ADMIN_EXCEL_IMPORT_STABILITY_V2
         unmappedColumns,
         cellsRead,
         cellsImported,
-        warnings,
+        warnings: createdCabinets.length ? [`تم إنشاء الكابينات: ${createdCabinets.slice(0, 30).join('، ')}${createdCabinets.length > 30 ? '...' : ''}`, ...warnings] : warnings,
         errors,
       });
       window.dispatchEvent(new Event('moldatk-local-sync'));
-      setMessage(`تم رفع ${imported.length} مشترك إلى حساب ${generator?.name || 'صاحب المولدة'} بنجاح — تم تخطي ${skippedRows} سطر.`);
+      setMessage(`تم رفع ${imported.length} مشترك وربطهم بالكابينات بنجاح${cabinetSummary} — تم تخطي ${skippedRows} سطر.`);
     } catch (err: any) {
       const errorMessage = err?.message || 'خطأ غير معروف';
       setExcelImportProgress(100);
@@ -300,4 +388,4 @@ const stableHandler = String.raw`  // SUPER_ADMIN_EXCEL_IMPORT_STABILITY_V2
 
 c = c.slice(0, start) + stableHandler + c.slice(end);
 fs.writeFileSync(p, c);
-console.log('Applied stable Super Admin Excel import with chunked row processing and safe storage errors.');
+console.log('Applied stable Super Admin Excel import with automatic cabinet creation/linking');
