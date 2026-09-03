@@ -158,7 +158,7 @@ export interface Collector {
   generatorId?: string | null;
 }
 
-export type UserRole = 'super_admin' | 'generator_admin' | 'admin' | 'collector';
+export type UserRole = 'super_admin' | 'super_admin_manager' | 'generator_admin' | 'admin' | 'collector';
 
 export interface ActiveUserSession {
   role: UserRole;
