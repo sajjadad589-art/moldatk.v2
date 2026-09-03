@@ -6,9 +6,11 @@ import {
   Plus,
   Wallet,
   ChevronLeft,
+  CircleDollarSign,
 } from 'lucide-react';
 import { Subscriber, SubscriptionTierPricing, GeneratorSpecs, LineDistribution } from '../../types';
-import { formatCurrency, formatNumberArabic } from '../../utils/formatters';
+import { calculateSubscriberBill, formatCurrency, formatNumberArabic } from '../../utils/formatters';
+import { getInvoiceRemaining, getMonthId } from '../../utils/monthlyAccounting';
 
 interface MobileDashboardProps {
   subscribers: Subscriber[];
@@ -19,6 +21,7 @@ interface MobileDashboardProps {
   onOpenNewSubscriberModal: () => void;
   onNavigateToTab: (tab: string) => void;
   cashboxAmount?: number;
+  activeMonthId?: string;
 }
 
 export const MobileDashboard: React.FC<MobileDashboardProps> = ({
@@ -30,19 +33,44 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
   onOpenNewSubscriberModal,
   onNavigateToTab,
   cashboxAmount = 0,
+  activeMonthId = getMonthId(),
 }) => {
   const totalSubscribers = subscribers.length;
-  const paidSubs = subscribers.filter(s => s.paymentStatus === 'paid');
-  const unpaidSubs = subscribers.filter(s => s.paymentStatus === 'unpaid' || s.paymentStatus === 'partial');
 
-  const totalCollectedRevenue = paidSubs.reduce(
-    (acc, s) => acc + (Number(s.amountPaid) || 0),
-    0
-  );
-  const totalUnpaidDebt = unpaidSubs.reduce((acc, s) => {
-    const due = Number(s.amountDue) || 0;
-    const paid = Number(s.amountPaid) || 0;
-    return acc + Math.max(0, due - paid);
+  const currentAccount = (sub: Subscriber) =>
+    (sub.invoicesHistory || []).find(inv => inv.monthId === activeMonthId && inv.status !== 'cancelled');
+
+  const paidSubs = subscribers.filter(sub => {
+    const invoice = currentAccount(sub);
+    if (invoice) return invoice.status !== 'free' && getInvoiceRemaining(invoice) === 0;
+    return sub.paymentStatus === 'paid';
+  });
+
+  const unpaidSubs = subscribers.filter(sub => {
+    const invoice = currentAccount(sub);
+    if (invoice) return invoice.status !== 'free' && getInvoiceRemaining(invoice) > 0;
+    return sub.paymentStatus === 'unpaid' || sub.paymentStatus === 'partial';
+  });
+
+  const totalCollectedRevenue = subscribers.reduce((acc, sub) => {
+    const invoice = currentAccount(sub);
+    if (invoice) return acc + Number(invoice.paidAmount || 0);
+    return acc + (sub.paymentStatus === 'paid' || sub.paymentStatus === 'partial' ? Number(sub.amountPaid || 0) : 0);
+  }, 0);
+
+  const totalUnpaidDebt = subscribers.reduce((acc, sub) => {
+    const invoice = currentAccount(sub);
+    if (invoice) return acc + getInvoiceRemaining(invoice);
+    if (sub.paymentStatus === 'unpaid' || sub.paymentStatus === 'partial') return acc + Math.max(0, Number(sub.amountDue || 0));
+    return acc;
+  }, 0);
+
+  // Monthly total is the charge of THIS month only. Old carried debt is deliberately excluded.
+  const currentMonthTotal = subscribers.reduce((acc, sub) => {
+    const invoice = currentAccount(sub);
+    if (invoice) return acc + Number(invoice.totalAmount || 0);
+    if (sub.tier === 'free' || sub.isExempted) return acc;
+    return acc + calculateSubscriberBill(sub.amperes, sub.tier, pricingTiers).total;
   }, 0);
 
   const circleLength = 251.2;
@@ -70,7 +98,7 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
         </button>
       </div>
 
-      {/* 2. Paid / Unpaid collection wheels */}
+      {/* 2. Paid / Unpaid collection wheels - keep the approved ring design unchanged. */}
       <section className="space-y-2.5">
         <div className="flex items-center justify-between px-1">
           <h2 className="text-sm font-black text-slate-900 dark:text-white">حالة تسديد المشتركين</h2>
@@ -112,7 +140,7 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
             <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-center">
               <span className="block text-[9px] font-bold text-slate-400 mb-0.5">المبلغ المستحصل</span>
               <span className="block text-sm font-black text-emerald-500 tabular-nums truncate" dir="ltr">
-                {formatCurrency(totalCollectedRevenue)}
+                {formatCurrency(totalCollectedRevenue, generatorSpecs.currency)}
               </span>
             </div>
           </button>
@@ -151,7 +179,7 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
             <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-center">
               <span className="block text-[9px] font-bold text-slate-400 mb-0.5">المبلغ غير المسدد</span>
               <span className="block text-sm font-black text-rose-500 tabular-nums truncate" dir="ltr">
-                {formatCurrency(totalUnpaidDebt)}
+                {formatCurrency(totalUnpaidDebt, generatorSpecs.currency)}
               </span>
             </div>
           </button>
@@ -177,7 +205,7 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
 
           <div className="text-left shrink-0">
             <span className="block text-lg font-black text-white tabular-nums" dir="ltr">
-              {formatCurrency(cashboxAmount)}
+              {formatCurrency(cashboxAmount, generatorSpecs.currency)}
             </span>
             <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-black text-emerald-200">
               فتح القاصة
@@ -186,6 +214,24 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
           </div>
         </div>
       </button>
+
+      {/* 4. The only new dashboard box requested: current-month tariff total, excluding old debt. */}
+      <div className="w-full rounded-3xl bg-gradient-to-l from-blue-950 via-[#13234a] to-[#111c38] border border-blue-700/60 p-4 shadow-lg">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-12 h-12 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center shrink-0">
+              <CircleDollarSign className="w-6 h-6 text-blue-300" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-sm font-black text-white">المبلغ الكلي لهذا الشهر</h3>
+              <p className="text-[10px] text-blue-200/80 mt-0.5">بحسب تسعيرة هذا الشهر فقط — بدون الديون السابقة</p>
+            </div>
+          </div>
+          <strong className="text-xl font-black text-white tabular-nums text-left shrink-0" dir="ltr">
+            {formatCurrency(currentMonthTotal, generatorSpecs.currency)}
+          </strong>
+        </div>
+      </div>
     </div>
   );
 };
