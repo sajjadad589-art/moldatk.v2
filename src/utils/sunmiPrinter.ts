@@ -16,6 +16,12 @@ export interface SunmiReceiptPayload {
   totalAmount: string;
   paidAmount: string;
   remainingAmount: string;
+  previousDebt?: string;
+  currentCharge?: string;
+  totalBeforePayment?: string;
+  appliedToPreviousDebt?: string;
+  appliedToCurrentMonth?: string;
+  totalOutstandingAfter?: string;
   note?: string;
   issueDate: string;
   printTime: string;
