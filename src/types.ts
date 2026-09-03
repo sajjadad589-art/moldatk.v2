@@ -20,7 +20,7 @@ export interface SubscriptionTierPricing {
 }
 
 export interface MonthlyTariffRecord {
-  id: string; // e.g. "2026-08"
+  id: string; // canonical YYYY-MM, e.g. "2026-08"
   month: number; // 1-12
   year: number; // 2026
   monthNameAr: string; // e.g. "شهر 8 (آب 2026)"
@@ -28,7 +28,14 @@ export interface MonthlyTariffRecord {
   fuelPricePerLiter?: number;
   operatingHoursTotal?: number;
   createdAt: string;
+  updatedAt?: string;
   isCurrentActive?: boolean;
+}
+
+export interface PaymentAllocationEntry {
+  monthId: string;
+  monthNameAr: string;
+  amount: number;
 }
 
 export interface SubscriberInvoice {
@@ -52,6 +59,15 @@ export interface SubscriberInvoice {
   collectorName?: string;
   notes?: string;
   receiptNumber?: string;
+
+  // Receipt/payment snapshot. These fields are optional so old cloud rows remain compatible.
+  previousDebtBefore?: number;
+  currentCharge?: number;
+  totalBeforePayment?: number;
+  appliedToPreviousDebt?: number;
+  appliedToCurrentMonth?: number;
+  totalOutstandingAfter?: number;
+  paymentAllocations?: PaymentAllocationEntry[];
 }
 
 export interface Subscriber {
@@ -71,7 +87,9 @@ export interface Subscriber {
   boxNumber?: string; // رقم الجوزة / الصندوق
   paymentStatus: PaymentStatus;
   lastPaymentDate?: string;
+  /** Total outstanding balance across all monthly invoices. */
   amountDue: number;
+  /** Amount paid toward the active/current month (legacy-compatible summary field). */
   amountPaid: number;
   notes?: string;
   isExempted?: boolean;
@@ -208,4 +226,3 @@ export interface FuelLogEntry {
   supplier: string;
   invoiceNumber: string;
 }
-
