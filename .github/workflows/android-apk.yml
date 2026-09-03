@@ -33,8 +33,8 @@ jobs:
     env:
       VITE_SUPABASE_URL: https://adluynhkikoodjljoxeu.supabase.co
       VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CObjK2Uua18kVkXCkxdRog_keQLIDiE
-      CURRENT_VERSION: 1.3.8
-      CURRENT_VERSION_CODE: 12
+      CURRENT_VERSION: 1.3.9
+      CURRENT_VERSION_CODE: 13
       SHOULD_RELEASE: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release') }}
 
     steps:
@@ -178,7 +178,7 @@ jobs:
             minimumVersionCode: 5,
             force: false,
             apkUrl: `https://github.com/sajjadad589-art/moldatk.v2/releases/download/v${version}/Moldatk-Android-Release.apk`,
-            notes: 'إصلاح جذري لدورة التسعيرة الشهرية: الشهر الجديد يصفّر المسدد مرة واحدة فقط، يحفظ الدين السابق، يمنع الفواتير الوهمية من إبقاء المشترك مسدداً، ويحفظ التسديدات عند تعديل تسعيرة الشهر النشط.'
+            notes: 'عند حذف جميع التسعيرات تتصفر قراءات التحصيل في لوحة التحكم: المسددين وغير المسددين ومبالغهم والمبلغ الكلي للشهر، مع بقاء عدد المشتركين والسجل التاريخي محفوظين.'
           };
           fs.writeFileSync('public/app-version.json', JSON.stringify(manifest, null, 2) + '\n');
           NODE
