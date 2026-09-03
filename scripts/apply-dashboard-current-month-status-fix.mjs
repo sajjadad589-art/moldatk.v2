@@ -3,9 +3,13 @@ import fs from 'node:fs';
 const p = 'src/components/mobile/MobileDashboard.tsx';
 let c = fs.readFileSync(p, 'utf8');
 
-const start = c.indexOf('  const currentAccount = (sub: Subscriber) =>');
-const end = c.indexOf('  // Monthly total is the charge of THIS month only.', start);
-if (start < 0 || end < 0) {
+const currentAccountStart = c.indexOf('  const currentAccount = (sub: Subscriber) =>');
+const existingGuardStart = currentAccountStart >= 0
+  ? c.lastIndexOf('  const billingCycleActive = pricingTiers.some', currentAccountStart)
+  : -1;
+const start = existingGuardStart >= 0 ? existingGuardStart : currentAccountStart;
+const end = c.indexOf('  // Monthly total is the charge of THIS month only.', currentAccountStart);
+if (currentAccountStart < 0 || start < 0 || end < 0) {
   throw new Error('Dashboard current-month status block not found');
 }
 
