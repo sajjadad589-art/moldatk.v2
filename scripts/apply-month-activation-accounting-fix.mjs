@@ -103,3 +103,4 @@ await import('./apply-monthly-ledger-typecheck-fixes.mjs');
 await import('./apply-dashboard-current-month-status-fix.mjs');
 await import('./apply-desktop-reports-pricing-editor-fix.mjs');
 await import('./apply-secure-reset-and-report-controls.mjs');
+await import('./apply-secure-reset-layout-fix.mjs');
