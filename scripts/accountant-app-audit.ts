@@ -62,7 +62,10 @@ mustContain('src/utils/monthlyAccounting.ts', "return `${month}-${year}`;", 'Num
 mustContain('src/utils/monthlyTariffDeletion.ts', "throw new Error('MONTH_HAS_PAYMENTS')", 'Paid month deletion hard-stop');
 mustContain('src/components/mobile/MobileDashboard.tsx', 'activeMonthId = getMonthId()', 'Dashboard must be scoped to current month');
 mustContain('src/components/mobile/MobileDashboard.tsx', 'const currentAccount = (sub: Subscriber)', 'Dashboard current-month invoice selector');
-mustContain('src/components/mobile/MobileDashboard.tsx', 'const currentMonthTotal = subscribers.reduce', 'Current month total card');
+mustContain('src/components/mobile/MobileDashboard.tsx', 'const billingCycleActive = pricingTiers.some', 'Dashboard must know when no tariff is active');
+mustContain('src/components/mobile/MobileDashboard.tsx', 'const currentMonthTotal = billingCycleActive', 'Current month total must zero when tariffs are cleared');
+mustContain('src/components/mobile/MobileDashboard.tsx', 'const paidSubs = billingCycleActive', 'Paid dashboard count must zero when tariffs are cleared');
+mustContain('src/components/DashboardView.tsx', 'const paidSubscribers = billingCycleActive', 'Desktop paid dashboard count must zero when tariffs are cleared');
 
 // ---------------------------------------------------------------------------
 // Payment path + receipt path
@@ -103,4 +106,4 @@ assert(allSrc.includes('#46515F') || allSrc.includes('slate'), 'Free state gray 
 assert(allSrc.includes('#8A2F3E') || allSrc.includes('rose'), 'Unpaid state burgundy/red styling must remain present');
 assert(allSrc.includes("paymentStatus === 'free'") || allSrc.includes("tier === 'free'"), 'Free account payment protection must remain present');
 
-console.log('Accountant app audit passed: pricing, numeric months, zero hidden fees, atomic monthly rollover, safe deletion, reports, debt allocation, receipts, isolation, offline sync, deletion tombstones, cashbox, notifications, colors, and free-account safeguards.');
+console.log('Accountant app audit passed: pricing, numeric months, zero hidden fees, atomic monthly rollover, safe deletion, zero-dashboard reset, reports, debt allocation, receipts, isolation, offline sync, deletion tombstones, cashbox, notifications, colors, and free-account safeguards.');
