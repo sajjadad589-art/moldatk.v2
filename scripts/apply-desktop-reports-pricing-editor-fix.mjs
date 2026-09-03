@@ -58,15 +58,12 @@ const write = (p, c) => fs.writeFileSync(p, c);
     );
   }
 
-  // Existing months are shown numerically too; tier names are normalized every time the modal opens.
-  c = c.replace(
-    '        setTariffs(monthlyTariffs);',
-    '        setTariffs(monthlyTariffs.map(month => ({ ...month, monthNameAr: numericMonthLabel(month.month, month.year), tiers: normalizeTierNames(month.tiers || []) })));'
-  );
-  c = c.replace(
-    '        setTariffs(monthlyTariffs.map(month => ({ ...month, tiers: normalizeTierNames(month.tiers || []) })));',
-    '        setTariffs(monthlyTariffs.map(month => ({ ...month, monthNameAr: numericMonthLabel(month.month, month.year), tiers: normalizeTierNames(month.tiers || []) })));'
-  );
+  // Existing months are shown numerically. Only the ACTIVE tariff has hidden fixed fees normalized to zero;
+  // old historical month monetary snapshots remain untouched.
+  const normalizedOpenState = '        setTariffs(monthlyTariffs.map(month => ({ ...month, monthNameAr: numericMonthLabel(month.month, month.year), tiers: normalizeTierNames(month.tiers || []).map(t => month.isCurrentActive ? ({ ...t, fixedFee: 0 }) : t) })));';
+  c = c.replace('        setTariffs(monthlyTariffs);', normalizedOpenState);
+  c = c.replace('        setTariffs(monthlyTariffs.map(month => ({ ...month, tiers: normalizeTierNames(month.tiers || []) })));', normalizedOpenState);
+  c = c.replace('        setTariffs(monthlyTariffs.map(month => ({ ...month, monthNameAr: numericMonthLabel(month.month, month.year), tiers: normalizeTierNames(month.tiers || []) })));', normalizedOpenState);
 
   c = c.replace(/          monthNameAr: 'شهر 8 \([^\n]*\)',/, '          monthNameAr: numericMonthLabel(8, 2026),');
   c = c.replace(
@@ -74,9 +71,14 @@ const write = (p, c) => fs.writeFileSync(p, c);
     '          tiers: normalizeTierNames(pricingTiers).map(t => ({ ...t, fixedFee: 0 })), '
   );
 
+  // Every NEW month is price-per-amp only. There is no invisible fixed surcharge.
   c = c.replace(
     "    const baseTiers = currentTiers.map(t => ({ ...t, fixedFee: Number(t.fixedFee || 0), description: t.description || '' }));",
-    "    const baseTiers = normalizeTierNames(currentTiers).map(t => ({ ...t, fixedFee: Number(t.fixedFee || 0), description: t.description || '' }));"
+    "    const baseTiers = normalizeTierNames(currentTiers).map(t => ({ ...t, fixedFee: 0, description: t.description || '' }));"
+  );
+  c = c.replace(
+    "    const baseTiers = normalizeTierNames(currentTiers).map(t => ({ ...t, fixedFee: Number(t.fixedFee || 0), description: t.description || '' }));",
+    "    const baseTiers = normalizeTierNames(currentTiers).map(t => ({ ...t, fixedFee: 0, description: t.description || '' }));"
   );
   c = c.replace(
     "    const baseTiers = currentTiers.map(t => ({ ...t, fixedFee: 0, description: '' }));",
@@ -128,4 +130,4 @@ const write = (p, c) => fs.writeFileSync(p, c);
   write(p, c);
 }
 
-console.log('Applied desktop reports, numeric month picker, fixed tier names, stable editor, and immediate month ledger activation');
+console.log('Applied desktop reports, numeric month picker, fixed tier names, zero hidden fees, stable editor, and immediate month ledger activation');
