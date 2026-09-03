@@ -1,4 +1,5 @@
 import type {
+  MonthlyTariffRecord,
   PaymentAllocationEntry,
   Subscriber,
   SubscriberInvoice,
@@ -11,8 +12,8 @@ export function getMonthId(date = new Date()): string {
 
 export function getMonthNameAr(date = new Date()): string {
   const month = date.getMonth() + 1;
-  const label = date.toLocaleDateString('ar-IQ-u-nu-latn', { month: 'long', year: 'numeric' });
-  return `شهر ${month} (${label})`;
+  const year = date.getFullYear();
+  return `${month}-${year}`;
 }
 
 export function monthIdToDate(monthId: string): Date {
@@ -59,6 +60,137 @@ export function getSubscriberDebt(subscriber: Subscriber, beforeMonthId?: string
   return Math.max(0, Number(subscriber.amountDue || 0) - Number(subscriber.amountPaid || 0));
 }
 
+function canonicalInvoiceForMonth(invoices: SubscriberInvoice[]): SubscriberInvoice | null {
+  if (!invoices.length) return null;
+  return [...invoices].sort((a, b) => {
+    const aTime = a.paymentDate || a.issueDate || '';
+    const bTime = b.paymentDate || b.issueDate || '';
+    if (aTime !== bTime) return bTime.localeCompare(aTime);
+    const aPaid = Number(a.paidAmount || 0);
+    const bPaid = Number(b.paidAmount || 0);
+    if (aPaid !== bPaid) return bPaid - aPaid;
+    return b.id.localeCompare(a.id);
+  })[0] || null;
+}
+
+export function activateMonthlyTariffForSubscribers(
+  subscribers: Subscriber[],
+  previousActiveRecord: MonthlyTariffRecord | undefined,
+  activeRecord: MonthlyTariffRecord,
+  now = new Date(),
+): Subscriber[] {
+  return subscribers.map(sub => {
+    const isFree = sub.tier === 'free' || sub.isExempted;
+    const history = [...(sub.invoicesHistory || [])].map(inv => ({ ...inv }));
+
+    // Backfill the closing month only when the account still comes from the legacy summary fields.
+    if (
+      previousActiveRecord &&
+      previousActiveRecord.id !== activeRecord.id &&
+      !history.some(inv => inv.monthId === previousActiveRecord.id && inv.status !== 'cancelled')
+    ) {
+      const previousCharge = calculateMonthlyCharge(sub, previousActiveRecord.tiers);
+      const previousTotal = isFree ? 0 : previousCharge.total;
+      const previousPaid = isFree
+        ? 0
+        : sub.paymentStatus === 'paid'
+        ? previousTotal
+        : sub.paymentStatus === 'partial'
+        ? Math.min(previousTotal, Math.max(0, Number(sub.amountPaid || 0)))
+        : 0;
+      const previousRemaining = Math.max(0, previousTotal - previousPaid);
+
+      history.push({
+        id: `inv-${previousActiveRecord.id}-${sub.id}`,
+        subscriberId: sub.id,
+        receiptNumber: `ACC-${previousActiveRecord.id}-${sub.code || sub.subscriberCode || sub.id}`,
+        monthId: previousActiveRecord.id,
+        monthNameAr: previousActiveRecord.monthNameAr || getMonthNameAr(monthIdToDate(previousActiveRecord.id)),
+        issueDate: previousActiveRecord.createdAt || now.toISOString().slice(0, 10),
+        paymentDate: previousPaid > 0 ? sub.lastPaymentDate : undefined,
+        amperes: sub.amperes,
+        tier: sub.tier,
+        pricePerAmpere: previousCharge.pricePerAmpere,
+        fixedFee: previousCharge.fixedFee,
+        totalAmount: previousTotal,
+        paidAmount: previousPaid,
+        remainingAmount: previousRemaining,
+        status: isFree ? 'free' : previousRemaining === 0 ? 'paid' : previousPaid > 0 ? 'partial' : 'unpaid',
+      });
+    }
+
+    const charge = calculateMonthlyCharge(sub, activeRecord.tiers);
+    const sameMonthInvoices = history.filter(inv => inv.monthId === activeRecord.id && inv.status !== 'cancelled');
+    let currentInvoice = canonicalInvoiceForMonth(sameMonthInvoices);
+
+    if (!currentInvoice) {
+      const previousDebt = history
+        .filter(inv => inv.monthId < activeRecord.id)
+        .reduce((sum, inv) => sum + getInvoiceRemaining(inv), 0);
+
+      currentInvoice = {
+        id: `inv-${activeRecord.id}-${sub.id}`,
+        subscriberId: sub.id,
+        receiptNumber: `ACC-${activeRecord.id}-${sub.code || sub.subscriberCode || sub.id}`,
+        monthId: activeRecord.id,
+        monthNameAr: activeRecord.monthNameAr || getMonthNameAr(monthIdToDate(activeRecord.id)),
+        issueDate: now.toISOString().slice(0, 10),
+        amperes: sub.amperes,
+        tier: sub.tier,
+        pricePerAmpere: isFree ? 0 : charge.pricePerAmpere,
+        fixedFee: isFree ? 0 : charge.fixedFee,
+        totalAmount: isFree ? 0 : charge.total,
+        paidAmount: 0,
+        remainingAmount: isFree ? 0 : charge.total,
+        status: isFree ? 'free' : 'unpaid',
+        notes: previousDebt > 0 ? `دين مرحل من أشهر سابقة: ${previousDebt}` : undefined,
+      };
+      history.push(currentInvoice);
+    } else if (currentInvoice.status !== 'paid' && currentInvoice.status !== 'free') {
+      // A price edit in the active month updates only the unpaid portion of that same month.
+      // Historical/fully-paid months are frozen and never recomputed.
+      const alreadyPaid = Math.max(0, Number(currentInvoice.paidAmount || 0));
+      currentInvoice.amperes = sub.amperes;
+      currentInvoice.tier = sub.tier;
+      currentInvoice.monthNameAr = activeRecord.monthNameAr || currentInvoice.monthNameAr;
+      currentInvoice.pricePerAmpere = isFree ? 0 : charge.pricePerAmpere;
+      currentInvoice.fixedFee = isFree ? 0 : charge.fixedFee;
+      currentInvoice.totalAmount = isFree ? 0 : charge.total;
+      currentInvoice.paidAmount = isFree ? 0 : Math.min(alreadyPaid, charge.total);
+      currentInvoice.remainingAmount = isFree ? 0 : Math.max(0, charge.total - currentInvoice.paidAmount);
+      currentInvoice.status = isFree
+        ? 'free'
+        : currentInvoice.remainingAmount === 0
+        ? 'paid'
+        : currentInvoice.paidAmount > 0
+        ? 'partial'
+        : 'unpaid';
+    }
+
+    const totalOutstanding = history.reduce((sum, inv) => sum + getInvoiceRemaining(inv), 0);
+    const currentRemaining = getInvoiceRemaining(currentInvoice);
+    const currentPaid = Math.max(0, Number(currentInvoice.paidAmount || 0));
+
+    // The dashboard/card status is the ACTIVE MONTH status. Old debt remains in amountDue
+    // and in the payment allocation flow, but it must not make a brand-new month look paid/partial.
+    const currentStatus: Subscriber['paymentStatus'] = currentInvoice.status === 'free'
+      ? 'free'
+      : currentRemaining === 0
+      ? 'paid'
+      : currentPaid > 0
+      ? 'partial'
+      : 'unpaid';
+
+    return {
+      ...sub,
+      invoicesHistory: history.sort((a, b) => b.monthId.localeCompare(a.monthId)),
+      amountDue: totalOutstanding,
+      amountPaid: currentPaid,
+      paymentStatus: currentStatus,
+    };
+  });
+}
+
 export function ensureMonthInvoice(
   subscriber: Subscriber,
   pricingTiers: SubscriptionTierPricing[],
@@ -68,7 +200,7 @@ export function ensureMonthInvoice(
 ): { invoices: SubscriberInvoice[]; currentInvoice: SubscriberInvoice; carriedDebt: number } {
   const charge = calculateMonthlyCharge(subscriber, pricingTiers);
   const existing = [...(subscriber.invoicesHistory || [])].map(inv => ({ ...inv }));
-  let currentInvoice = existing.find(inv => inv.monthId === monthId && inv.status !== 'cancelled');
+  let currentInvoice = canonicalInvoiceForMonth(existing.filter(inv => inv.monthId === monthId && inv.status !== 'cancelled'));
   const carriedDebt = existing
     .filter(inv => inv.monthId < monthId)
     .reduce((sum, inv) => sum + getInvoiceRemaining(inv), 0);
@@ -179,7 +311,7 @@ export function applyPaymentOldestFirst(
 
   // Keep a human-readable allocation trail in the current invoice's notes so it survives
   // the existing cloud schema without requiring a destructive migration.
-  const currentInvoice = invoices.find(inv => inv.monthId === activeMonthId && inv.status !== 'cancelled');
+  const currentInvoice = canonicalInvoiceForMonth(invoices.filter(inv => inv.monthId === activeMonthId && inv.status !== 'cancelled'));
   if (currentInvoice && allocations.length) {
     const allocationText = allocations.map(a => `${a.monthId}:${a.amount}`).join(',');
     const baseNote = (currentInvoice.notes || '').replace(/(?:\s*\|\s*)?توزيع آخر دفعة:[^|]*/g, '').trim();
@@ -229,19 +361,6 @@ export interface MonthlyReport {
   unpaidSubscribers: MonthlySubscriberRow[];
   freeSubscribers: MonthlySubscriberRow[];
   subscriberDebts: Array<{ subscriberId: string; name: string; code: string; debt: number }>;
-}
-
-function canonicalInvoiceForMonth(invoices: SubscriberInvoice[]): SubscriberInvoice | null {
-  if (!invoices.length) return null;
-  return [...invoices].sort((a, b) => {
-    const aTime = a.paymentDate || a.issueDate || '';
-    const bTime = b.paymentDate || b.issueDate || '';
-    if (aTime !== bTime) return bTime.localeCompare(aTime);
-    const aPaid = Number(a.paidAmount || 0);
-    const bPaid = Number(b.paidAmount || 0);
-    if (aPaid !== bPaid) return bPaid - aPaid;
-    return b.id.localeCompare(a.id);
-  })[0] || null;
 }
 
 export function buildMonthlyReports(subscribers: Subscriber[]): MonthlyReport[] {
