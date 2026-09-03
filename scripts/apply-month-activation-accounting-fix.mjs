@@ -107,3 +107,4 @@ await import('./apply-secure-reset-layout-fix.mjs');
 await import('./apply-secure-reset-safety-finalization.mjs');
 await import('./apply-monthly-cycle-tier-source-prep.mjs');
 await import('./apply-monthly-cycle-empty-tariffs-fix.mjs');
+await import('./apply-collector-account-save-login-fix.mjs?monthly-cycle-final=1');
