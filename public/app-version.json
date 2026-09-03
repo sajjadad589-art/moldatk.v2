@@ -1,9 +1,9 @@
 {
   "enabled": true,
-  "versionCode": 12,
-  "versionName": "1.3.8",
+  "versionCode": 13,
+  "versionName": "1.3.9",
   "minimumVersionCode": 5,
   "force": false,
-  "apkUrl": "https://github.com/sajjadad589-art/moldatk.v2/releases/download/v1.3.8/Moldatk-Android-Release.apk",
-  "notes": "إصلاح جذري لدورة التسعيرة الشهرية: الشهر الجديد يصفّر المسدد مرة واحدة فقط، يحفظ الدين السابق، يمنع الفواتير الوهمية من إبقاء المشترك مسدداً، ويحفظ التسديدات عند تعديل تسعيرة الشهر النشط."
+  "apkUrl": "https://github.com/sajjadad589-art/moldatk.v2/releases/download/v1.3.9/Moldatk-Android-Release.apk",
+  "notes": "عند حذف جميع التسعيرات تتصفر قراءات التحصيل في لوحة التحكم: المسددين وغير المسددين ومبالغهم والمبلغ الكلي للشهر، مع بقاء عدد المشتركين والسجل التاريخي محفوظين."
 }
