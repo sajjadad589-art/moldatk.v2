@@ -150,3 +150,4 @@ await import('./apply-tariff-sync-dedupe-fix.mjs');
 await import('./apply-wallet-authoritative-sync-fix.mjs');
 await import('./apply-collector-account-save-login-fix.mjs');
 await import('./apply-monthly-ledger-finalization.mjs');
+await import('./apply-monthly-ledger-typecheck-fixes.mjs');
