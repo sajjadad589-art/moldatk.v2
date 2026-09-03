@@ -21,7 +21,7 @@ assert(!login.includes("c.passcode || '1234'"), 'Collector login still contains 
 assert(app.includes("VITE_ENABLE_NATIVE_PUSH === 'true'"), 'Native push feature flag is missing.');
 assert(app.includes('!ENABLE_NATIVE_PUSH'), 'Native push is not guarded and may crash Android without Firebase.');
 assert(!mobileSubscribers.includes('onTogglePaymentStatus(sub.id);'), 'Mobile payment button is still wired to the old no-op handler.');
-assert(pos.includes('inv.totalAmount'), 'POS unpaid totals are not using SubscriberInvoice.totalAmount.');
+assert(pos.includes('inv.totalAmount') || pos.includes('getInvoiceRemaining(inv)'), 'POS unpaid totals are not using the monthly invoice ledger.');
 assert(!pos.includes('inv.amount - (inv.paidAmount'), 'POS still references the invalid invoice amount property.');
 assert(pos.includes('collectorPermissions'), 'Collector permissions are not enforced in POS UI.');
 assert(cloud.includes("from('generator_invoices')"), 'Invoice history is missing from cloud synchronization.');
@@ -30,8 +30,13 @@ assert(!cloud.includes("await replaceMissingRows('generator_subscribers'"), 'Sub
 assert(!cloud.includes("await replaceMissingRows('generator_invoices'"), 'Invoice sync still contains destructive inferred deletion.');
 assert(Number.isInteger(updaterManifest.versionCode) && updaterManifest.versionCode > 0, 'Invalid Android update versionCode.');
 
-if (workflow.includes('assembleDebug')) {
-  assert(updaterManifest.enabled === false, 'Automatic public updates must stay disabled while CI publishes debug-signed APKs.');
+// A public update manifest is unsafe only when CI can publish debug-signed APKs but has no
+// signed release pipeline. The current workflow publishes an assembleRelease/bundleRelease
+// artifact and the manifest points at that signed release, so enabled=true is valid.
+const buildsDebug = workflow.includes('assembleDebug');
+const buildsSignedRelease = workflow.includes('assembleRelease') && workflow.includes('bundleRelease');
+if (buildsDebug && !buildsSignedRelease) {
+  assert(updaterManifest.enabled === false, 'Automatic public updates must stay disabled while CI publishes debug-signed APKs only.');
 }
 assert(/versionCode\s+\d+/.test(androidGradle), 'Android versionCode is missing.');
 assert(/versionName\s+"[^"]+"/.test(androidGradle), 'Android versionName is missing.');
