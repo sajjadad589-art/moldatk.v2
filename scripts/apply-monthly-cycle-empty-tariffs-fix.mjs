@@ -111,7 +111,7 @@ const replaceBlock = (source, startNeedle, endNeedle, replacement, label) => {
   if (!c.includes("getStorageKey('moldatk_deleted_tariffs')")) {
     throw new Error('App tariff tombstone persistence missing');
   }
-  if (!c.includes('const liveStatus: Subscriber[\'paymentStatus\']')) {
+  if (!c.includes("const liveStatus: Subscriber['paymentStatus']")) {
     throw new Error('App active-month payment status reset missing');
   }
 
@@ -131,7 +131,7 @@ const replaceBlock = (source, startNeedle, endNeedle, replacement, label) => {
     if (!localKeysMatch) throw new Error('Cloud sync localKeys block not found');
     const patched = localKeysMatch[0].replace(
       /\n    \};$/,
-      ",\n      deletedTariffs: key('moldatk_deleted_tariffs', generatorId)\n    };"
+      "\n      deletedTariffs: key('moldatk_deleted_tariffs', generatorId),\n    };"
     );
     c = c.replace(localKeysMatch[0], patched);
   }
@@ -159,7 +159,7 @@ const replaceBlock = (source, startNeedle, endNeedle, replacement, label) => {
     c = c.slice(0, tariffsStart) + deletion + c.slice(tariffsStart);
   }
 
-  if (!c.includes("writeLocal(localKeys.deletedTariffs, []);")) {
+  if (!c.includes('writeLocal(localKeys.deletedTariffs, []);')) {
     const pushStart = c.indexOf('    const push = async () => {');
     const pushEnd = c.indexOf('\n\n    const pull = async', pushStart);
     const clearPendingAt = c.indexOf('        clearPendingLocalChanges();', pushStart);
