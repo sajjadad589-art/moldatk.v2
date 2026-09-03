@@ -105,3 +105,4 @@ await import('./apply-desktop-reports-pricing-editor-fix.mjs');
 await import('./apply-secure-reset-and-report-controls.mjs');
 await import('./apply-secure-reset-layout-fix.mjs');
 await import('./apply-secure-reset-safety-finalization.mjs');
+await import('./apply-monthly-cycle-empty-tariffs-fix.mjs');
