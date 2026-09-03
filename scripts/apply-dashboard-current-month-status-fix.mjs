@@ -21,4 +21,24 @@ else if (!c.includes('const currentMonthTotal = billingCycleActive')) {
 }
 
 fs.writeFileSync(p, c);
-console.log('Fixed dashboard active-month readings and zeroed billing widgets when no tariff is active');
+
+// Desktop dashboard must follow the same rule. Clearing all tariffs means there is no
+// active billing cycle, so paid/unpaid billing widgets become zero without deleting history.
+const desktopPath = 'src/components/DashboardView.tsx';
+let d = fs.readFileSync(desktopPath, 'utf8');
+const oldDesktopSummary = `  const totalCount = subscribers.length;\n  const paidSubscribers = subscribers.filter(s => s.paymentStatus === 'paid');\n  const unpaidSubscribers = subscribers.filter(s => s.paymentStatus === 'unpaid' || s.paymentStatus === 'partial');`;
+const guardedDesktopSummary = `  const totalCount = subscribers.length;\n  const billingCycleActive = pricingTiers.some(t =>\n    t.type !== 'free' && (Number(t.pricePerAmpere || 0) > 0 || Number(t.fixedFee || 0) > 0)\n  );\n  const paidSubscribers = billingCycleActive\n    ? subscribers.filter(s => s.paymentStatus === 'paid')\n    : [];\n  const unpaidSubscribers = billingCycleActive\n    ? subscribers.filter(s => s.paymentStatus === 'unpaid' || s.paymentStatus === 'partial')\n    : [];`;
+if (d.includes(oldDesktopSummary)) d = d.replace(oldDesktopSummary, guardedDesktopSummary);
+else if (!d.includes('const billingCycleActive = pricingTiers.some')) {
+  throw new Error('Desktop dashboard billing-cycle guard block not found');
+}
+
+const oldDesktopDebt = `  const totalUnpaidDebt = unpaidSubscribers.reduce((acc, s) => {\n    const due = Number(s.amountDue) || 0;\n    const paid = Number(s.amountPaid) || 0;\n    return acc + Math.max(0, due - paid);\n  }, 0);`;
+const guardedDesktopDebt = `  const totalUnpaidDebt = billingCycleActive\n    ? unpaidSubscribers.reduce((acc, s) => {\n        const due = Number(s.amountDue) || 0;\n        const paid = Number(s.amountPaid) || 0;\n        return acc + Math.max(0, due - paid);\n      }, 0)\n    : 0;`;
+if (d.includes(oldDesktopDebt)) d = d.replace(oldDesktopDebt, guardedDesktopDebt);
+else if (!d.includes('const totalUnpaidDebt = billingCycleActive')) {
+  throw new Error('Desktop dashboard unpaid amount guard block not found');
+}
+
+fs.writeFileSync(desktopPath, d);
+console.log('Fixed mobile/desktop dashboard readings and zeroed billing widgets when no tariff is active');
