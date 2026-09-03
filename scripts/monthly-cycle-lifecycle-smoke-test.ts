@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import type { MonthlyTariffRecord, Subscriber } from '../src/types';
 import { activateMonthlyTariffForSubscribers } from '../src/utils/monthlyAccounting';
+import { zeroLiveMonthlyCycle } from '../src/utils/monthlyCycleEngine';
 
 const aug: MonthlyTariffRecord = {
   id: '2026-08', month: 8, year: 2026, monthNameAr: '8-2026', createdAt: '2026-08-01', isCurrentActive: false,
@@ -62,9 +63,18 @@ assert.equal(rolled.find(s => s.id === 'unpaid')?.amountDue, 25000, 'Unpaid prev
 assert.equal(rolled.find(s => s.id === 'partial')?.amountDue, 20000, 'Partial previous month remainder must carry as old debt');
 assert.equal(rolled.find(s => s.id === 'partial')?.invoicesHistory?.find(i => i.monthId === '2026-08')?.remainingAmount, 5000, 'Historical partial debt must stay frozen');
 
+const zeroed = zeroLiveMonthlyCycle(rolled);
+for (const sub of zeroed) {
+  assert.equal(sub.amountDue, 0, 'Empty tariff list must zero the live due amount');
+  assert.equal(sub.amountPaid, 0, 'Empty tariff list must zero the live paid counter');
+  assert.equal(sub.paymentStatus, 'unpaid', 'Empty tariff list must reset billable subscribers to unpaid');
+  assert((sub.invoicesHistory || []).length > 0, 'Empty tariff list must preserve historical invoices');
+}
+
 // Static integration invariants after the final build-time patch has run.
 const pricing = fs.readFileSync('src/components/PricingModal.tsx', 'utf8');
 const app = fs.readFileSync('src/App.tsx', 'utf8');
+const engine = fs.readFileSync('src/utils/monthlyCycleEngine.ts', 'utf8');
 const sync = fs.readFileSync('src/lib/useGeneratorCloudSync.ts', 'utf8');
 
 assert(pricing.includes("onSaveMonthlyTariffs(updatedTariffs, monthId, true);"), 'Creating a tariff must activate the monthly cycle immediately');
@@ -73,14 +83,16 @@ assert(pricing.includes('لا توجد تسعيرة معتمدة حالياً'),
 assert(!pricing.includes('لا يمكن حذف آخر تسعيرة موجودة'), 'The last tariff must not be protected from deletion');
 
 assert(app.includes("getStorageKey('moldatk_deleted_tariffs')"), 'Tariff deletions need sync tombstones');
-assert(app.includes('normalized.length === 0'), 'App must explicitly handle an empty tariff list');
-assert(app.includes('amountDue: 0'), 'Empty tariff list must zero the live due amount');
-assert(app.includes('amountPaid: 0'), 'Empty tariff list must zero the live paid counter');
-assert(app.includes("paymentStatus: (sub.tier === 'free' || Boolean(sub.isExempted)) ? 'free' : 'unpaid'"), 'Empty tariff live status must reset safely');
-assert(app.includes("const liveStatus: Subscriber['paymentStatus']"), 'Active-month status must be independent from historical partial debt');
+assert(app.includes('zeroLiveMonthlyCycle(subscribers)'), 'App must explicitly zero the live state when tariff list is empty');
+assert(app.includes('startFreshMonthlyCycle('), 'App must use a dedicated fresh-month rollover engine');
+assert(app.includes('repriceActiveMonthlyCycle('), 'Editing the active month must preserve recorded payments');
+assert(app.includes("getStorageKey('moldatk_active_monthly_cycle')"), 'Monthly activation must be idempotent');
+assert(engine.includes('amountDue: 0'), 'Monthly engine must zero live due when there is no active tariff');
+assert(engine.includes('amountPaid: 0'), 'Monthly engine must zero live paid counter when there is no active tariff');
+assert(engine.includes("? 'free' : 'unpaid'"), 'Monthly engine must reset billable live status safely');
 
 assert(sync.includes("deletedTariffs: key('moldatk_deleted_tariffs', generatorId)"), 'Cloud sync must persist tariff deletion tombstones');
 assert(sync.includes(".delete().eq('generator_id', generatorId).in('id', deletedTariffIds)"), 'Cloud sync must delete tombstoned tariffs remotely');
 assert(sync.includes('.filter(t => !deletedTariffSet.has(t.id))'), 'Cloud pull must never resurrect a deleted tariff');
 
-console.log('Monthly cycle lifecycle suite passed: monthly reset, carried debt, delete-all tariffs, zero live state, and sync-safe deletion.');
+console.log('Monthly cycle lifecycle suite passed: monthly reset, carried debt, delete-all tariffs, zero live state, idempotent activation, and sync-safe deletion.');
