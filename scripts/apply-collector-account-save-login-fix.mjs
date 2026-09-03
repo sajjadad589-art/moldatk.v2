@@ -43,7 +43,7 @@ const exists = p => fs.existsSync(p);
     if (c.includes("import { supabase } from './lib/supabase';")) {
       c = c.replace(
         "import { supabase } from './lib/supabase';",
-        "import { supabase } from './lib/supabase';\nimport { syncCloudCollectorRoster } from './lib/collectorCloud';"
+        "import { supabase } from './lib/supabase';\nimport { loadCloudCollectors, syncCloudCollectorRoster } from './lib/collectorCloud';"
       );
     }
 
