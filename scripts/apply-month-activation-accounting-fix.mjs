@@ -39,38 +39,30 @@ const replacement = `  const handleSaveMonthlyTariffs = (updatedTariffs: Monthly
       ? previousActiveRecord.id
       : null;
 
-    // مسح شهر نشط مسموح فقط إذا لم يُقبض عليه أي مبلغ. هكذا لا يمكن حذف شهر بعد وجود إيصالات/تسديدات.
     if (removedActiveMonthId && hasPaymentsInMonth(subscribers, removedActiveMonthId)) {
       showToast('لا يمكن مسح تسعيرة هذا الشهر لأن توجد تسديدات مسجلة عليه');
       return;
     }
 
-    setMonthlyTariffs(normalized);
-    try {
-      localStorage.setItem(getStorageKey('moldatk_monthly_tariffs'), JSON.stringify(normalized));
-    } catch (e) {}
-
+    let nextSubscribers = subscribers;
     if (removedActiveMonthId) {
-      setSubscribers(prev => {
-        const cleaned = removeUnpaidMonthLedger(prev, removedActiveMonthId, activeRecord.id);
-        try {
-          localStorage.setItem(getStorageKey('moldatk_subscribers'), JSON.stringify(cleaned));
-        } catch (e) {}
-        return cleaned;
-      });
+      nextSubscribers = removeUnpaidMonthLedger(subscribers, removedActiveMonthId, activeRecord.id);
     } else if (shouldRecalculateBills) {
-      setSubscribers(prev => {
-        const recalculated = activateMonthlyTariffForSubscribers(prev, previousActiveRecord, activeRecord, new Date());
-        try {
-          localStorage.setItem(getStorageKey('moldatk_subscribers'), JSON.stringify(recalculated));
-        } catch (e) {}
-        return recalculated;
-      });
+      nextSubscribers = activateMonthlyTariffForSubscribers(subscribers, previousActiveRecord, activeRecord, new Date());
     }
 
-    // لا نطلق تحديث الواجهة/المزامنة إلا بعد حفظ التسعيرة وحسابات المشتركين محلياً،
-    // حتى لا ترى عملية السحب شهراً جديداً قبل أن تنشأ فواتيره.
-    queueMicrotask(() => window.dispatchEvent(new Event('moldatk-local-sync')));
+    // اكتب snapshot التسعيرة والحسابات معاً قبل إطلاق أي حدث sync، حتى لا تسحب الواجهة
+    // شهراً جديداً بينما المشتركين بعدهم على عدادات الشهر السابق.
+    setMonthlyTariffs(normalized);
+    if (nextSubscribers !== subscribers) setSubscribers(nextSubscribers);
+    try {
+      localStorage.setItem(getStorageKey('moldatk_monthly_tariffs'), JSON.stringify(normalized));
+      if (nextSubscribers !== subscribers) {
+        localStorage.setItem(getStorageKey('moldatk_subscribers'), JSON.stringify(nextSubscribers));
+      }
+    } catch (e) {}
+
+    window.dispatchEvent(new Event('moldatk-local-sync'));
 
     addAuditLog({
       category: 'pricing',
@@ -101,7 +93,7 @@ if (!pattern.test(app)) throw new Error('handleSaveMonthlyTariffs block not foun
 app = app.replace(pattern, replacement + '\n  const handleOpenFolderModal');
 
 fs.writeFileSync(appFile, app);
-console.log('Applied tested monthly rollover engine: current-month reset, carried debt, safe deletion, and synchronized persistence');
+console.log('Applied atomic monthly rollover: current-month reset, carried debt, safe deletion, and sync-safe persistence');
 
 await import('./apply-sync-status-stability-fix.mjs');
 await import('./apply-offline-pending-local-first-fix.mjs');
