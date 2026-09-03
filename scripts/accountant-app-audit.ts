@@ -35,6 +35,8 @@ mustContain('src/components/PricingModal.tsx', "case 'free': return 'مجاني'
 mustContain('src/components/PricingModal.tsx', "default: return 'نهاري';", 'Daytime fixed tier');
 mustContain('src/components/PricingModal.tsx', 'value={fixedTierName(tier.type)}', 'Tier names are not retyped every month');
 mustMatch('src/components/PricingModal.tsx', /<option key=\{i \+ 1\} value=\{i \+ 1\}>\s*\{i \+ 1\}\s*<\/option>/m, 'Month picker must show 1..12');
+mustContain('src/components/PricingModal.tsx', 'numericMonthLabel(newMonthNumber, newYearNumber)', 'Month record label must be numeric');
+mustContain('src/components/PricingModal.tsx', 'fixedFee: 0', 'New/current pricing must not contain hidden fixed surcharge');
 mustContain('src/components/PricingModal.tsx', '}, [isOpen]);', 'Open pricing editor must not be overwritten by sync refresh');
 mustContain('src/components/Sidebar.tsx', "id: 'reports'", 'Desktop reports navigation');
 mustContain('src/App.tsx', "activeTab === 'reports'", 'Desktop reports screen');
@@ -47,8 +49,17 @@ mustContain('src/components/mobile/MobileMonthlyReports.tsx', "setOpenList(openL
 mustContain('src/App.tsx', 'activateMonthlyTariffForSubscribers', 'App must use tested rollover engine');
 mustContain('src/App.tsx', 'hasPaymentsInMonth', 'Deleting a paid month must be blocked');
 mustContain('src/App.tsx', 'removeUnpaidMonthLedger', 'Accidental unpaid month deletion must clean its ledger');
+mustContain('src/App.tsx', "localStorage.setItem(getStorageKey('moldatk_monthly_tariffs')", 'Tariff snapshot must persist locally');
+mustContain('src/App.tsx', "localStorage.setItem(getStorageKey('moldatk_subscribers')", 'Subscriber ledger snapshot must persist locally');
+const appText = read('src/App.tsx');
+const tariffWrite = appText.indexOf("localStorage.setItem(getStorageKey('moldatk_monthly_tariffs')");
+const subscriberWrite = appText.indexOf("localStorage.setItem(getStorageKey('moldatk_subscribers')", tariffWrite);
+const syncAfterWrites = appText.indexOf("window.dispatchEvent(new Event('moldatk-local-sync'))", subscriberWrite);
+assert(tariffWrite >= 0 && subscriberWrite > tariffWrite && syncAfterWrites > subscriberWrite,
+  'Monthly rollover must write tariff + subscriber ledger before dispatching sync refresh');
 mustContain('src/utils/monthlyAccounting.ts', 'export function activateMonthlyTariffForSubscribers', 'Rollover engine export');
 mustContain('src/utils/monthlyAccounting.ts', "return `${month}-${year}`;", 'Numeric month labels');
+mustContain('src/utils/monthlyTariffDeletion.ts', "throw new Error('MONTH_HAS_PAYMENTS')", 'Paid month deletion hard-stop');
 mustContain('src/components/mobile/MobileDashboard.tsx', 'activeMonthId = getMonthId()', 'Dashboard must be scoped to current month');
 mustContain('src/components/mobile/MobileDashboard.tsx', 'const currentAccount = (sub: Subscriber)', 'Dashboard current-month invoice selector');
 mustContain('src/components/mobile/MobileDashboard.tsx', 'const currentMonthTotal = subscribers.reduce', 'Current month total card');
@@ -92,4 +103,4 @@ assert(allSrc.includes('#46515F') || allSrc.includes('slate'), 'Free state gray 
 assert(allSrc.includes('#8A2F3E') || allSrc.includes('rose'), 'Unpaid state burgundy/red styling must remain present');
 assert(allSrc.includes("paymentStatus === 'free'") || allSrc.includes("tier === 'free'"), 'Free account payment protection must remain present');
 
-console.log('Accountant app audit passed: pricing, numeric months, monthly rollover, reports, debt allocation, receipts, isolation, offline sync, deletion tombstones, cashbox, notifications, colors, and free-account safeguards.');
+console.log('Accountant app audit passed: pricing, numeric months, zero hidden fees, atomic monthly rollover, safe deletion, reports, debt allocation, receipts, isolation, offline sync, deletion tombstones, cashbox, notifications, colors, and free-account safeguards.');
