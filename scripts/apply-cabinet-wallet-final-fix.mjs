@@ -30,16 +30,13 @@ const replaceFlex = (src, patterns, to, label) => {
     );
   }
 
-  // Replace any old add-line state commit with immediate persistence.
   s = s.replace(/setCurrentLines\(\s*\[\.\.\.currentLines,\s*newLine\]\s*\);/g, 'persistLinesImmediately([...currentLines, newLine]);');
 
-  // Replace delete line function even if old scripts changed whitespace.
   s = s.replace(
     /  const handleDeleteLine = \(id: string\) => \{[\s\S]*?\n  \};\n\n  const handleUpdateLine =/,
     `  const handleDeleteLine = (id: string) => {\n    const nextLines = currentLines.filter(l => l.id !== id);\n    persistLinesImmediately(nextLines);\n  };\n\n  const handleUpdateLine =`
   );
 
-  // Replace update line function body, without touching collector update.
   s = s.replace(
     /  const handleUpdateLine = \(id: string, updates: Partial<LineDistribution>\) => \{[\s\S]*?\n  \};\n\n  \/\/ --- Collector Handlers ---/,
     `  const handleUpdateLine = (id: string, updates: Partial<LineDistribution>) => {\n    setCurrentLines(prev => {\n      const nextLines = prev.map(l => (l.id === id ? { ...l, ...updates } : l));\n      onUpdateLines(nextLines);\n      setSaved(true);\n      window.setTimeout(() => setSaved(false), 900);\n      return nextLines;\n    });\n  };\n\n  // --- Collector Handlers ---`
@@ -55,7 +52,6 @@ const replaceFlex = (src, patterns, to, label) => {
   const path = 'src/App.tsx';
   let s = read(path);
 
-  // Normalize simple onUpdateLines callback used by FolderDetailModal instances.
   s = s.replace(
     /onUpdateLines=\{\(newLines\) => \{\s*setLines\(newLines\);\s*localStorage\.setItem\(getStorageKey\('moldatk_lines'\), JSON\.stringify\(newLines\)\);\s*\}\}/g,
     `onUpdateLines={(newLines) => {\n          const fixedLines = newLines.map(line => ({ ...line }));\n          setLines(fixedLines);\n          try {\n            localStorage.setItem(getStorageKey('moldatk_lines'), JSON.stringify(fixedLines));\n            localStorage.setItem(getStorageKey('moldatk_lines_updated_at'), new Date().toISOString());\n            window.dispatchEvent(new Event('moldatk-local-sync'));\n          } catch (e) {}\n        }}`
@@ -66,9 +62,6 @@ const replaceFlex = (src, patterns, to, label) => {
     `onUpdateLines={newLines => {\n                const fixedLines = newLines.map(line => ({ ...line }));\n                setLines(fixedLines);\n                try {\n                  localStorage.setItem(getStorageKey('moldatk_lines'), JSON.stringify(fixedLines));\n                  localStorage.setItem(getStorageKey('moldatk_lines_updated_at'), new Date().toISOString());\n                  window.dispatchEvent(new Event('moldatk-local-sync'));\n                } catch (e) {}\n              }}`
   );
 
-  if (!s.includes('moldatk_lines_updated_at')) {
-    console.warn('skip: no simple App onUpdateLines pattern found; line persistence may already be patched');
-  }
   write(path, s);
 }
 
@@ -113,18 +106,18 @@ const replaceFlex = (src, patterns, to, label) => {
   write(path, s);
 }
 
-// 5) Wallet page must subtract cancellations and show negative cancelled operations even with positive amount stored.
+// 5) Wallet page must subtract cancellations and show negative cancelled operations.
 {
   const path = 'src/components/WalletView.tsx';
   let s = read(path);
 
   s = s.replace(
-    /  const totalCollected = financialLogs\s*\.filter\(log => log\.category === 'payment'\)\s*\.reduce\(\(acc, log\) => acc \+ \(Number\(log\.amount\) \|\| 0\), 0\);/,
-    `  const totalCollected = financialLogs\n    .filter(log => log.category === 'payment' || log.category === 'cancellation')\n    .reduce((acc, log) => {\n      const amount = Math.abs(Number(log.amount) || 0);\n      return log.category === 'cancellation' ? acc - amount : acc + amount;\n    }, 0);`
+    /  const totalCollected = financialLogs[\s\S]*?\n\n  return \(/,
+    `  const totalCollected = financialLogs\n    .filter(log => log.category === 'payment' || log.category === 'cancellation')\n    .reduce((acc, log) => {\n      const amount = Math.abs(Number(log.amount) || 0);\n      return log.category === 'cancellation' ? acc - amount : acc + amount;\n    }, 0);\n\n  return (`
   );
 
   s = s.replace(
-    /\{log\.amount !== undefined && log\.amount > 0 && \(\s*<span className=\{`text-sm font-black tabular-nums \$\{isPayment \? 'text-emerald-500' : 'text-rose-500'\}`\} dir="ltr">\s*\{isPayment \? '\+' : '-'\}\{log\.amount\.toLocaleString\(\)\} \{currency\}\s*<\/span>\s*\)\}/,
+    /\{log\.amount !== undefined && log\.amount > 0 && \([\s\S]*?<\/span>\s*\)\}/,
     `{log.amount !== undefined && Math.abs(Number(log.amount) || 0) > 0 && (\n                    <span className={\`text-sm font-black tabular-nums \${isPayment ? 'text-emerald-500' : 'text-rose-500'}\`} dir="ltr">\n                      {isPayment ? '+' : '-'}{Math.abs(Number(log.amount) || 0).toLocaleString()} {currency}\n                    </span>\n                  )}`
   );
 
