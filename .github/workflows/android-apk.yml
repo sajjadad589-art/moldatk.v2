@@ -33,8 +33,8 @@ jobs:
     env:
       VITE_SUPABASE_URL: https://adluynhkikoodjljoxeu.supabase.co
       VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CObjK2Uua18kVkXCkxdRog_keQLIDiE
-      CURRENT_VERSION: 1.3.9
-      CURRENT_VERSION_CODE: 13
+      CURRENT_VERSION: 1.3.10
+      CURRENT_VERSION_CODE: 14
       SHOULD_RELEASE: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release') }}
 
     steps:
@@ -178,7 +178,7 @@ jobs:
             minimumVersionCode: 5,
             force: false,
             apkUrl: `https://github.com/sajjadad589-art/moldatk.v2/releases/download/v${version}/Moldatk-Android-Release.apk`,
-            notes: 'عند حذف جميع التسعيرات تتصفر قراءات التحصيل في لوحة التحكم: المسددين وغير المسددين ومبالغهم والمبلغ الكلي للشهر، مع بقاء عدد المشتركين والسجل التاريخي محفوظين.'
+            notes: 'إصلاح تصفير النظام على iPhone/iPad: النسخة الاحتياطية تبقى محفوظة بأمان داخل مولدتك بدون فتح ملف JSON والخروج من التطبيق، بينما يستمر تنزيل ملف النسخة الاحتياطية تلقائياً على المتصفح المكتبي.'
           };
           fs.writeFileSync('public/app-version.json', JSON.stringify(manifest, null, 2) + '\n');
           NODE
