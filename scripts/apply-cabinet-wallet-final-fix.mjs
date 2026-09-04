@@ -13,6 +13,20 @@ const replaceFlex = (src, patterns, to, label) => {
   return src;
 };
 
+const replaceBetween = (src, startNeedle, endNeedle, replacement, label) => {
+  const start = src.indexOf(startNeedle);
+  if (start < 0) {
+    console.warn(`skip: ${label} start not found`);
+    return src;
+  }
+  const end = src.indexOf(endNeedle, start);
+  if (end < 0) {
+    console.warn(`skip: ${label} end not found`);
+    return src;
+  }
+  return src.slice(0, start) + replacement + src.slice(end);
+};
+
 // 1) Make cabinet/line add, delete and edit persist immediately.
 {
   const path = 'src/components/FolderDetailModal.tsx';
@@ -97,11 +111,9 @@ const replaceFlex = (src, patterns, to, label) => {
   const path = 'src/components/DashboardView.tsx';
   let s = read(path);
 
-  s = s.replace(
-    /  \/\/ القاصة تقرأ حصراً[\s\S]*?\.reduce\(\(acc, log\) => acc \+ \(Number\(log\.amount\) \|\| 0\), 0\);/,
-    `  // القاصة تقرأ من سجل العمليات: التسديد يزيد، والإلغاء ينقص حتى تبقى مطابقة للداخل.\n  const totalCollectedRevenue = auditLogs\n    .filter(log => {\n      if (log.category !== 'payment' && log.category !== 'cancellation') return false;\n      if (resetTimeMs > 0) {\n        const logTime = log.timestamp ? new Date(log.timestamp).getTime() : 0;\n        if (logTime > 0 && logTime < resetTimeMs) return false;\n      }\n      return true;\n    })\n    .reduce((acc, log) => {\n      const amount = Math.abs(Number(log.amount) || 0);\n      return log.category === 'cancellation' ? acc - amount : acc + amount;\n    }, 0);`
-  );
+  const dashboardReplacement = `  // القاصة تقرأ من سجل العمليات: التسديد يزيد، والإلغاء ينقص حتى تبقى مطابقة للداخل.\n  const totalCollectedRevenue = auditLogs\n    .filter(log => {\n      if (log.category !== 'payment' && log.category !== 'cancellation') return false;\n      if (resetTimeMs > 0) {\n        const logTime = log.timestamp ? new Date(log.timestamp).getTime() : 0;\n        if (logTime > 0 && logTime < resetTimeMs) return false;\n      }\n      return true;\n    })\n    .reduce((acc, log) => {\n      const amount = Math.abs(Number(log.amount) || 0);\n      return log.category === 'cancellation' ? acc - amount : acc + amount;\n    }, 0);`;
 
+  s = replaceBetween(s, '  const totalCollectedRevenue = auditLogs', '\n\n  // حساب الديون', dashboardReplacement, 'dashboard wallet total');
   must(s.includes("log.category !== 'payment' && log.category !== 'cancellation'"), 'Dashboard cancellation subtraction missing');
   write(path, s);
 }
@@ -111,10 +123,9 @@ const replaceFlex = (src, patterns, to, label) => {
   const path = 'src/components/WalletView.tsx';
   let s = read(path);
 
-  s = s.replace(
-    /  const totalCollected = financialLogs[\s\S]*?\n\n  return \(/,
-    `  const totalCollected = financialLogs\n    .filter(log => log.category === 'payment' || log.category === 'cancellation')\n    .reduce((acc, log) => {\n      const amount = Math.abs(Number(log.amount) || 0);\n      return log.category === 'cancellation' ? acc - amount : acc + amount;\n    }, 0);\n\n  return (`
-  );
+  const walletReplacement = `  const totalCollected = financialLogs\n    .filter(log => log.category === 'payment' || log.category === 'cancellation')\n    .reduce((acc, log) => {\n      const amount = Math.abs(Number(log.amount) || 0);\n      return log.category === 'cancellation' ? acc - amount : acc + amount;\n    }, 0);\n\n`;
+
+  s = replaceBetween(s, '  const totalCollected = financialLogs', '  return (', walletReplacement, 'wallet total');
 
   s = s.replace(
     /\{log\.amount !== undefined && log\.amount > 0 && \([\s\S]*?<\/span>\s*\)\}/,
