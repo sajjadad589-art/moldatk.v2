@@ -117,3 +117,4 @@ await import('./apply-workmode-final-bundle-repair.mjs');
 await import('./apply-workmode-final-bundle-repair2.mjs');
 await import('./apply-workmode-final-bundle-repair3.mjs');
 await import('./apply-supabase-ads-binding.mjs');
+await import('./apply-supabase-ads-binding-repair.mjs');
