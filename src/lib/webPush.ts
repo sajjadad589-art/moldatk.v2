@@ -42,7 +42,7 @@ async function saveSubscription(subscription: PushSubscription) {
 
 export async function refreshExistingWebPushSubscription() {
   if (!webPushSupported() || Notification.permission !== 'granted') return false;
-  const registration = await navigator.serviceWorker.register('/push-sw.js', { scope: '/' });
+  const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
   const existing = await registration.pushManager.getSubscription();
   if (!existing) return false;
   await saveSubscription(existing);
@@ -62,7 +62,7 @@ export async function enableWebPush() {
     };
   }
 
-  const registration = await navigator.serviceWorker.register('/push-sw.js', { scope: '/' });
+  const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
   let permission = Notification.permission;
   if (permission !== 'granted') permission = await Notification.requestPermission();
   if (permission !== 'granted') {
