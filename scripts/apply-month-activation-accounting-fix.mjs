@@ -116,3 +116,4 @@ await import('./apply-workmode-final-bundle.mjs');
 await import('./apply-workmode-final-bundle-repair.mjs');
 await import('./apply-workmode-final-bundle-repair2.mjs');
 await import('./apply-workmode-final-bundle-repair3.mjs');
+await import('./apply-workmode-final-bundle-repair4.mjs');
