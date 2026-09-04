@@ -119,3 +119,4 @@ await import('./apply-workmode-final-bundle-repair3.mjs');
 await import('./apply-supabase-ads-binding.mjs');
 await import('./apply-supabase-ads-binding-repair.mjs');
 await import('./apply-web-theme-popup-only.mjs');
+await import('./apply-global-theme-coverage-fix.mjs');
