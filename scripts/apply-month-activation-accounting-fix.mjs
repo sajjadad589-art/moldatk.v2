@@ -110,3 +110,4 @@ await import('./apply-monthly-cycle-empty-tariffs-fix.mjs');
 await import('./apply-collector-account-save-login-fix.mjs?monthly-cycle-final=1');
 await import('./apply-monthly-pricing-authoritative-fix.mjs');
 await import('./apply-collector-account-save-login-fix.mjs?after-authoritative=1');
+await import('./apply-ios-reset-backup-navigation-fix.mjs');
