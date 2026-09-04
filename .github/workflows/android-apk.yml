@@ -33,8 +33,8 @@ jobs:
     env:
       VITE_SUPABASE_URL: https://adluynhkikoodjljoxeu.supabase.co
       VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CObjK2Uua18kVkXCkxdRog_keQLIDiE
-      CURRENT_VERSION: 1.3.11
-      CURRENT_VERSION_CODE: 15
+      CURRENT_VERSION: 1.3.12
+      CURRENT_VERSION_CODE: 16
       SHOULD_RELEASE: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release') }}
 
     steps:
@@ -181,7 +181,7 @@ jobs:
             minimumVersionCode: 5,
             force: false,
             apkUrl: `https://github.com/sajjadad589-art/moldatk.v2/releases/download/v${version}/Moldatk-Android-Release.apk`,
-            notes: 'إصلاح واجهة إضافة صاحب مولدة: حقول واضحة بخلفية بيضاء ونص داكن، زر إنشاء الحساب يعمل كإرسال صريح، وتظهر أخطاء البريد المكرر أو أخطاء السيرفر داخل النافذة مباشرة بدل أن تختفي خلفها.'
+            notes: 'اختبار تحديث النسخة الموقعة واعتماد تسلسل إصدارات موحّد للتحديثات المستقبلية.'
           };
           fs.writeFileSync('public/app-version.json', JSON.stringify(manifest, null, 2) + '\n');
           NODE
