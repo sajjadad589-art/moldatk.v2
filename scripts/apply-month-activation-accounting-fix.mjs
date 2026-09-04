@@ -119,5 +119,4 @@ await import('./apply-workmode-final-bundle-repair3.mjs');
 await import('./apply-supabase-ads-binding.mjs');
 await import('./apply-supabase-ads-binding-repair.mjs');
 await import('./apply-live-web-independent-ad-slides.mjs');
-await import('./force-remove-mobile-theme-and-fix-ad-slider.mjs');
 await import('./force-remove-theme-and-stabilize-ad-carousel.mjs');
