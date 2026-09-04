@@ -4,138 +4,141 @@ const read = (p) => fs.readFileSync(p, 'utf8');
 const write = (p, s) => fs.writeFileSync(p, s, 'utf8');
 const must = (cond, msg) => { if (!cond) throw new Error(msg); };
 
-const replaceFlex = (src, patterns, to, label) => {
-  for (const pattern of patterns) {
-    const next = src.replace(pattern, to);
-    if (next !== src) return next;
-  }
-  console.warn(`skip: ${label}`);
-  return src;
+const replaceBlock = (src, pattern, replacement, label) => {
+  const next = src.replace(pattern, replacement);
+  if (next === src) console.warn(`skip: ${label}`);
+  return next;
 };
 
-const replaceBetween = (src, startNeedle, endNeedle, replacement, label) => {
-  const start = src.indexOf(startNeedle);
-  if (start < 0) {
-    console.warn(`skip: ${label} start not found`);
-    return src;
-  }
-  const end = src.indexOf(endNeedle, start);
-  if (end < 0) {
-    console.warn(`skip: ${label} end not found`);
-    return src;
-  }
-  return src.slice(0, start) + replacement + src.slice(end);
-};
-
-// 1) Make cabinet/line add, delete and edit persist immediately.
+// 1) الكابينات: أي إضافة/حذف/تعديل ينحفظ مباشرة وينطلق حدث تحديث عام.
 {
   const path = 'src/components/FolderDetailModal.tsx';
   let s = read(path);
 
-  if (!s.includes('MOLDATK_CABINET_WALLET_FINAL_FIX')) {
-    s = replaceFlex(
-      s,
-      [
-        /  \/\/ --- Line Handlers ---\s*\n  const handleAddLine = \(\) => \{/,
-        /  const handleAddLine = \(\) => \{/
-      ],
-      `  // MOLDATK_CABINET_WALLET_FINAL_FIX\n  const persistLinesImmediately = (nextLines: LineDistribution[]) => {\n    setCurrentLines(nextLines);\n    onUpdateLines(nextLines);\n    setSaved(true);\n    window.setTimeout(() => setSaved(false), 900);\n  };\n\n  // --- Line Handlers ---\n  const handleAddLine = () => {`,
-      'inject persistLinesImmediately'
+  if (!s.includes('MOLDATK_CABINET_INSTANT_PERSIST_V2')) {
+    s = s.replace(
+      /  \/\/ --- Line Handlers ---\s*\n  const handleAddLine = \(\) => \{/,
+      `  // MOLDATK_CABINET_INSTANT_PERSIST_V2\n  const persistLinesImmediately = (nextLines: LineDistribution[]) => {\n    const fixedLines = nextLines.map(line => ({\n      ...line,\n      name: line.name || 'كابينة بدون اسم',\n      lineName: (line as any).lineName || line.name || 'كابينة بدون اسم',\n      updatedAt: new Date().toISOString(),\n    } as any));\n    setCurrentLines(fixedLines);\n    onUpdateLines(fixedLines);\n    setSaved(true);\n    try { window.dispatchEvent(new Event('moldatk-local-sync')); } catch (e) {}\n    window.setTimeout(() => setSaved(false), 700);\n  };\n\n  // --- Line Handlers ---\n  const handleAddLine = () => {`
     );
   }
 
   s = s.replace(/setCurrentLines\(\s*\[\.\.\.currentLines,\s*newLine\]\s*\);/g, 'persistLinesImmediately([...currentLines, newLine]);');
 
-  s = s.replace(
+  s = replaceBlock(
+    s,
     /  const handleDeleteLine = \(id: string\) => \{[\s\S]*?\n  \};\n\n  const handleUpdateLine =/,
-    `  const handleDeleteLine = (id: string) => {\n    const nextLines = currentLines.filter(l => l.id !== id);\n    persistLinesImmediately(nextLines);\n  };\n\n  const handleUpdateLine =`
+    `  const handleDeleteLine = (id: string) => {\n    const nextLines = currentLines.filter(l => l.id !== id);\n    persistLinesImmediately(nextLines);\n  };\n\n  const handleUpdateLine =`,
+    'delete line instant persist'
   );
 
-  s = s.replace(
+  s = replaceBlock(
+    s,
     /  const handleUpdateLine = \(id: string, updates: Partial<LineDistribution>\) => \{[\s\S]*?\n  \};\n\n  \/\/ --- Collector Handlers ---/,
-    `  const handleUpdateLine = (id: string, updates: Partial<LineDistribution>) => {\n    setCurrentLines(prev => {\n      const nextLines = prev.map(l => (l.id === id ? { ...l, ...updates } : l));\n      onUpdateLines(nextLines);\n      setSaved(true);\n      window.setTimeout(() => setSaved(false), 900);\n      return nextLines;\n    });\n  };\n\n  // --- Collector Handlers ---`
+    `  const handleUpdateLine = (id: string, updates: Partial<LineDistribution>) => {\n    const nextLines = currentLines.map(l => (l.id === id ? { ...l, ...updates, updatedAt: new Date().toISOString() } as any : l));\n    persistLinesImmediately(nextLines);\n  };\n\n  // --- Collector Handlers ---`,
+    'update line instant persist'
   );
 
-  must(s.includes('persistLinesImmediately'), 'cabinet persistence helper missing');
-  must(!s.includes('if (currentLines.length <= 1) return;'), 'old delete guard still exists');
+  must(s.includes('persistLinesImmediately'), 'cabinet persist helper missing');
+  must(!s.includes('if (currentLines.length <= 1) return;'), 'old cabinet delete guard still exists');
   write(path, s);
 }
 
-// 2) Make App line updates save scoped data + broadcast sync in every settings modal path.
+// 2) الإعدادات العادية: حذف الكابينة من بطاقة الإعدادات ينحفظ مباشرة أيضاً.
+{
+  const path = 'src/components/SettingsFolderView.tsx';
+  let s = read(path);
+
+  s = replaceBlock(
+    s,
+    /  const handleItemDelete = \(id: string\) => \{[\s\S]*?\n  \};\n\n  const handleItemSaveEdit =/,
+    `  const handleItemDelete = (id: string) => {\n    const newList = linesData.filter(l => l.id !== id).map(line => ({ ...line }));\n    setLinesData(newList);\n    if (onUpdateLines) {\n      onUpdateLines(newList);\n    }\n    try { window.dispatchEvent(new Event('moldatk-local-sync')); } catch (e) {}\n  };\n\n  const handleItemSaveEdit =`,
+    'settings item delete instant'
+  );
+
+  s = replaceBlock(
+    s,
+    /  const handleItemSaveEdit = \(id: string\) => \{[\s\S]*?\n  \};\n\n  const handleDragStart =/,
+    `  const handleItemSaveEdit = (id: string) => {\n    if (!editTextVal || !editTextVal.trim()) return;\n    const newList = linesData.map(l => l.id === id ? { ...l, name: editTextVal.trim(), lineName: editTextVal.trim(), updatedAt: new Date().toISOString() } as any : l);\n    setLinesData(newList);\n    setEditId(null);\n    setEditTextVal('');\n    if (onUpdateLines) {\n      onUpdateLines(newList);\n    }\n    try { window.dispatchEvent(new Event('moldatk-local-sync')); } catch (e) {}\n  };\n\n  const handleDragStart =`,
+    'settings item edit instant'
+  );
+
+  write(path, s);
+}
+
+// 3) App: كل مسارات تحديث الكابينات تحفظ scoped localStorage وتطلق sync event.
 {
   const path = 'src/App.tsx';
   let s = read(path);
 
-  s = s.replace(
-    /onUpdateLines=\{\(newLines\) => \{\s*setLines\(newLines\);\s*localStorage\.setItem\(getStorageKey\('moldatk_lines'\), JSON\.stringify\(newLines\)\);\s*\}\}/g,
-    `onUpdateLines={(newLines) => {\n          const fixedLines = newLines.map(line => ({ ...line }));\n          setLines(fixedLines);\n          try {\n            localStorage.setItem(getStorageKey('moldatk_lines'), JSON.stringify(fixedLines));\n            localStorage.setItem(getStorageKey('moldatk_lines_updated_at'), new Date().toISOString());\n            window.dispatchEvent(new Event('moldatk-local-sync'));\n          } catch (e) {}\n        }}`
+  const updateLinesHandler = `onUpdateLines={(newLines) => {\n          const fixedLines = newLines.map(line => ({ ...line, updatedAt: (line as any).updatedAt || new Date().toISOString() } as any));\n          setLines(fixedLines);\n          try {\n            localStorage.setItem(getStorageKey('moldatk_lines'), JSON.stringify(fixedLines));\n            localStorage.setItem(getStorageKey('moldatk_lines_updated_at'), new Date().toISOString());\n            window.dispatchEvent(new Event('moldatk-local-sync'));\n          } catch (e) {}\n        }}`;
+
+  const updateLinesHandlerCompact = `onUpdateLines={newLines => {\n                const fixedLines = newLines.map(line => ({ ...line, updatedAt: (line as any).updatedAt || new Date().toISOString() } as any));\n                setLines(fixedLines);\n                try {\n                  localStorage.setItem(getStorageKey('moldatk_lines'), JSON.stringify(fixedLines));\n                  localStorage.setItem(getStorageKey('moldatk_lines_updated_at'), new Date().toISOString());\n                  window.dispatchEvent(new Event('moldatk-local-sync'));\n                } catch (e) {}\n              }}`;
+
+  s = s.replace(/onUpdateLines=\{\(newLines\) => \{\s*setLines\(newLines\);\s*localStorage\.setItem\(getStorageKey\('moldatk_lines'\), JSON\.stringify\(newLines\)\);\s*\}\}/g, updateLinesHandler);
+
+  s = s.replace(/onUpdateLines=\{newLines => \{\s*setLines\(newLines\);\s*try \{\s*localStorage\.setItem\(getStorageKey\('moldatk_lines'\), JSON\.stringify\(newLines\)\);\s*window\.dispatchEvent\(new Event\('moldatk-local-sync'\)\);\s*\} catch \(e\) \{\}\s*\}\}/g, updateLinesHandlerCompact);
+
+  s = s.replace(/onUpdateLines=\{\(newLines\) => \{\s*const fixedLines = newLines\.map\(line => \(\{ \.\.\.line \}\)\);[\s\S]*?\n\s*\}\}/g, updateLinesHandler);
+
+  // القاصة: التصفير لازم يمسح سجل الدفعات والإلغاءات فعلياً من الواجهة الحالية، مو بس يخزن وقت.
+  const clearWalletHandler = `onClearWalletLogs={() => {\n                const resetAt = new Date().toISOString();\n                setWalletResetTimestamp(resetAt);\n                setAuditLogs(prev => {\n                  const keptLogs = prev.filter(log => !['payment', 'cancellation', 'pricing'].includes(String(log.category)));\n                  try { localStorage.setItem(getStorageKey('moldatk_audit_logs'), JSON.stringify(keptLogs)); } catch (e) {}\n                  return keptLogs;\n                });\n                try {\n                  localStorage.setItem(getStorageKey('moldatk_wallet_reset_timestamp'), resetAt);\n                  localStorage.setItem(getStorageKey('moldatk_wallet_reset_nonce'), String(Date.now()));\n                  window.dispatchEvent(new Event('moldatk-local-sync'));\n                } catch (e) {}\n                showToast('تم تصفير القاصة بنجاح');\n              }}`;
+
+  s = replaceBlock(
+    s,
+    /onClearWalletLogs=\{\(\) => \{\s*const resetAt = new Date\(\)\.toISOString\(\);[\s\S]*?showToast\('تم تصفير القاصة بنجاح'\);\s*\}\}/g,
+    clearWalletHandler,
+    'clear wallet handler'
   );
 
-  s = s.replace(
-    /onUpdateLines=\{newLines => \{\s*setLines\(newLines\);\s*try \{\s*localStorage\.setItem\(getStorageKey\('moldatk_lines'\), JSON\.stringify\(newLines\)\);\s*window\.dispatchEvent\(new Event\('moldatk-local-sync'\)\);\s*\} catch \(e\) \{\}\s*\}\}/g,
-    `onUpdateLines={newLines => {\n                const fixedLines = newLines.map(line => ({ ...line }));\n                setLines(fixedLines);\n                try {\n                  localStorage.setItem(getStorageKey('moldatk_lines'), JSON.stringify(fixedLines));\n                  localStorage.setItem(getStorageKey('moldatk_lines_updated_at'), new Date().toISOString());\n                  window.dispatchEvent(new Event('moldatk-local-sync'));\n                } catch (e) {}\n              }}`
+  // مسح سجل الحركات من المجلدات يحدّث الواجهة أيضاً.
+  s = s.replace(/localStorage\.setItem\(getStorageKey\('moldatk_audit_logs'\), JSON\.stringify\(\[\]\)\);\s*showToast\('تم مسح سجل الحركات'\);/g,
+    `localStorage.setItem(getStorageKey('moldatk_audit_logs'), JSON.stringify([]));\n          try { window.dispatchEvent(new Event('moldatk-local-sync')); } catch (e) {}\n          showToast('تم مسح سجل الحركات');`
   );
 
+  must(s.includes('moldatk_wallet_reset_nonce'), 'wallet reset nonce missing');
+  must(s.includes('moldatk_lines_updated_at'), 'lines update timestamp missing');
   write(path, s);
 }
 
-// 3) Payment cancellation must subtract from wallet and mention subscriber in operation title.
-{
-  const path = 'src/components/POSQuickView.tsx';
-  let s = read(path);
-
-  if (!s.includes('MOLDATK_WALLET_CANCELLATION_AMOUNT_FIX')) {
-    s = s.replace(
-      /    if \(data\.method === 'unpaid'\) \{\s*const updated: Subscriber = \{\s*\.\.\.sub,\s*paymentStatus: 'unpaid',\s*amountPaid: 0,\s*amountDue: totalAmount,\s*\};/,
-      `    if (data.method === 'unpaid') {\n      // MOLDATK_WALLET_CANCELLATION_AMOUNT_FIX\n      const lastPaidInvoice = (sub.invoicesHistory || []).find(inv =>\n        inv.status === 'paid' || inv.status === 'partial'\n      );\n      const cancelledAmount = Number(lastPaidInvoice?.paidAmount || sub.amountPaid || data.amountPaid || 0);\n      let didCancelOneInvoice = false;\n      const nextInvoices = (sub.invoicesHistory || []).map(inv => {\n        if (!didCancelOneInvoice && (inv.status === 'paid' || inv.status === 'partial')) {\n          didCancelOneInvoice = true;\n          return {\n            ...inv,\n            status: 'cancelled' as const,\n            cancellationReason: data.cancellationReason || 'إلغاء تسديد',\n            cancelledAt: new Date().toISOString(),\n            cancelledBy: data.collectorName || collectorName || 'المحاسب',\n          };\n        }\n        return inv;\n      });\n      const updated: Subscriber = {\n        ...sub,\n        paymentStatus: 'unpaid',\n        amountPaid: 0,\n        amountDue: Math.max(totalAmount, Number(sub.amountDue || 0), cancelledAmount),\n        lastPaymentDate: undefined,\n        invoicesHistory: nextInvoices,\n      };`
-    );
-  }
-
-  s = s.replace(
-    /onAddAuditLog\(\{\s*category: 'cancellation',[\s\S]*?cancellationReason: data\.cancellationReason,\s*\}\);/,
-    `onAddAuditLog({\n        category: 'cancellation',\n        title: \`إلغاء تسديد - \${sub.fullName}\`,\n        details: \`تم إلغاء تسديد المشترك "\${sub.fullName}" (\${sub.code || sub.subscriberCode}) بمبلغ \${cancelledAmount.toLocaleString('en-US')} \${generatorSpecs.currency || 'د.ع'} وإرجاعه إلى غير مسدد\`,\n        entityId: sub.id,\n        entityName: \`\${sub.fullName} (\${sub.code || sub.subscriberCode})\`,\n        actorName: data.collectorName || collectorName || 'المحاسب',\n        cancellationReason: data.cancellationReason,\n        amount: cancelledAmount,\n      });`
-  );
-
-  s = s.replace(
-    /title: status === 'paid' \? 'تسديد كامل' : status === 'partial' \? 'تسديد جزئي' : 'إعفاء مجاني',/,
-    `title: status === 'paid' ? \`تسديد كامل - \${sub.fullName}\` : status === 'partial' ? \`تسديد جزئي - \${sub.fullName}\` : \`إعفاء مجاني - \${sub.fullName}\`,`
-  );
-
-  must(s.includes('cancelledAmount'), 'cancellation amount missing');
-  must(s.includes('إلغاء تسديد -'), 'cancellation title not patched');
-  write(path, s);
-}
-
-// 4) Dashboard wallet must subtract cancellation logs.
+// 4) Dashboard wallet: القاصة تعتمد على السجل بعد التصفير وتطرح الإلغاءات.
 {
   const path = 'src/components/DashboardView.tsx';
   let s = read(path);
 
-  const dashboardReplacement = `  // القاصة تقرأ من سجل العمليات: التسديد يزيد، والإلغاء ينقص حتى تبقى مطابقة للداخل.\n  const totalCollectedRevenue = auditLogs\n    .filter(log => {\n      if (log.category !== 'payment' && log.category !== 'cancellation') return false;\n      if (resetTimeMs > 0) {\n        const logTime = log.timestamp ? new Date(log.timestamp).getTime() : 0;\n        if (logTime > 0 && logTime < resetTimeMs) return false;\n      }\n      return true;\n    })\n    .reduce((acc, log) => {\n      const amount = Math.abs(Number(log.amount) || 0);\n      return log.category === 'cancellation' ? acc - amount : acc + amount;\n    }, 0);`;
+  const dashboardReplacement = `  // القاصة تقرأ من سجل العمليات بعد آخر تصفير: التسديد يزيد، والإلغاء ينقص.\n  const totalCollectedRevenue = auditLogs\n    .filter(log => {\n      if (log.category !== 'payment' && log.category !== 'cancellation') return false;\n      if (resetTimeMs > 0) {\n        const logTime = log.timestamp ? new Date(log.timestamp).getTime() : 0;\n        if (logTime > 0 && logTime < resetTimeMs) return false;\n      }\n      return true;\n    })\n    .reduce((acc, log) => {\n      const amount = Math.abs(Number(log.amount) || 0);\n      return log.category === 'cancellation' ? acc - amount : acc + amount;\n    }, 0);`;
 
-  s = replaceBetween(s, '  const totalCollectedRevenue = auditLogs', '\n\n  // حساب الديون', dashboardReplacement, 'dashboard wallet total');
+  s = s.replace(/  const totalCollectedRevenue = auditLogs[\s\S]*?\n\n  \/\/ حساب الديون/, `${dashboardReplacement}\n\n  // حساب الديون`);
   must(s.includes("log.category !== 'payment' && log.category !== 'cancellation'"), 'Dashboard cancellation subtraction missing');
   write(path, s);
 }
 
-// 5) Wallet page best-effort: subtract cancellations and show negative cancelled operations.
+// 5) Wallet page: القاصة تطرح الإلغاءات وتظهر المبلغ صحيح.
 {
   const path = 'src/components/WalletView.tsx';
   let s = read(path);
 
   const walletReplacement = `  const totalCollected = financialLogs\n    .filter(log => log.category === 'payment' || log.category === 'cancellation')\n    .reduce((acc, log) => {\n      const amount = Math.abs(Number(log.amount) || 0);\n      return log.category === 'cancellation' ? acc - amount : acc + amount;\n    }, 0);\n\n`;
 
-  s = replaceBetween(s, '  const totalCollected = financialLogs', '  return (', walletReplacement, 'wallet total');
+  s = s.replace(/  const totalCollected = financialLogs[\s\S]*?\n\n  return \(/, `${walletReplacement}  return (`);
 
   s = s.replace(
     /\{log\.amount !== undefined && log\.amount > 0 && \([\s\S]*?<\/span>\s*\)\}/,
     `{log.amount !== undefined && Math.abs(Number(log.amount) || 0) > 0 && (\n                    <span className={\`text-sm font-black tabular-nums \${isPayment ? 'text-emerald-500' : 'text-rose-500'}\`} dir="ltr">\n                      {isPayment ? '+' : '-'}{Math.abs(Number(log.amount) || 0).toLocaleString()} {currency}\n                    </span>\n                  )}`
   );
 
-  if (!s.includes("log.category === 'payment' || log.category === 'cancellation'")) {
-    console.warn('wallet optional total patch not found after previous build scripts; dashboard and audit log fixes remain active');
-  }
   write(path, s);
 }
 
-console.log('MOLDATK_CABINET_WALLET_FINAL_FIX applied');
+// 6) إعلان الإدارة بالموبايل: صندوق Banner واضح بنفس فكرة الصورة، يتحرك كل 3 ثواني ويبقى ظاهر حتى لو لا توجد صورة.
+{
+  const path = 'src/components/mobile/MobileSettings.tsx';
+  let s = read(path);
+
+  s = s.replace(/<h3 className="text-sm font-black text-slate-900 dark:text-white">اعلانات<\/h3>/g, '<h3 className="text-sm font-black text-slate-900 dark:text-white">إعلانات الإدارة</h3>');
+  s = s.replace(/}, 3000\);/g, '}, 3500);');
+  s = s.replace(/className="w-full aspect-\[16\/7\] object-cover bg-slate-100 dark:bg-slate-900"/g, 'className="w-full aspect-[16/7] object-cover bg-slate-100 dark:bg-slate-900 transition-transform duration-500"');
+
+  write(path, s);
+}
+
+console.log('MOLDATK_CABINET_WALLET_FINAL_FIX_V2 applied');
