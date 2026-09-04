@@ -15,7 +15,10 @@ assert(reset.includes('password.length > 0'), 'Password entry is required before
 assert(app.includes("supabase.auth.signInWithPassword({ email, password })"), 'Owner password must be re-authenticated by Supabase');
 assert(app.includes("userSession?.role !== 'generator_admin'"), 'Full reset must be owner-only');
 assert(app.includes('moldatk_emergency_backup_last_'), 'Emergency local backup must be retained');
-assert(app.includes("a.download = 'moldatk-backup-before-reset-'"), 'Automatic downloadable backup must be created');
+assert(app.includes("a.download = 'moldatk-backup-before-reset-'"), 'Desktop downloadable backup must remain available');
+assert(app.includes('const isIOSBrowser = /iPad|iPhone|iPod/i.test(navigator.userAgent)'), 'iOS reset must detect Safari/WebView');
+assert(app.includes('const shouldAutoDownloadBackup = !isIOSBrowser && !Capacitor.isNativePlatform()'), 'iOS/native reset must not auto-open the JSON backup preview');
+assert(app.includes("console.info('Reset backup kept safely inside Moldatk; automatic file preview skipped on iOS/native app.')"), 'Mobile reset must preserve backup without navigating away');
 assert(app.includes(".delete().eq('generator_id', generatorId)"), 'Cloud deletes must be generator-scoped');
 assert(sync.includes('moldatk_factory_reset_in_progress'), 'Cloud sync must pause during destructive reset');
 
@@ -50,4 +53,4 @@ assert(app.includes("getStorageKey('moldatk_deleted_tariffs')"), 'Tariff deletio
 assert(app.includes('normalized.length === 0'), 'Empty tariff list must have an explicit live-zero path');
 assert(sync.includes('.filter(t => !deletedTariffSet.has(t.id))'), 'Deleted tariffs must not resurrect from cloud pull');
 
-console.log('Secure destructive controls audit passed: owner re-auth, backups, scoped reset, annual reports reset, delete-all tariffs, live-zero state, and preserved accounting history.');
+console.log('Secure destructive controls audit passed: owner re-auth, iOS-safe backup, scoped reset, annual reports reset, delete-all tariffs, live-zero state, and preserved accounting history.');
