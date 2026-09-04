@@ -120,4 +120,4 @@ await import('./apply-supabase-ads-binding.mjs');
 await import('./apply-supabase-ads-binding-repair.mjs');
 await import('./apply-live-web-independent-ad-slides.mjs');
 await import('./force-remove-theme-and-stabilize-ad-carousel.mjs');
-await import('./absolute-mobile-settings-finalizer.mjs');
+await import('./absolute-mobile-settings-finalizer-v2.mjs');
