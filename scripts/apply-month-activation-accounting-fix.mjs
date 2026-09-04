@@ -113,3 +113,4 @@ await import('./apply-collector-account-save-login-fix.mjs?after-authoritative=1
 await import('./apply-ios-reset-backup-navigation-fix.mjs');
 await import('./apply-super-admin-owner-create-fix.mjs');
 await import('./apply-workmode-final-bundle.mjs');
+await import('./apply-workmode-final-bundle-repair.mjs');
