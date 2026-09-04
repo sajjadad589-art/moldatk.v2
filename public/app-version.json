@@ -1,9 +1,9 @@
 {
   "enabled": true,
-  "versionCode": 14,
-  "versionName": "1.3.10",
+  "versionCode": 15,
+  "versionName": "1.3.11",
   "minimumVersionCode": 5,
   "force": false,
-  "apkUrl": "https://github.com/sajjadad589-art/moldatk.v2/releases/download/v1.3.10/Moldatk-Android-Release.apk",
-  "notes": "إصلاح تصفير النظام على iPhone/iPad: النسخة الاحتياطية تبقى محفوظة بأمان داخل مولدتك بدون فتح ملف JSON والخروج من التطبيق، بينما يستمر تنزيل ملف النسخة الاحتياطية تلقائياً على المتصفح المكتبي."
+  "apkUrl": "https://github.com/sajjadad589-art/moldatk.v2/releases/download/v1.3.11/Moldatk-Android-Release.apk",
+  "notes": "إصلاح واجهة إضافة صاحب مولدة: حقول واضحة بخلفية بيضاء ونص داكن، زر إنشاء الحساب يعمل كإرسال صريح، وتظهر أخطاء البريد المكرر أو أخطاء السيرفر داخل النافذة مباشرة بدل أن تختفي خلفها."
 }
