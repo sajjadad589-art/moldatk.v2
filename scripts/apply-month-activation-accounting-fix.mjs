@@ -119,3 +119,4 @@ await import('./apply-workmode-final-bundle-repair3.mjs');
 await import('./apply-supabase-ads-binding.mjs');
 await import('./apply-supabase-ads-binding-repair.mjs');
 await import('./apply-live-web-independent-ad-slides.mjs');
+await import('./apply-remove-appearance-card-final.mjs');
