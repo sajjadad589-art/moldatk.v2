@@ -15,7 +15,6 @@ const write = (path, content) => fs.writeFileSync(path, content);
       const block = `  // WORKMODE_MOBILELAYOUT_THEME_FALLBACK
   const __moldatkTheme = (() => { try { return localStorage.getItem('moldatk_mobile_theme') || 'ocean-calm'; } catch (e) { return 'ocean-calm'; } })();
   const __setMoldatkTheme = (theme: string) => { try { localStorage.setItem('moldatk_mobile_theme', theme); document.documentElement.setAttribute('data-moldatk-theme', theme); } catch (e) {} };
-  const monthlyTariffs = [] as any[];
 `;
       c = c.replace(/(\}\) => \{\n)(\s*return \()/, `$1${block}$2`);
       write(path, c);
