@@ -122,3 +122,4 @@ await import('./apply-live-web-independent-ad-slides.mjs');
 await import('./force-remove-theme-and-stabilize-ad-carousel.mjs');
 await import('./absolute-mobile-settings-finalizer-v2.mjs');
 await import('./fix-superadmin-ad-upload-ui-final.mjs');
+await import('./apply-final-admin-ads-popup-notifications.mjs');
