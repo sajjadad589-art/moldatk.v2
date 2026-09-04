@@ -114,3 +114,4 @@ await import('./apply-ios-reset-backup-navigation-fix.mjs');
 await import('./apply-super-admin-owner-create-fix.mjs');
 await import('./apply-workmode-final-bundle.mjs');
 await import('./apply-workmode-final-bundle-repair.mjs');
+await import('./apply-workmode-final-bundle-repair2.mjs');
