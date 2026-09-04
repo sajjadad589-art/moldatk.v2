@@ -7,9 +7,7 @@ import {
   Smartphone,
   Monitor,
   RotateCcw,
-  Download,
   ChevronLeft,
-  Shield,
   Sliders,
   Sparkles,
   Users,
@@ -24,7 +22,6 @@ import {
   LineDistribution,
   SettingsFolderItem,
 } from '../../types';
-import { formatCurrency } from '../../utils/formatters';
 import { SubscriptionInfoButton, SubscriptionInfo } from '../SubscriptionStatusUI';
 import { supabase } from '../../lib/supabase';
 
@@ -58,27 +55,26 @@ type AdminAdSlide = {
 export const MobileSettings: React.FC<MobileSettingsProps> = ({
   viewMode,
   onChangeViewMode,
-  pricingTiers,
-  generatorSpecs,
-  lines,
   folders,
   onOpenPricingModal,
   onOpenFolderModal,
-  onExportData,
-  onResetData,
   subscriptionInfo = null,
   subscriptionLoading = false,
 }) => {
-  const [adminAd, setAdminAd] = React.useState<AdminAdSlide | null>(null);
+  const [adminAdSlides, setAdminAdSlides] = React.useState<AdminAdSlide[]>([]);
+  const [activeAdIndex, setActiveAdIndex] = React.useState(0);
   const [adLoading, setAdLoading] = React.useState(true);
 
   React.useEffect(() => {
     let cancelled = false;
 
-    const loadAdminAd = async () => {
+    const loadAdminAds = async () => {
       try {
-        const cached = localStorage.getItem('moldatk_single_admin_ad_slide');
-        if (cached && !cancelled) setAdminAd(JSON.parse(cached));
+        const cached = localStorage.getItem('moldatk_admin_ad_slides');
+        if (cached && !cancelled) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) setAdminAdSlides(parsed);
+        }
       } catch (e) {}
 
       try {
@@ -88,35 +84,45 @@ export const MobileSettings: React.FC<MobileSettingsProps> = ({
           .eq('is_active', true)
           .order('sort_order', { ascending: true })
           .order('updated_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .limit(10);
 
-        if (!error && data) {
-          localStorage.setItem('moldatk_single_admin_ad_slide', JSON.stringify(data));
-          if (!cancelled) setAdminAd(data as AdminAdSlide);
-        } else if (!error && !data) {
-          localStorage.removeItem('moldatk_single_admin_ad_slide');
-          if (!cancelled) setAdminAd(null);
+        if (!error && Array.isArray(data)) {
+          const slides = data.filter(slide => Boolean(slide.image_url)) as AdminAdSlide[];
+          localStorage.setItem('moldatk_admin_ad_slides', JSON.stringify(slides));
+          if (!cancelled) {
+            setAdminAdSlides(slides);
+            setActiveAdIndex(index => slides.length ? Math.min(index, slides.length - 1) : 0);
+          }
         }
       } catch (e) {
-        // Keep cached ad if offline.
+        // Keep cached ads if offline.
       } finally {
         if (!cancelled) setAdLoading(false);
       }
     };
 
-    void loadAdminAd();
-    const timer = window.setInterval(() => void loadAdminAd(), 60000);
-    window.addEventListener('moldatk-local-sync', loadAdminAd as EventListener);
+    void loadAdminAds();
+    const timer = window.setInterval(() => void loadAdminAds(), 60000);
+    window.addEventListener('moldatk-local-sync', loadAdminAds as EventListener);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
-      window.removeEventListener('moldatk-local-sync', loadAdminAd as EventListener);
+      window.removeEventListener('moldatk-local-sync', loadAdminAds as EventListener);
     };
   }, []);
 
+  React.useEffect(() => {
+    if (adminAdSlides.length <= 1) return;
+    const timer = window.setInterval(() => {
+      setActiveAdIndex(index => (index + 1) % adminAdSlides.length);
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [adminAdSlides.length]);
+
+  const activeAd = adminAdSlides[activeAdIndex] || null;
+
   const openAdminAd = () => {
-    if (adminAd?.link_url) window.open(adminAd.link_url, '_blank', 'noopener,noreferrer');
+    if (activeAd?.link_url) window.open(activeAd.link_url, '_blank', 'noopener,noreferrer');
   };
 
   const getFolderIcon = (iconName: string) => {
@@ -138,7 +144,6 @@ export const MobileSettings: React.FC<MobileSettingsProps> = ({
 
   return (
     <div className="p-3.5 space-y-4 max-w-lg mx-auto pb-24">
-      {/* Independent single Supabase advertisement box */}
       <section className="bg-white dark:bg-[#111c38] rounded-2xl p-4 border border-slate-200/90 dark:border-slate-800 shadow-sm space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -146,31 +151,34 @@ export const MobileSettings: React.FC<MobileSettingsProps> = ({
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-xs font-bold text-slate-900 dark:text-white">إعلان الإدارة</h3>
-              <p className="text-[10px] text-slate-400">يتحدث تلقائياً عند الاتصال بالإنترنت</p>
+              <h3 className="text-sm font-black text-slate-900 dark:text-white">اعلانات</h3>
+              <p className="text-[10px] text-slate-400">تتحدث تلقائياً عند الاتصال بالإنترنت</p>
             </div>
           </div>
-          <span className="text-[10px] font-bold text-cyan-600 dark:text-cyan-300">Supabase</span>
+          <span className="text-[10px] font-bold text-cyan-600 dark:text-cyan-300">مزامنة</span>
         </div>
 
-        {adminAd?.image_url ? (
+        {activeAd?.image_url ? (
           <button
             type="button"
             onClick={openAdminAd}
-            className={`block w-full overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 text-right ${adminAd.link_url ? 'cursor-pointer' : 'cursor-default'}`}
+            className={`block w-full overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 text-right ${activeAd.link_url ? 'cursor-pointer' : 'cursor-default'}`}
           >
             <img
-              src={adminAd.image_url}
-              alt={adminAd.title || 'إعلان الإدارة'}
+              src={activeAd.image_url}
+              alt={activeAd.title || 'اعلان'}
               className="w-full aspect-[16/7] object-cover bg-slate-100 dark:bg-slate-900"
               loading="lazy"
             />
-            {(adminAd.title || adminAd.link_url) && (
+            {(activeAd.title || activeAd.link_url || adminAdSlides.length > 1) && (
               <div className="flex items-center justify-between gap-2 px-3 py-2">
                 <span className="text-xs font-black text-slate-800 dark:text-slate-100 truncate">
-                  {adminAd.title || 'إعلان الإدارة'}
+                  {activeAd.title || 'اعلان'}
                 </span>
-                {adminAd.link_url && <ExternalLink className="w-4 h-4 text-blue-500 shrink-0" />}
+                <div className="flex items-center gap-2 shrink-0">
+                  {adminAdSlides.length > 1 && <span className="text-[10px] text-slate-400">{activeAdIndex + 1}/{adminAdSlides.length}</span>}
+                  {activeAd.link_url && <ExternalLink className="w-4 h-4 text-blue-500" />}
+                </div>
               </div>
             )}
           </button>
@@ -181,15 +189,28 @@ export const MobileSettings: React.FC<MobileSettingsProps> = ({
             </div>
             <div>
               <p className="text-xs font-black text-slate-800 dark:text-slate-100">
-                {adLoading ? 'جاري تحميل إعلان الإدارة...' : 'لا يوجد إعلان حالياً'}
+                {adLoading ? 'جاري تحميل الاعلانات...' : 'لا توجد اعلانات حالياً'}
               </p>
-              <p className="text-[10px] text-slate-400 mt-1">يرفعه السوبر أدمن ويظهر هنا بدون تحديث التطبيق</p>
+              <p className="text-[10px] text-slate-400 mt-1">تضاف من السوبر أدمن وتظهر هنا بدون تحديث التطبيق</p>
             </div>
+          </div>
+        )}
+
+        {adminAdSlides.length > 1 && (
+          <div className="flex items-center justify-center gap-1.5 pt-1">
+            {adminAdSlides.map((slide, index) => (
+              <button
+                key={slide.id}
+                type="button"
+                onClick={() => setActiveAdIndex(index)}
+                className={`h-1.5 rounded-full transition-all ${index === activeAdIndex ? 'w-6 bg-cyan-500' : 'w-1.5 bg-slate-300 dark:bg-slate-700'}`}
+                aria-label={`اعلان ${index + 1}`}
+              />
+            ))}
           </div>
         )}
       </section>
 
-      {/* Device View Mode Selector Card */}
       <div className="bg-white dark:bg-[#111c38] rounded-2xl p-4 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-3">
         <div className="flex items-center gap-2">
           <div className="p-2 rounded-xl bg-blue-600/10 text-blue-600 dark:text-blue-400">
@@ -252,7 +273,6 @@ export const MobileSettings: React.FC<MobileSettingsProps> = ({
 
       <SubscriptionInfoButton info={subscriptionInfo} loading={subscriptionLoading} />
 
-      {/* Settings Folders */}
       <div className="bg-white dark:bg-[#111c38] rounded-2xl p-4 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
