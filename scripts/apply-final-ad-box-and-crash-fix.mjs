@@ -74,8 +74,8 @@ const folderIcon = (key: string) => {
 };
 
 const isHiddenFolder = (folder: SettingsFolderItem) => {
-  const text = `${folder.key || ''} ${folder.title || ''} ${folder.description || ''}`.toLowerCase();
-  return /theme|appearance|view mode|مظهر|ثيم|نمط العرض|التوافق/.test(text);
+  const text = String(folder.key || '') + ' ' + String(folder.title || '') + ' ' + String(folder.description || '');
+  return /theme|appearance|view mode|مظهر|ثيم|نمط العرض|التوافق/i.test(text);
 };
 
 export const MobileSettings: React.FC<MobileSettingsProps> = ({
