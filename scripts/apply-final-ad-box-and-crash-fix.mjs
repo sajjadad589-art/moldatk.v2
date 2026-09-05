@@ -94,27 +94,35 @@ superSrc = superSrc.replace(
 );
 superSrc = superSrc.replace(/\n\s*<AdminAdSlidesPanel \/>\s*\n/g, '\n');
 
+superSrc = superSrc.replace(/\{tab === 'notifications' && <div\s*\n\s*className=/g, "{tab === 'notifications' && <div className=");
+superSrc = superSrc.replace(/\{tab === 'notifications' && <div\s*\n\s*<AdminAdSlidesPanel \/>\s*\n\s*className=/g, "{tab === 'notifications' && <div className=");
+
 const insertPanel = (source) => {
   let src = source;
-  const insert = '<AdminAdSlidesPanel />\n            ';
-  const needles = [
-    '<form onSubmit={sendNotification}',
-    '{tab === \'notifications\' && <div className="grid grid-cols-[420px_1fr] gap-5">',
-    "{tab === 'notifications' && <div",
-    "{tab === 'overview' && <>",
-    '<main className="flex-1 p-6 overflow-y-auto">',
-  ];
-  for (const needle of needles) {
-    const idx = src.indexOf(needle);
-    if (idx >= 0) {
-      if (needle.startsWith('{tab')) {
-        return src.slice(0, idx + needle.length) + '\n            ' + insert + src.slice(idx + needle.length);
-      }
-      if (needle.startsWith('<main')) {
-        return src.slice(0, idx + needle.length) + '\n          ' + insert + src.slice(idx + needle.length);
-      }
-      return src.slice(0, idx) + insert + src.slice(idx);
-    }
+  const insert = '\n            <AdminAdSlidesPanel />';
+  const formNeedle = '<form onSubmit={sendNotification}';
+  const formIndex = src.indexOf(formNeedle);
+  if (formIndex >= 0) return src.slice(0, formIndex) + '<AdminAdSlidesPanel />\n            ' + src.slice(formIndex);
+
+  const gridOpen = /\{tab === 'notifications' && <div\s+className="[^"]*"\s*>/;
+  const match = src.match(gridOpen);
+  if (match?.index !== undefined) {
+    const end = match.index + match[0].length;
+    return src.slice(0, end) + insert + src.slice(end);
+  }
+
+  const overviewNeedle = "{tab === 'overview' && <>";
+  const overviewIndex = src.indexOf(overviewNeedle);
+  if (overviewIndex >= 0) {
+    const end = overviewIndex + overviewNeedle.length;
+    return src.slice(0, end) + '\n            <AdminAdSlidesPanel />' + src.slice(end);
+  }
+
+  const mainNeedle = '<main className="flex-1 p-6 overflow-y-auto">';
+  const mainIndex = src.indexOf(mainNeedle);
+  if (mainIndex >= 0) {
+    const end = mainIndex + mainNeedle.length;
+    return src.slice(0, end) + '\n          <AdminAdSlidesPanel />' + src.slice(end);
   }
   return src;
 };
