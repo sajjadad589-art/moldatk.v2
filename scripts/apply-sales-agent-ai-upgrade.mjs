@@ -79,45 +79,28 @@ const landingPath = 'src/LandingPage.tsx';
 let landing = read(landingPath);
 if (landing) {
   if (!landing.includes('const orderUrl =')) {
-    landing = landing.replace(
-      "  const appUrl = `${window.location.origin}/`;",
-      "  const appUrl = `${window.location.origin}/`;\n  const orderUrl = `${window.location.origin}/order`;"
-    );
+    if (landing.includes("  const appUrl = `${window.location.origin}/`;")) {
+      landing = landing.replace(
+        "  const appUrl = `${window.location.origin}/`;",
+        "  const appUrl = `${window.location.origin}/`;\n  const orderUrl = `${window.location.origin}/order`;"
+      );
+    } else {
+      landing = landing.replace(
+        'export default function LandingPage() {',
+        "export default function LandingPage() {\n  const orderUrl = '/order';"
+      );
+    }
   }
 
-  const oldHeroActions = String.raw`            <div className="flex flex-wrap gap-3">
-              <a href={appUrl} className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-amber-400 text-slate-950 font-black hover:bg-amber-300 transition-all">
-                فتح النظام الآن <ArrowLeft className="w-5 h-5" />
-              </a>
-              <a href="#release" className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/10 border border-white/15 text-white font-black hover:bg-white/15 transition-all">
-                <Download className="w-5 h-5" /> نسخة Android
-              </a>
-            </div>`;
-  const newHeroActions = String.raw`            <div className="space-y-3">
-              <a href={orderUrl} className="group w-full sm:w-auto min-w-[290px] inline-flex items-center justify-center gap-3 px-8 py-5 rounded-[1.35rem] bg-amber-400 text-slate-950 text-lg sm:text-xl font-black hover:bg-amber-300 hover:-translate-y-0.5 transition-all shadow-2xl shadow-amber-950/30 ring-4 ring-amber-400/10">
-                <Zap className="w-6 h-6" /> اطلب اشتراك مولدتك الآن <ArrowLeft className="w-6 h-6 transition-transform group-hover:-translate-x-1" />
-              </a>
-              <div className="flex flex-wrap gap-3">
-                <a href={appUrl} className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/10 border border-white/15 text-white font-black hover:bg-white/15 transition-all">
-                  دخول المشتركين <ArrowLeft className="w-5 h-5" />
-                </a>
-                <a href="#release" className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/10 border border-white/15 text-white font-black hover:bg-white/15 transition-all">
-                  <Download className="w-5 h-5" /> نسخة Android
-                </a>
-              </div>
-            </div>`;
-  if (landing.includes(oldHeroActions)) landing = landing.replace(oldHeroActions, newHeroActions);
+  if (!landing.includes('اطلب اشتراك مولدتك الآن')) {
+    const actionsMarker = '            <div className="flex flex-wrap gap-3">';
+    const bigCta = String.raw`            <a href={orderUrl} className="group w-full sm:w-auto min-w-[300px] inline-flex items-center justify-center gap-3 px-8 py-5 rounded-[1.35rem] bg-amber-400 text-slate-950 text-lg sm:text-xl font-black hover:bg-amber-300 hover:-translate-y-0.5 transition-all shadow-2xl shadow-amber-950/30 ring-4 ring-amber-400/10">
+              <Zap className="w-6 h-6" /> اطلب اشتراك مولدتك الآن <ArrowLeft className="w-6 h-6 transition-transform group-hover:-translate-x-1" />
+            </a>
 
-  if (!landing.includes('href={orderUrl} className="hidden sm:inline-flex')) {
-    const loginButton = '<a href={appUrl} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-sm font-bold transition-all shrink-0">';
-    landing = landing.replace(
-      loginButton,
-      '<div className="flex items-center gap-2"><a href={orderUrl} className="hidden sm:inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-400 text-slate-950 text-sm font-black hover:bg-amber-300 transition-all shadow-lg"><Zap className="w-4 h-4"/> اطلب الآن</a>' + loginButton
-    );
-    landing = landing.replace(
-      'دخول النظام <ArrowLeft className="w-4 h-4" />\n          </a>\n        </div>\n      </header>',
-      'دخول النظام <ArrowLeft className="w-4 h-4" />\n          </a></div>\n        </div>\n      </header>'
-    );
+`;
+    const idx = landing.indexOf(actionsMarker);
+    if (idx >= 0) landing = landing.slice(0, idx) + bigCta + landing.slice(idx);
   }
 
   write(landingPath, landing);
