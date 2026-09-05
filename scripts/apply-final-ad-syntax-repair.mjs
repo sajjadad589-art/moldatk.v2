@@ -41,6 +41,17 @@ src = src.replace(/\n\s*const \{ data, error \} = await supabase\s*\n\s*\.from\(
 src = src.replace(/\n\s*await supabase\s*\n\s*\.from\('app_ad_slides'\)[\s\S]*?(?=\n\s*(?:const|return|if|await|set|}\)|};|<))/g, '\n');
 src = src.replace(/\n\s*(?:setAdminAdSlides|setAdminAdTitle|setAdminAdBody|setAdminAdLink|setAdminAdImage|setAdminAdMessage|setAdminAdFile|setAdminAdSaving|setAdminAdImageFile|setAdminAdForm)\([^\n;]*\);?/g, '\n');
 
+// Some historical injectors leave a one-line setter callback behind after their parent block is removed.
+// Strip those residual statements explicitly so no undefined identifier can reach the bundle.
+for (const legacySetter of [
+  'setAdminAdSlides', 'setAdminAdTitle', 'setAdminAdBody', 'setAdminAdLink',
+  'setAdminAdImage', 'setAdminAdMessage', 'setAdminAdFile', 'setAdminAdSaving',
+  'setAdminAdImageFile', 'setAdminAdForm',
+]) {
+  const escaped = legacySetter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  src = src.replace(new RegExp(`^.*${escaped}.*(?:\\r?\\n|$)`, 'gm'), '');
+}
+
 // Keep exactly one modern panel import and one panel instance.
 src = src.replace(/\nimport \{ AdminAdSlidesPanel \} from '\.\/AdminAdSlidesPanel';/g, '');
 src = src.replace(
