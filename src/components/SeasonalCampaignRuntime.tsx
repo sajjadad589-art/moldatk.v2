@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ExternalLink, Sparkles } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -26,11 +26,16 @@ const DEFAULT_SOFT = '#ccfbf1';
 
 export const SeasonalCampaignRuntime: React.FC = () => {
   const [campaign, setCampaign] = useState<SeasonalCampaign | null>(null);
+  const originalIconHrefRef = useRef<string | null>(null);
+  const originalThemeColorRef = useRef<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
-    let originalIconHref: string | null = null;
-    let originalThemeColor: string | null = null;
+
+    const iconLink = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+    if (iconLink && originalIconHrefRef.current === null) originalIconHrefRef.current = iconLink.href;
+    const themeMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (themeMeta && originalThemeColorRef.current === null) originalThemeColorRef.current = themeMeta.content;
 
     const loadCampaign = async () => {
       const now = new Date().toISOString();
@@ -61,11 +66,6 @@ export const SeasonalCampaignRuntime: React.FC = () => {
     document.addEventListener('visibilitychange', onRefresh);
     const timer = window.setInterval(loadCampaign, 60000);
 
-    const iconLink = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-    if (iconLink) originalIconHref = iconLink.href;
-    const themeMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-    if (themeMeta) originalThemeColor = themeMeta.content;
-
     return () => {
       mounted = false;
       window.clearInterval(timer);
@@ -75,8 +75,10 @@ export const SeasonalCampaignRuntime: React.FC = () => {
       document.documentElement.removeAttribute('data-seasonal-theme');
       document.documentElement.style.removeProperty('--seasonal-accent');
       document.documentElement.style.removeProperty('--seasonal-accent-soft');
-      if (iconLink && originalIconHref) iconLink.href = originalIconHref;
-      if (themeMeta && originalThemeColor) themeMeta.content = originalThemeColor;
+      const cleanupIcon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+      const cleanupThemeMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+      if (cleanupIcon && originalIconHrefRef.current) cleanupIcon.href = originalIconHrefRef.current;
+      if (cleanupThemeMeta && originalThemeColorRef.current !== null) cleanupThemeMeta.content = originalThemeColorRef.current;
     };
   }, []);
 
@@ -91,6 +93,9 @@ export const SeasonalCampaignRuntime: React.FC = () => {
       root.removeAttribute('data-seasonal-theme');
       root.style.removeProperty('--seasonal-accent');
       root.style.removeProperty('--seasonal-accent-soft');
+      if (iconLink && originalIconHrefRef.current) iconLink.href = originalIconHrefRef.current;
+      if (themeMeta && originalThemeColorRef.current !== null) themeMeta.content = originalThemeColorRef.current;
+      window.dispatchEvent(new CustomEvent('moldatk-seasonal-campaign', { detail: null }));
       return;
     }
 
