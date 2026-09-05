@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import LandingPage from './LandingPage';
 import { AndroidUpdateChecker } from './components/AndroidUpdateChecker';
+import { SeasonalCampaignRuntime } from './components/SeasonalCampaignRuntime';
 import './index.css';
 
 function RootRouter() {
@@ -36,6 +37,7 @@ function RootRouter() {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
+    <SeasonalCampaignRuntime />
     <RootRouter />
     <AndroidUpdateChecker />
   </React.StrictMode>
