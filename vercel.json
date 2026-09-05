@@ -5,6 +5,7 @@
   "outputDirectory": "dist",
   "rewrites": [
     { "source": "/download", "destination": "/" },
-    { "source": "/about", "destination": "/" }
+    { "source": "/about", "destination": "/" },
+    { "source": "/order", "destination": "/" }
   ]
 }
