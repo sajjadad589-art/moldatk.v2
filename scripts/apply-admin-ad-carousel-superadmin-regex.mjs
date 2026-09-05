@@ -11,20 +11,21 @@ if (!src.includes("import { AdminAdSlidesPanel } from './AdminAdSlidesPanel';"))
 }
 
 if (!src.includes('<AdminAdSlidesPanel />')) {
-  src = src.replace(
-    /\{tab === 'notifications' && <div className="grid grid-cols-\[(?:420px|480px)_1fr\] gap-5">\s*<form onSubmit=\{sendNotification\}/,
-    `{tab === 'notifications' && <div className="grid grid-cols-[480px_1fr] gap-5">
-            <div className="space-y-5">
-              <AdminAdSlidesPanel />
-              <form onSubmit={sendNotification}`
-  );
+  src = src.replace('grid grid-cols-[420px_1fr] gap-5', 'grid grid-cols-[480px_1fr] gap-5');
+  src = src.replace('grid grid-cols-[480px_1fr] gap-5', 'grid grid-cols-[480px_1fr] gap-5');
 
-  src = src.replace(
-    /(<button className="w-full bg-blue-700 text-white rounded-xl py-3 font-black flex items-center justify-center gap-2"><Bell className="w-4 h-4" \/>نشر الإشعار<\/button>\s*<\/form>)\s*<section className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">/,
-    `$1
-            </div>
-            <section className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">`
-  );
+  const notificationFormNeedle = '<form onSubmit={sendNotification}';
+  const idx = src.indexOf(notificationFormNeedle);
+  if (idx >= 0) {
+    src = src.slice(0, idx) + '<div className="space-y-5">\n              <AdminAdSlidesPanel />\n              ' + src.slice(idx);
+
+    const afterIdx = src.indexOf('نشر الإشعار', idx);
+    const formCloseIdx = afterIdx >= 0 ? src.indexOf('</form>', afterIdx) : -1;
+    if (formCloseIdx >= 0) {
+      const insertAt = formCloseIdx + '</form>'.length;
+      src = src.slice(0, insertAt) + '\n            </div>' + src.slice(insertAt);
+    }
+  }
 }
 
 fs.writeFileSync(path, src);
@@ -34,6 +35,6 @@ if (!out.includes("import { AdminAdSlidesPanel } from './AdminAdSlidesPanel';"))
   throw new Error('AdminAdSlidesPanel import was not injected');
 }
 if (!out.includes('<AdminAdSlidesPanel />')) {
-  throw new Error('AdminAdSlidesPanel was not inserted in notifications tab');
+  throw new Error('AdminAdSlidesPanel was not inserted before notification form');
 }
-console.log('Super admin ad panel injected as standalone component.');
+console.log('Super admin ad panel injected before notification form.');
