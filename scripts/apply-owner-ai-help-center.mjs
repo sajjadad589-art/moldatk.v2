@@ -18,13 +18,36 @@ const injectMobileSettings = () => {
   const path = 'src/components/mobile/MobileSettings.tsx';
   let src = read(path);
   if (!src) return;
+
   if (!src.includes("from '../OwnerAIAssistant'")) {
-    src = src.replace("import React from 'react';", "import React from 'react';\nimport { OwnerAIAssistant } from '../OwnerAIAssistant';\nimport { HelpCenter } from '../HelpCenter';");
+    src = src.replace(
+      "import React from 'react';",
+      "import React from 'react';\nimport { OwnerAIAssistant } from '../OwnerAIAssistant';\nimport { HelpCenter } from '../HelpCenter';"
+    );
   }
-  const marker = '      <section className="rounded-[24px] bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 p-4 shadow-sm">\n        <button type="button" onClick={onOpenPricingModal}';
-  if (!src.includes('<OwnerAIAssistant />')) {
-    src = src.replace(marker, '      <OwnerAIAssistant />\n      <HelpCenter />\n\n' + marker);
+
+  if (!src.includes('<OwnerAIAssistant')) {
+    const markers = [
+      '    <div className="p-3.5 space-y-4 max-w-lg mx-auto pb-24">',
+      '    <div className="space-y-4 pb-24" dir="rtl">',
+    ];
+    let inserted = false;
+    for (const marker of markers) {
+      if (src.includes(marker)) {
+        src = src.replace(marker, `${marker}\n      <OwnerAIAssistant />\n      <HelpCenter />`);
+        inserted = true;
+        break;
+      }
+    }
+    if (!inserted) throw new Error('Could not find safe MobileSettings root for Owner AI/help center');
   }
+
+  // Guard the real settings bindings. Never allow an injected/simplified view to
+  // replace SettingsFolderItem fields with key/title/description.
+  if (!src.includes('f.folderKey') || !src.includes('f.titleAr')) {
+    throw new Error('MobileSettings real folder bindings missing before AI injection');
+  }
+
   write(path, src);
 };
 
@@ -33,7 +56,10 @@ const injectDesktopSettings = () => {
   let src = read(path);
   if (!src) return;
   if (!src.includes("from './OwnerAIAssistant'")) {
-    src = src.replace("import { SubscriptionInfoButton, SubscriptionInfo } from './SubscriptionStatusUI';", "import { SubscriptionInfoButton, SubscriptionInfo } from './SubscriptionStatusUI';\nimport { OwnerAIAssistant } from './OwnerAIAssistant';\nimport { HelpCenter } from './HelpCenter';");
+    src = src.replace(
+      "import { SubscriptionInfoButton, SubscriptionInfo } from './SubscriptionStatusUI';",
+      "import { SubscriptionInfoButton, SubscriptionInfo } from './SubscriptionStatusUI';\nimport { OwnerAIAssistant } from './OwnerAIAssistant';\nimport { HelpCenter } from './HelpCenter';"
+    );
   }
   if (!src.includes('<OwnerAIAssistant compact />')) {
     const root = `    <div className="space-y-6 font-['Cairo'] pb-20" dir="rtl">`;
@@ -47,7 +73,10 @@ const injectGlobalWatcher = () => {
   let src = read(path);
   if (!src) return;
   if (!src.includes("from './components/OwnerAIWatcher'")) {
-    src = src.replace("import { GeneratorNotifications } from './components/GeneratorNotifications';", "import { GeneratorNotifications } from './components/GeneratorNotifications';\nimport { OwnerAIWatcher } from './components/OwnerAIWatcher';");
+    src = src.replace(
+      "import { GeneratorNotifications } from './components/GeneratorNotifications';",
+      "import { GeneratorNotifications } from './components/GeneratorNotifications';\nimport { OwnerAIWatcher } from './components/OwnerAIWatcher';"
+    );
   }
   const notification = `{userSession.role === 'generator_admin' && <GeneratorNotifications hideFloatingTriggers={activeTab === 'settings'} />}`;
   const watcher = `{userSession.role === 'generator_admin' && <OwnerAIWatcher onOpenAssistant={() => { setActiveTab('settings'); window.setTimeout(() => window.dispatchEvent(new Event('moldatk-open-owner-ai')), 220); }} />}`;
@@ -67,7 +96,8 @@ const mobile = read('src/components/mobile/MobileSettings.tsx');
 const desktop = read('src/components/SettingsFolderView.tsx');
 const app = read('src/App.tsx');
 if (!assistant.includes('moldatk-open-owner-ai')) throw new Error('Owner AI open event missing');
-if (!mobile.includes('<OwnerAIAssistant />') || !mobile.includes('<HelpCenter />')) throw new Error('Owner AI/help center missing from mobile settings');
+if (!mobile.includes('<OwnerAIAssistant') || !mobile.includes('<HelpCenter')) throw new Error('Owner AI/help center missing from mobile settings');
+if (!mobile.includes('f.folderKey') || !mobile.includes('f.titleAr')) throw new Error('Mobile settings labels were lost');
 if (!desktop.includes('<OwnerAIAssistant compact />') || !desktop.includes('<HelpCenter />')) throw new Error('Owner AI/help center missing from desktop settings');
 if (!app.includes('<OwnerAIWatcher onOpenAssistant=')) throw new Error('Owner AI proactive watcher missing from app');
-console.log('Owner AI, proactive watcher, and help center injected into settings/app.');
+console.log('Owner AI, proactive watcher, and help center injected without replacing settings.');
