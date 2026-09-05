@@ -157,9 +157,10 @@ if (/المظهر والثيم|اختر اللون المريح|بحري هاد�
   throw new Error('Old theme/view mode settings card still exists');
 }
 
-// Run the Super Admin ad cleanup last. This also fails the build if any legacy
-// adminAdTitle/adminAdBody code survives, preventing a broken bundle from shipping.
+// Run build-safety repairs first, then inject the owner-facing AI/help features last
+// so later build transforms cannot remove them.
 await import('./apply-final-ad-syntax-repair.mjs');
 await import('./apply-sales-agent-ai-upgrade.mjs');
+await import('./apply-owner-ai-help-center.mjs');
 
-console.log('Final mobile ad slider, clean settings, admin ad guard, and AI sales agent applied.');
+console.log('Final mobile ad slider, clean settings, admin ad guard, sales AI, owner AI, and help center applied.');
