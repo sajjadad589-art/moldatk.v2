@@ -3,19 +3,59 @@ import fs from 'node:fs';
 const path = 'src/components/SuperAdminDashboard.tsx';
 let src = fs.readFileSync(path, 'utf8');
 
+const removeConstFunction = (name) => {
+  let guard = 0;
+  while (guard++ < 10) {
+    const token = `const ${name} =`;
+    const start = src.indexOf(token);
+    if (start < 0) break;
+    const lineStart = src.lastIndexOf('\n', start) + 1;
+    const braceStart = src.indexOf('{', start);
+    if (braceStart < 0) break;
+
+    let depth = 0;
+    let quote = null;
+    let escaped = false;
+    let end = -1;
+    for (let i = braceStart; i < src.length; i += 1) {
+      const ch = src[i];
+      if (quote) {
+        if (escaped) { escaped = false; continue; }
+        if (ch === '\\') { escaped = true; continue; }
+        if (ch === quote) quote = null;
+        continue;
+      }
+      if (ch === "'" || ch === '"' || ch === '`') { quote = ch; continue; }
+      if (ch === '{') depth += 1;
+      if (ch === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          end = i + 1;
+          while (end < src.length && /[ \t;]/.test(src[end])) end += 1;
+          if (src[end] === '\r') end += 1;
+          if (src[end] === '\n') end += 1;
+          break;
+        }
+      }
+    }
+    if (end < 0) break;
+    src = src.slice(0, lineStart) + src.slice(end);
+  }
+};
+
 // The build still runs older migration scripts that can inject legacy ad managers.
-// Remove that legacy output deterministically; AdminAdSlidesPanel is the only ad UI allowed here.
+// Remove complete legacy functions first so their Supabase chains cannot be left orphaned.
+for (const name of ['loadAdminAdSlides', 'saveIndependentAdminAd', 'deleteIndependentAdminAd']) {
+  removeConstFunction(name);
+}
+
 src = src.replace(/\n\s*type AdminAdSlide = \{[^\n]*\};\s*/g, '\n');
 src = src.replace(/\n\s*const \[[^\n]*(?:adminAd|AdminAd)[^\n]*\n/g, '\n');
 src = src.replace(/\n\s*const [^=\n]*(?:adminAd|AdminAd)[^=\n]*=[^\n]*\n/g, '\n');
-
 src = src.replace(
   /useEffect\(\(\) => \{\s*void load\(\);\s*void loadAdminAdSlides\(\);\s*\}, \[\]\);/g,
   'useEffect(() => { void load(); }, []);'
 );
-
-src = src.replace(/\n\s*const loadAdminAdSlides = async \(\) => \{[\s\S]*?\n\s*\};/g, '\n');
-src = src.replace(/\n\s*const saveIndependentAdminAd = async \(e: React\.FormEvent\) => \{[\s\S]*?(?=\n\s*const sendNotification = async)/g, '\n');
 
 // One old patch embeds an advertisement form directly inside the notifications tab.
 src = src.replace(/\s*<form onSubmit=\{saveIndependentAdminAd\}[\s\S]*?<\/form>\s*/g, '\n');
@@ -33,16 +73,9 @@ const removeSectionContaining = (token) => {
 };
 removeSectionContaining('إدارة سلايدات اعلانات');
 
-// Remove any remaining legacy JSX section that directly references the old ad state.
 src = src.replace(/\n\s*<section[\s\S]*?(?:adminAdSlides|adminAdTitle|adminAdForm|adminAdImageFile|saveIndependentAdminAd|deleteIndependentAdminAd)[\s\S]*?<\/section>\s*\n/g, '\n');
 
-// Fallback cleanup for fragments left by older patch variants.
-src = src.replace(/\n\s*const \{ data, error \} = await supabase\s*\n\s*\.from\('app_ad_slides'\)[\s\S]*?(?=\n\s*(?:const|return|if|await|set|}\)|};|<))/g, '\n');
-src = src.replace(/\n\s*await supabase\s*\n\s*\.from\('app_ad_slides'\)[\s\S]*?(?=\n\s*(?:const|return|if|await|set|}\)|};|<))/g, '\n');
-src = src.replace(/\n\s*(?:setAdminAdSlides|setAdminAdTitle|setAdminAdBody|setAdminAdLink|setAdminAdImage|setAdminAdMessage|setAdminAdFile|setAdminAdSaving|setAdminAdImageFile|setAdminAdForm)\([^\n;]*\);?/g, '\n');
-
-// Some historical injectors leave one-line callbacks/JSX props or loader calls behind after their parent block is removed.
-// Strip every residual line that refers to the legacy local ad implementation. The standalone panel uses none of these names.
+// Strip one-line callbacks/JSX props/loader calls left by historical injectors.
 for (const legacyToken of [
   'setAdminAdSlides', 'setAdminAdTitle', 'setAdminAdBody', 'setAdminAdLink',
   'setAdminAdImage', 'setAdminAdMessage', 'setAdminAdFile', 'setAdminAdSaving',
@@ -51,8 +84,8 @@ for (const legacyToken of [
   'adminAdLink', 'adminAdSaving', 'loadAdminAdSlides', 'saveIndependentAdminAd',
   'deleteIndependentAdminAd',
 ]) {
-  const escaped = legacyToken.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  src = src.replace(new RegExp(`^.*${escaped}.*(?:\\r?\\n|$)`, 'gm'), '');
+  const escapedToken = legacyToken.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  src = src.replace(new RegExp(`^.*${escapedToken}.*(?:\\r?\\n|$)`, 'gm'), '');
 }
 
 // Keep exactly one modern panel import and one panel instance.
@@ -72,17 +105,10 @@ fs.writeFileSync(path, src, 'utf8');
 
 const out = fs.readFileSync(path, 'utf8');
 const forbidden = [
-  'adminAdTitle',
-  'adminAdBody',
-  'adminAdSlides',
-  'setAdminAdSlides',
-  'adminAdForm',
-  'adminAdImageFile',
-  'loadAdminAdSlides',
-  'saveIndependentAdminAd',
-  'deleteIndependentAdminAd',
-  "from('app_ad_slides')",
-  'إدارة سلايدات اعلانات',
+  'adminAdTitle', 'adminAdBody', 'adminAdSlides', 'setAdminAdSlides',
+  'adminAdForm', 'adminAdImageFile', 'loadAdminAdSlides',
+  'saveIndependentAdminAd', 'deleteIndependentAdminAd',
+  "from('app_ad_slides')", 'إدارة سلايدات اعلانات',
 ];
 for (const token of forbidden) {
   if (out.includes(token)) throw new Error(`Old/broken admin ad code remains in SuperAdminDashboard: ${token}`);
