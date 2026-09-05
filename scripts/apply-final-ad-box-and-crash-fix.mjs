@@ -156,4 +156,9 @@ if (!finalSlider.includes('3500')) throw new Error('Mobile slider interval missi
 if (/المظهر والثيم|اختر اللون المريح|بحري هادئ|ذهبي فاتح|داكن رسمي|View Mode|نمط العرض والتوافق/.test(finalSettings)) {
   throw new Error('Old theme/view mode settings card still exists');
 }
-console.log('Final mobile ad slider and clean settings applied.');
+
+// Run the Super Admin ad cleanup last. This also fails the build if any legacy
+// adminAdTitle/adminAdBody code survives, preventing a broken bundle from shipping.
+await import('./apply-final-ad-syntax-repair.mjs');
+
+console.log('Final mobile ad slider, clean settings, and admin ad crash guard applied.');
