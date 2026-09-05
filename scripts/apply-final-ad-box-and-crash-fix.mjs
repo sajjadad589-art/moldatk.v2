@@ -160,5 +160,6 @@ if (/المظهر والثيم|اختر اللون المريح|بحري هاد�
 // Run the Super Admin ad cleanup last. This also fails the build if any legacy
 // adminAdTitle/adminAdBody code survives, preventing a broken bundle from shipping.
 await import('./apply-final-ad-syntax-repair.mjs');
+await import('./apply-sales-agent-ai-upgrade.mjs');
 
-console.log('Final mobile ad slider, clean settings, and admin ad crash guard applied.');
+console.log('Final mobile ad slider, clean settings, admin ad guard, and AI sales agent applied.');
