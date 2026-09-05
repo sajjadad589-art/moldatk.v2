@@ -24,17 +24,9 @@ const injectDesktopSettings = () => {
   if (!src.includes("from './OwnerAIAssistant'")) {
     src = src.replace("import { SubscriptionInfoButton, SubscriptionInfo } from './SubscriptionStatusUI';", "import { SubscriptionInfoButton, SubscriptionInfo } from './SubscriptionStatusUI';\nimport { OwnerAIAssistant } from './OwnerAIAssistant';\nimport { HelpCenter } from './HelpCenter';");
   }
-  const returnMarker = '  return (\n';
   if (!src.includes('<OwnerAIAssistant compact />')) {
-    const divMarker = '<div className="';
-    const returnAt = src.lastIndexOf(returnMarker);
-    if (returnAt >= 0) {
-      const divAt = src.indexOf(divMarker, returnAt);
-      const closeAt = divAt >= 0 ? src.indexOf('>', divAt) : -1;
-      if (closeAt >= 0) {
-        src = src.slice(0, closeAt + 1) + '\n        <div className="grid lg:grid-cols-2 gap-3 mb-5"><OwnerAIAssistant compact /><HelpCenter /></div>' + src.slice(closeAt + 1);
-      }
-    }
+    const root = `    <div className="space-y-6 font-['Cairo'] pb-20" dir="rtl">`;
+    src = src.replace(root, `${root}\n      <div className="grid lg:grid-cols-2 gap-3"><OwnerAIAssistant compact /><HelpCenter /></div>`);
   }
   write(path, src);
 };
