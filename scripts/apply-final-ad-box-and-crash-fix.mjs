@@ -162,5 +162,6 @@ if (/المظهر والثيم|اختر اللون المريح|بحري هاد�
 await import('./apply-final-ad-syntax-repair.mjs');
 await import('./apply-sales-agent-ai-upgrade.mjs');
 await import('./apply-owner-ai-help-center.mjs');
+await import('./apply-lazy-xlsx.mjs');
 
-console.log('Final mobile ad slider, clean settings, admin ad guard, sales AI, owner AI, and help center applied.');
+console.log('Final mobile ad slider, clean settings, admin ad guard, sales AI, owner AI, help center, and lazy Excel parser applied.');
