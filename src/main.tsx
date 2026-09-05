@@ -4,6 +4,7 @@ import App from './App';
 import LandingPage from './LandingPage';
 import { AndroidUpdateChecker } from './components/AndroidUpdateChecker';
 import { SeasonalCampaignRuntime } from './components/SeasonalCampaignRuntime';
+import { CustomerOrderAssistant } from './components/CustomerOrderAssistant';
 import './index.css';
 
 function RootRouter() {
@@ -23,6 +24,10 @@ function RootRouter() {
 
   if (window.location.pathname === '/download' || window.location.pathname === '/about') {
     return <LandingPage />;
+  }
+
+  if (window.location.pathname === '/order') {
+    return <CustomerOrderAssistant />;
   }
 
   // بوابة Super Admin منفصلة عن جلسة الأدمن المحلية القديمة.
