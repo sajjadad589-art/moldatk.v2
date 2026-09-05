@@ -12,6 +12,14 @@ const ensureMobileSliderImport = (path) => {
   write(path, src);
 };
 
+const removeMobileSlider = (path) => {
+  let src = read(path);
+  if (!src) return;
+  src = src.replace(/import \{ MobileAdSlider \} from '\.\/MobileAdSlider';\n/g, '');
+  src = src.replace(/\n\s*<MobileAdSlider(?:\s+className="[^"]*")?\s*\/>\n/g, '\n');
+  write(path, src);
+};
+
 const dashboardPath = 'src/components/mobile/MobileDashboard.tsx';
 ensureMobileSliderImport(dashboardPath);
 let dashboard = read(dashboardPath);
@@ -21,14 +29,9 @@ if (dashboard.includes(dashboardMarker) && !dashboard.includes('<MobileAdSlider 
 }
 write(dashboardPath, dashboard);
 
+// Reports must remain clean: no advertisement carousel in the monthly reports screen.
 const reportsPath = 'src/components/mobile/MobileMonthlyReports.tsx';
-ensureMobileSliderImport(reportsPath);
-let reports = read(reportsPath);
-const reportsMarker = '      <div className="grid grid-cols-2 gap-2.5">';
-if (reports.includes(reportsMarker) && !reports.includes('<MobileAdSlider className="my-1" />')) {
-  reports = reports.replace(reportsMarker, '      <MobileAdSlider className="my-1" />\n\n' + reportsMarker);
-}
-write(reportsPath, reports);
+removeMobileSlider(reportsPath);
 
 const sliderPath = 'src/components/mobile/MobileAdSlider.tsx';
 let slider = read(sliderPath);
@@ -57,14 +60,18 @@ await import('./apply-sales-agent-ai-upgrade.mjs');
 await import('./apply-owner-ai-help-center.mjs');
 await import('./apply-lazy-xlsx.mjs');
 
+// Re-apply the reports cleanup after every build-time transform so no earlier script
+// can bring the reports advertisement back.
+removeMobileSlider(reportsPath);
+
 const finalDashboard = read(dashboardPath);
 const finalReports = read(reportsPath);
 const finalSlider = read(sliderPath);
 const finalSettings = read(settingsPath);
 if (!finalDashboard.includes('<MobileAdSlider className="mt-1" />')) throw new Error('Dashboard ad slider missing');
-if (!finalReports.includes('<MobileAdSlider className="my-1" />')) throw new Error('Reports ad slider missing');
+if (finalReports.includes('MobileAdSlider')) throw new Error('Reports must not contain an ad slider');
 if (!finalSlider.includes('3500')) throw new Error('Mobile slider interval missing');
 if (!finalSettings.includes('f.folderKey') || !finalSettings.includes('f.titleAr')) throw new Error('Mobile settings folder labels missing');
 if (!finalSettings.includes('<OwnerAIAssistant') || !finalSettings.includes('<HelpCenter')) throw new Error('Owner AI/help center missing from mobile settings');
 
-console.log('Final release guard preserved full settings and applied ads, sales AI, owner AI, help center, and lazy Excel parser.');
+console.log('Final release guard preserved full settings, kept dashboard ads, removed report ads, and applied AI/help features safely.');
