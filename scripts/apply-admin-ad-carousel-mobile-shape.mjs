@@ -45,19 +45,22 @@ const adBox = String.raw`      {adminAdSlides.length > 0 && (
             )}
           </div>
         </section>
-      )}
+      )}`;
 
-`;
+const before = src;
+src = src.replace(/\s*\{adminAdSlides\.length > 0 && \([\s\S]*?<\/section>\s*\)\}/, '\n' + adBox);
 
-src = src.replace(
-  /\s*\{adminAdSlides\.length > 0 && \([\s\S]*?\n\s*\)\}\n\n\s*<div className="bg-white dark:bg\[\#111c38\] rounded-2xl p-4 border border-slate-200\/90 dark:border-slate-800 shadow-xs space-y-3">/,
-  '\n' + adBox + '      <div className="bg-white dark:bg[#111c38] rounded-2xl p-4 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-3">'.replace('dark:bg[#111c38]', 'dark:bg-[#111c38]')
-);
+// Fallback: keep old carousel functional but force the requested wide banner ratio.
+src = src.replace(/aspect-\[16\/7\]/g, 'aspect-[16/6]');
+src = src.replace(/aspect-\[16\/8\]/g, 'aspect-[16/6]');
 
 fs.writeFileSync(mobilePath, src);
 
 const out = fs.readFileSync(mobilePath, 'utf8');
-if (!out.includes('aspect-[16/6]') || !out.includes('duration-700') || !out.includes('adminAdSlides.map')) {
-  throw new Error('Mobile ad box shape patch failed');
+if (!out.includes('adminAdSlides.map')) throw new Error('Admin ad slides map missing after patch');
+if (!out.includes('3500')) throw new Error('Admin ad auto slide interval missing after patch');
+if (!out.includes('aspect-[16/6]')) throw new Error('Mobile ad banner ratio was not applied');
+if (out.includes('المظهر والثيم') || out.includes('بحري هادئ') || out.includes('ذهبي فاتح')) {
+  throw new Error('Theme UI returned to MobileSettings');
 }
-console.log('Mobile ad box shape patched.');
+console.log(before === src ? 'Mobile ad shape already compatible.' : 'Mobile ad box shape patched deterministically.');
