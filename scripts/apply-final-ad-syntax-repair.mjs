@@ -41,14 +41,16 @@ src = src.replace(/\n\s*const \{ data, error \} = await supabase\s*\n\s*\.from\(
 src = src.replace(/\n\s*await supabase\s*\n\s*\.from\('app_ad_slides'\)[\s\S]*?(?=\n\s*(?:const|return|if|await|set|}\)|};|<))/g, '\n');
 src = src.replace(/\n\s*(?:setAdminAdSlides|setAdminAdTitle|setAdminAdBody|setAdminAdLink|setAdminAdImage|setAdminAdMessage|setAdminAdFile|setAdminAdSaving|setAdminAdImageFile|setAdminAdForm)\([^\n;]*\);?/g, '\n');
 
-// Some historical injectors leave a one-line setter callback behind after their parent block is removed.
-// Strip those residual statements explicitly so no undefined identifier can reach the bundle.
-for (const legacySetter of [
+// Some historical injectors leave one-line callbacks/JSX props behind after their parent block is removed.
+// Strip every residual line that refers to the legacy local ad state. The standalone panel uses none of these names.
+for (const legacyToken of [
   'setAdminAdSlides', 'setAdminAdTitle', 'setAdminAdBody', 'setAdminAdLink',
   'setAdminAdImage', 'setAdminAdMessage', 'setAdminAdFile', 'setAdminAdSaving',
-  'setAdminAdImageFile', 'setAdminAdForm',
+  'setAdminAdImageFile', 'setAdminAdForm', 'adminAdTitle', 'adminAdBody',
+  'adminAdSlides', 'adminAdForm', 'adminAdImageFile', 'adminAdFile',
+  'adminAdLink', 'adminAdSaving',
 ]) {
-  const escaped = legacySetter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const escaped = legacyToken.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   src = src.replace(new RegExp(`^.*${escaped}.*(?:\\r?\\n|$)`, 'gm'), '');
 }
 
