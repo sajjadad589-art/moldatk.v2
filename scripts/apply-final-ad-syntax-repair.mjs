@@ -44,7 +44,6 @@ const removeConstFunction = (name) => {
 };
 
 // The build still runs older migration scripts that can inject legacy ad managers.
-// Remove complete legacy functions first so their Supabase chains cannot be left orphaned.
 for (const name of ['loadAdminAdSlides', 'saveIndependentAdminAd', 'deleteIndependentAdminAd']) {
   removeConstFunction(name);
 }
@@ -56,8 +55,6 @@ src = src.replace(
   /useEffect\(\(\) => \{\s*void load\(\);\s*void loadAdminAdSlides\(\);\s*\}, \[\]\);/g,
   'useEffect(() => { void load(); }, []);'
 );
-
-// One old patch embeds an advertisement form directly inside the notifications tab.
 src = src.replace(/\s*<form onSubmit=\{saveIndependentAdminAd\}[\s\S]*?<\/form>\s*/g, '\n');
 
 const removeSectionContaining = (token) => {
@@ -75,7 +72,6 @@ removeSectionContaining('إدارة سلايدات اعلانات');
 
 src = src.replace(/\n\s*<section[\s\S]*?(?:adminAdSlides|adminAdTitle|adminAdForm|adminAdImageFile|saveIndependentAdminAd|deleteIndependentAdminAd)[\s\S]*?<\/section>\s*\n/g, '\n');
 
-// Strip one-line callbacks/JSX props/loader calls left by historical injectors.
 for (const legacyToken of [
   'setAdminAdSlides', 'setAdminAdTitle', 'setAdminAdBody', 'setAdminAdLink',
   'setAdminAdImage', 'setAdminAdMessage', 'setAdminAdFile', 'setAdminAdSaving',
@@ -88,20 +84,54 @@ for (const legacyToken of [
   src = src.replace(new RegExp(`^.*${escapedToken}.*(?:\\r?\\n|$)`, 'gm'), '');
 }
 
-// Keep exactly one modern panel import and one panel instance.
+// Keep exactly one modern ad panel, seasonal manager and customer orders panel.
 src = src.replace(/\nimport \{ AdminAdSlidesPanel \} from '\.\/AdminAdSlidesPanel';/g, '');
+src = src.replace(/\nimport \{ SeasonalCampaignManager \} from '\.\/SeasonalCampaignManager';/g, '');
+src = src.replace(/\nimport \{ CustomerOrdersPanel \} from '\.\/CustomerOrdersPanel';/g, '');
 src = src.replace(
   "import { calculateSubscriberBill } from '../utils/formatters';",
-  "import { calculateSubscriberBill } from '../utils/formatters';\nimport { AdminAdSlidesPanel } from './AdminAdSlidesPanel';"
+  "import { calculateSubscriberBill } from '../utils/formatters';\nimport { AdminAdSlidesPanel } from './AdminAdSlidesPanel';\nimport { SeasonalCampaignManager } from './SeasonalCampaignManager';\nimport { CustomerOrdersPanel } from './CustomerOrdersPanel';"
 );
+
+src = src.replace(/type Tab = 'overview' \| 'generators' \| 'finance' \| 'notifications';/g, "type Tab = 'overview' | 'generators' | 'finance' | 'orders' | 'notifications';");
+src = src.replace(/\n\s*\['orders', 'طلبات الموقع',[^\n]*\n/g, '\n');
+src = src.replace(
+  "    ['finance', 'الحسابات', CircleDollarSign],\n    ['notifications', 'الإشعارات', Bell],",
+  "    ['finance', 'الحسابات', CircleDollarSign],\n    ['orders', 'طلبات الموقع', WalletCards],\n    ['notifications', 'الإشعارات', Bell],"
+);
+
+src = src.replace(/\n\s*\{tab === 'orders' && <CustomerOrdersPanel \/>\}\s*\n/g, '\n');
+const generatorsNeedle = "          {tab === 'generators' &&";
+const generatorsIndex = src.indexOf(generatorsNeedle);
+if (generatorsIndex >= 0) {
+  src = src.slice(0, generatorsIndex) + "          {tab === 'orders' && <CustomerOrdersPanel />}\n\n" + src.slice(generatorsIndex);
+}
+
 src = src.replace(/\n\s*<AdminAdSlidesPanel \/>\s*\n/g, '\n');
+src = src.replace(/\n\s*<SeasonalCampaignManager \/>\s*\n/g, '\n');
 const needle = '<form onSubmit={sendNotification}';
 const idx = src.indexOf(needle);
 if (idx >= 0) {
-  src = src.slice(0, idx) + '<AdminAdSlidesPanel />\n            ' + src.slice(idx);
+  src = src.slice(0, idx) + '<SeasonalCampaignManager />\n            <AdminAdSlidesPanel />\n            ' + src.slice(idx);
 }
 
 fs.writeFileSync(path, src, 'utf8');
+
+// Add a prominent order entry point to the public landing page. Do it at the end of the build
+// so older patch scripts cannot hide the customer-order flow.
+const landingPath = 'src/LandingPage.tsx';
+let landing = fs.readFileSync(landingPath, 'utf8');
+if (!landing.includes('href="/order"')) {
+  landing = landing.replace(
+    '<div className="flex flex-wrap gap-3">',
+    '<div className="flex flex-wrap gap-3">\n              <a href="/order" className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-emerald-400 text-slate-950 font-black hover:bg-emerald-300 transition-all">\n                اشترك أو جدد الآن <ArrowLeft className="w-5 h-5" />\n              </a>'
+  );
+  landing = landing.replace(
+    '<a href="#features" className="hover:text-white transition-colors">المزايا</a>',
+    '<a href="/order" className="text-emerald-300 hover:text-emerald-200 transition-colors">الاشتراك</a>\n            <a href="#features" className="hover:text-white transition-colors">المزايا</a>'
+  );
+}
+fs.writeFileSync(landingPath, landing, 'utf8');
 
 const out = fs.readFileSync(path, 'utf8');
 const forbidden = [
@@ -114,4 +144,8 @@ for (const token of forbidden) {
   if (out.includes(token)) throw new Error(`Old/broken admin ad code remains in SuperAdminDashboard: ${token}`);
 }
 if (!out.includes('<AdminAdSlidesPanel />')) throw new Error('AdminAdSlidesPanel missing after repair');
-console.log('Final admin ad syntax repair applied.');
+if (!out.includes('<SeasonalCampaignManager />')) throw new Error('SeasonalCampaignManager missing after repair');
+if (!out.includes("['orders', 'طلبات الموقع', WalletCards]")) throw new Error('Customer orders navigation missing after repair');
+if (!out.includes("{tab === 'orders' && <CustomerOrdersPanel />}")) throw new Error('CustomerOrdersPanel missing after repair');
+if (!landing.includes('href="/order"')) throw new Error('Customer order landing link missing after repair');
+console.log('Final admin ad, seasonal campaign and customer order repair applied.');
