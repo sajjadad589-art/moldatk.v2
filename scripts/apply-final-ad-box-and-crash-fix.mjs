@@ -15,6 +15,7 @@ const removeLegacyAdminAdBlocks = (source) => {
       src.lastIndexOf('\n    const ', pos),
       src.lastIndexOf('\n            <section', pos),
       src.lastIndexOf('\n          <section', pos),
+      src.lastIndexOf('\n          <div', pos),
     ].filter(x => x >= 0);
     return candidates.length ? Math.max(...candidates) : Math.max(0, src.lastIndexOf('\n', pos));
   };
@@ -25,6 +26,8 @@ const removeLegacyAdminAdBlocks = (source) => {
       src.indexOf('\n  const sendNotification', pos + 1),
       src.indexOf('\n  const resetAllDataForRelease', pos + 1),
       src.indexOf('\n  const signOut', pos + 1),
+      src.indexOf('\n          {tab ===', pos + 1),
+      src.indexOf('\n        </main>', pos + 1),
       src.indexOf('\n  return (', pos + 1),
       src.indexOf('\n};\n', pos + 1),
     ].filter(x => x > pos);
@@ -77,8 +80,6 @@ if (slider) {
   slider = slider.replace(/rounded-\[28px\]/g, 'rounded-[22px]');
   slider = slider.replace(/aspect-\[16\/6\]/g, 'aspect-[16/6.4]');
   slider = slider.replace(/aspect-\[16\/7\]/g, 'aspect-[16/6.4]');
-  slider = slider.replace(/},\s*45000\)/g, '}, 45000)');
-  slider = slider.replace(/},\s*60000\)/g, '}, 45000)');
   slider = slider.replace(/},\s*4000\)/g, '}, 3500)');
   slider = slider.replace(/},\s*3000\)/g, '}, 3500)');
   write(sliderPath, slider);
@@ -92,11 +93,33 @@ superSrc = superSrc.replace(
   "import { calculateSubscriberBill } from '../utils/formatters';\nimport { AdminAdSlidesPanel } from './AdminAdSlidesPanel';"
 );
 superSrc = superSrc.replace(/\n\s*<AdminAdSlidesPanel \/>\s*\n/g, '\n');
-const formNeedle = '<form onSubmit={sendNotification}';
-const formIndex = superSrc.indexOf(formNeedle);
-if (formIndex >= 0) {
-  superSrc = superSrc.slice(0, formIndex) + '<AdminAdSlidesPanel />\n            ' + superSrc.slice(formIndex);
-}
+
+const insertPanel = (source) => {
+  let src = source;
+  const insert = '<AdminAdSlidesPanel />\n            ';
+  const needles = [
+    '<form onSubmit={sendNotification}',
+    '{tab === \'notifications\' && <div className="grid grid-cols-[420px_1fr] gap-5">',
+    "{tab === 'notifications' && <div",
+    "{tab === 'overview' && <>",
+    '<main className="flex-1 p-6 overflow-y-auto">',
+  ];
+  for (const needle of needles) {
+    const idx = src.indexOf(needle);
+    if (idx >= 0) {
+      if (needle.startsWith('{tab')) {
+        return src.slice(0, idx + needle.length) + '\n            ' + insert + src.slice(idx + needle.length);
+      }
+      if (needle.startsWith('<main')) {
+        return src.slice(0, idx + needle.length) + '\n          ' + insert + src.slice(idx + needle.length);
+      }
+      return src.slice(0, idx) + insert + src.slice(idx);
+    }
+  }
+  return src;
+};
+
+superSrc = insertPanel(superSrc);
 write(superPath, superSrc);
 
 const settingsPath = 'src/components/mobile/MobileSettings.tsx';
