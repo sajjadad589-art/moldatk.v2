@@ -3,50 +3,6 @@ import fs from 'node:fs';
 const read = (path) => fs.existsSync(path) ? fs.readFileSync(path, 'utf8') : '';
 const write = (path, content) => fs.writeFileSync(path, content, 'utf8');
 
-const removeLegacyAdminAdBlocks = (source) => {
-  let src = source;
-  const tokens = ["from('app_ad_slides')", 'from("app_ad_slides")', 'adminAdTitle', 'adminAdBody', 'adminAdSlides', 'setAdminAdSlides', 'setAdminAdTitle', 'setAdminAdBody'];
-
-  const findBlockStart = (pos) => {
-    const candidates = [
-      src.lastIndexOf('\n  const ', pos),
-      src.lastIndexOf('\n  async function ', pos),
-      src.lastIndexOf('\n  function ', pos),
-      src.lastIndexOf('\n    const ', pos),
-      src.lastIndexOf('\n            <section', pos),
-      src.lastIndexOf('\n          <section', pos),
-      src.lastIndexOf('\n          <div', pos),
-    ].filter(x => x >= 0);
-    return candidates.length ? Math.max(...candidates) : Math.max(0, src.lastIndexOf('\n', pos));
-  };
-
-  const findBlockEnd = (pos) => {
-    const candidates = [
-      src.indexOf('\n  const ', pos + 1),
-      src.indexOf('\n  const sendNotification', pos + 1),
-      src.indexOf('\n  const resetAllDataForRelease', pos + 1),
-      src.indexOf('\n  const signOut', pos + 1),
-      src.indexOf('\n          {tab ===', pos + 1),
-      src.indexOf('\n        </main>', pos + 1),
-      src.indexOf('\n  return (', pos + 1),
-      src.indexOf('\n};\n', pos + 1),
-    ].filter(x => x > pos);
-    return candidates.length ? Math.min(...candidates) : src.length;
-  };
-
-  let guard = 0;
-  while (guard++ < 150) {
-    const positions = tokens.map(t => src.indexOf(t)).filter(x => x >= 0);
-    if (!positions.length) break;
-    const pos = Math.min(...positions);
-    const start = findBlockStart(pos);
-    const end = findBlockEnd(pos);
-    src = src.slice(0, start) + '\n' + src.slice(end);
-  }
-
-  return src;
-};
-
 const ensureMobileSliderImport = (path) => {
   let src = read(path);
   if (!src) return;
@@ -85,63 +41,20 @@ if (slider) {
   write(sliderPath, slider);
 }
 
-const superPath = 'src/components/SuperAdminDashboard.tsx';
-let superSrc = removeLegacyAdminAdBlocks(read(superPath));
-superSrc = superSrc.replace(/\nimport \{ AdminAdSlidesPanel \} from '\.\/AdminAdSlidesPanel';/g, '');
-superSrc = superSrc.replace(
-  "import { calculateSubscriberBill } from '../utils/formatters';",
-  "import { calculateSubscriberBill } from '../utils/formatters';\nimport { AdminAdSlidesPanel } from './AdminAdSlidesPanel';"
-);
-superSrc = superSrc.replace(/\n\s*<AdminAdSlidesPanel \/>\s*\n/g, '\n');
-
-superSrc = superSrc.replace(/\{tab === 'notifications' && <div\s*\n\s*className=/g, "{tab === 'notifications' && <div className=");
-superSrc = superSrc.replace(/\{tab === 'notifications' && <div\s*\n\s*<AdminAdSlidesPanel \/>\s*\n\s*className=/g, "{tab === 'notifications' && <div className=");
-
-const insertPanel = (source) => {
-  let src = source;
-  const insert = '\n            <AdminAdSlidesPanel />';
-  const formNeedle = '<form onSubmit={sendNotification}';
-  const formIndex = src.indexOf(formNeedle);
-  if (formIndex >= 0) return src.slice(0, formIndex) + '<AdminAdSlidesPanel />\n            ' + src.slice(formIndex);
-
-  const gridOpen = /\{tab === 'notifications' && <div\s+className="[^"]*"\s*>/;
-  const match = src.match(gridOpen);
-  if (match?.index !== undefined) {
-    const end = match.index + match[0].length;
-    return src.slice(0, end) + insert + src.slice(end);
-  }
-
-  const overviewNeedle = "{tab === 'overview' && <>";
-  const overviewIndex = src.indexOf(overviewNeedle);
-  if (overviewIndex >= 0) {
-    const end = overviewIndex + overviewNeedle.length;
-    return src.slice(0, end) + '\n            <AdminAdSlidesPanel />' + src.slice(end);
-  }
-
-  const mainNeedle = '<main className="flex-1 p-6 overflow-y-auto">';
-  const mainIndex = src.indexOf(mainNeedle);
-  if (mainIndex >= 0) {
-    const end = mainIndex + mainNeedle.length;
-    return src.slice(0, end) + '\n          <AdminAdSlidesPanel />' + src.slice(end);
-  }
-  return src;
-};
-
-superSrc = insertPanel(superSrc);
-write(superPath, superSrc);
-
 const settingsPath = 'src/components/mobile/MobileSettings.tsx';
 let settings = read(settingsPath);
 settings = settings.replace(/\s*<section[\s\S]*?(المظهر والثيم|اختر اللون المريح|بحري هادئ|ذهبي فاتح|داكن رسمي)[\s\S]*?<\/section>\s*/g, '\n');
 settings = settings.replace(/\s*<div[\s\S]*?(View Mode|نمط العرض والتوافق)[\s\S]*?<\/div>\s*/g, '\n');
 write(settingsPath, settings);
 
-const finalSuper = read(superPath);
-for (const token of ["from('app_ad_slides')", 'from("app_ad_slides")', 'adminAdTitle', 'adminAdBody', 'adminAdSlides', 'setAdminAdSlides']) {
-  if (finalSuper.includes(token)) throw new Error(`Legacy admin ad code remains: ${token}`);
+const finalDashboard = read(dashboardPath);
+const finalReports = read(reportsPath);
+const finalSlider = read(sliderPath);
+const finalSettings = read(settingsPath);
+if (!finalDashboard.includes('<MobileAdSlider className="mt-1" />')) throw new Error('Dashboard ad slider missing');
+if (!finalReports.includes('<MobileAdSlider className="my-1" />')) throw new Error('Reports ad slider missing');
+if (!finalSlider.includes('3500')) throw new Error('Mobile slider interval missing');
+if (/المظهر والثيم|اختر اللون المريح|بحري هادئ|ذهبي فاتح|داكن رسمي|View Mode|نمط العرض والتوافق/.test(finalSettings)) {
+  throw new Error('Old theme/view mode settings card still exists');
 }
-if (!finalSuper.includes('<AdminAdSlidesPanel />')) throw new Error('AdminAdSlidesPanel missing');
-if (!read(dashboardPath).includes('<MobileAdSlider className="mt-1" />')) throw new Error('Dashboard ad slider missing');
-if (!read(reportsPath).includes('<MobileAdSlider className="my-1" />')) throw new Error('Reports ad slider missing');
-if (!read(sliderPath).includes('3500')) throw new Error('Mobile slider interval missing');
-console.log('Final admin ad box cleanup applied.');
+console.log('Final mobile ad slider and settings cleanup applied.');
