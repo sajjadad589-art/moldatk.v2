@@ -3,7 +3,7 @@ import fs from 'node:fs';
 const path = 'src/components/SuperAdminDashboard.tsx';
 let src = fs.readFileSync(path, 'utf8');
 
-// The build still runs older migration scripts that can inject a legacy ad manager.
+// The build still runs older migration scripts that can inject legacy ad managers.
 // Remove that legacy output deterministically; AdminAdSlidesPanel is the only ad UI allowed here.
 src = src.replace(/\n\s*type AdminAdSlide = \{[^\n]*\};\s*/g, '\n');
 src = src.replace(/\n\s*const \[[^\n]*(?:adminAd|AdminAd)[^\n]*\n/g, '\n');
@@ -16,6 +16,9 @@ src = src.replace(
 
 src = src.replace(/\n\s*const loadAdminAdSlides = async \(\) => \{[\s\S]*?\n\s*\};/g, '\n');
 src = src.replace(/\n\s*const saveIndependentAdminAd = async \(e: React\.FormEvent\) => \{[\s\S]*?(?=\n\s*const sendNotification = async)/g, '\n');
+
+// One old patch embeds an advertisement form directly inside the notifications tab.
+src = src.replace(/\s*<form onSubmit=\{saveIndependentAdminAd\}[\s\S]*?<\/form>\s*/g, '\n');
 
 const removeSectionContaining = (token) => {
   let guard = 0;
@@ -30,10 +33,13 @@ const removeSectionContaining = (token) => {
 };
 removeSectionContaining('إدارة سلايدات اعلانات');
 
+// Remove any remaining legacy JSX section that directly references the old ad state.
+src = src.replace(/\n\s*<section[\s\S]*?(?:adminAdSlides|adminAdTitle|adminAdForm|adminAdImageFile|saveIndependentAdminAd|deleteIndependentAdminAd)[\s\S]*?<\/section>\s*\n/g, '\n');
+
 // Fallback cleanup for fragments left by older patch variants.
 src = src.replace(/\n\s*const \{ data, error \} = await supabase\s*\n\s*\.from\('app_ad_slides'\)[\s\S]*?(?=\n\s*(?:const|return|if|await|set|}\)|};|<))/g, '\n');
 src = src.replace(/\n\s*await supabase\s*\n\s*\.from\('app_ad_slides'\)[\s\S]*?(?=\n\s*(?:const|return|if|await|set|}\)|};|<))/g, '\n');
-src = src.replace(/\n\s*(?:setAdminAdSlides|setAdminAdTitle|setAdminAdBody|setAdminAdLink|setAdminAdImage|setAdminAdMessage|setAdminAdFile|setAdminAdSaving)\([^\n;]*\);?/g, '\n');
+src = src.replace(/\n\s*(?:setAdminAdSlides|setAdminAdTitle|setAdminAdBody|setAdminAdLink|setAdminAdImage|setAdminAdMessage|setAdminAdFile|setAdminAdSaving|setAdminAdImageFile|setAdminAdForm)\([^\n;]*\);?/g, '\n');
 
 // Keep exactly one modern panel import and one panel instance.
 src = src.replace(/\nimport \{ AdminAdSlidesPanel \} from '\.\/AdminAdSlidesPanel';/g, '');
@@ -56,6 +62,8 @@ const forbidden = [
   'adminAdBody',
   'adminAdSlides',
   'setAdminAdSlides',
+  'adminAdForm',
+  'adminAdImageFile',
   'loadAdminAdSlides',
   'saveIndependentAdminAd',
   'deleteIndependentAdminAd',
