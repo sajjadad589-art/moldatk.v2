@@ -11,6 +11,17 @@ on:
         options:
           - release
           - debug
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'android/**'
+      - 'capacitor.config.ts'
+      - 'tsconfig.json'
+      - 'package.json'
+      - '.github/workflows/android-apk.yml'
+      - 'scripts/**'
 
 permissions:
   contents: write
@@ -22,9 +33,9 @@ jobs:
     env:
       VITE_SUPABASE_URL: https://adluynhkikoodjljoxeu.supabase.co
       VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CObjK2Uua18kVkXCkxdRog_keQLIDiE
-      CURRENT_VERSION: 1.3.12
-      CURRENT_VERSION_CODE: 16
-      SHOULD_RELEASE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release' }}
+      CURRENT_VERSION: 1.3.14
+      CURRENT_VERSION_CODE: 18
+      SHOULD_RELEASE: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release') }}
 
     steps:
       - name: Checkout
@@ -47,6 +58,9 @@ jobs:
 
       - name: Typecheck launch build
         run: npm run lint
+
+      - name: Android Firebase and Super Admin regression test
+        run: npx tsx scripts/android-push-superadmin-smoke-test.ts
 
       - name: Accountant monthly regression test
         run: npx tsx scripts/monthly-ledger-smoke-test.ts
@@ -74,6 +88,12 @@ jobs:
 
       - name: Sync Capacitor Android
         run: npx cap sync android
+
+      - name: Verify Firebase Android configuration
+        run: |
+          test -f android/app/google-services.json
+          grep -q 'com.mwaldatk.app' android/app/google-services.json
+          grep -q 'POST_NOTIFICATIONS' android/app/src/main/AndroidManifest.xml
 
       - name: Build debug APK
         run: |
@@ -153,7 +173,7 @@ jobs:
           else
             gh release create "$TAG" release/Moldatk-Android-Release.apk release/Moldatk-Android-Release.aab \
               --title "Moldatk ${CURRENT_VERSION}" \
-              --notes "نسخة Android Release موقعة: APK للتثبيت المباشر و AAB للرفع على Google Play."
+              --notes "نسخة Android موقعة: تفعيل Firebase Push، إذن إشعارات Android، وإصلاح تحميل بيانات Super Admin داخل التطبيق."
           fi
 
       - name: Activate in-app update manifest
@@ -167,10 +187,10 @@ jobs:
             enabled: true,
             versionCode,
             versionName: version,
-            minimumVersionCode: 5,
-            force: false,
+            minimumVersionCode: versionCode,
+            force: true,
             apkUrl: `https://github.com/sajjadad589-art/moldatk.v2/releases/download/v${version}/Moldatk-Android-Release.apk`,
-            notes: 'اختبار تحديث النسخة الموقعة واعتماد تسلسل إصدارات موحّد للتحديثات المستقبلية.'
+            notes: 'تحديث إلزامي: تفعيل إشعارات Android عبر Firebase وإصلاح ظهور بيانات Super Admin داخل تطبيق Android.'
           };
           fs.writeFileSync('public/app-version.json', JSON.stringify(manifest, null, 2) + '\n');
           NODE
@@ -179,6 +199,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add public/app-version.json
           if ! git diff --cached --quiet; then
-            git commit -m "Activate in-app update ${CURRENT_VERSION}"
+            git commit -m "Activate mandatory Android update ${CURRENT_VERSION}"
             git push
           fi
