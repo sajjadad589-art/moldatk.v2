@@ -46,8 +46,6 @@ if (slider) {
 
 // IMPORTANT: never overwrite MobileSettings here. The real component contains
 // ads, device compatibility, subscription info, pricing and every settings folder.
-// A previous release build replaced it with a simplified component that used
-// non-existent fields (key/title/description), producing blank settings cards.
 const settingsPath = 'src/components/mobile/MobileSettings.tsx';
 const sourceSettings = read(settingsPath);
 if (!sourceSettings.includes('f.folderKey') || !sourceSettings.includes('f.titleAr')) {
@@ -80,4 +78,7 @@ if (finalSuperAdmin.includes('<SeasonalCampaignManager />')) throw new Error('Du
 if (!finalSuperAdmin.includes('SUPER_ADMIN_NOTIFICATIONS_LAYOUT_V2')) throw new Error('Super Admin notifications layout fix missing');
 if (!finalSuperAdmin.includes('deleteGeneratorAccount')) throw new Error('Super Admin generator delete control missing');
 
-console.log('Final release guard preserved full settings, kept dashboard ads, removed report ads, applied AI/help features, Android push/Super Admin recovery, and finalized Super Admin notifications/delete controls.');
+// Branding is deliberately last so old build-time fix scripts cannot restore the previous blue identity.
+await import('./apply-brand-identity-v2.mjs');
+
+console.log('Final release guard preserved core features and applied the final Moldatk calm brand identity after all legacy transforms.');
