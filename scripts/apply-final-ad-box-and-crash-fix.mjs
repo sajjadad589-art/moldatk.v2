@@ -77,6 +77,7 @@ await import('./apply-brand-identity-v2.mjs');
 await import('./apply-brand-surfaces-v2.mjs');
 await import('./apply-update-delivery-and-internal-theme-v3-fixed.mjs');
 await import('./apply-google-play-cabinet-collector-v2.mjs');
+await import('./generate-pwa-brand-icons.mjs');
 
 // The update-delivery compatibility guard still targets 1.3.17 internally. Rewrite its generated artifacts at the very end for this release.
 for (const path of ['public/sw.js', 'src/main.tsx']) {
@@ -85,5 +86,8 @@ for (const path of ['public/sw.js', 'src/main.tsx']) {
 }
 if (!read('public/sw.js').includes('moldatk-shell-v4-1.3.18')) throw new Error('1.3.18 service worker cache version missing');
 if (!read('src/main.tsx').includes('/sw.js?v=1.3.18')) throw new Error('1.3.18 service worker registration missing');
+for (const iconPath of ['public/icons/moldatk-apple-touch-v5.png', 'public/icons/moldatk-icon-192-v5.png', 'public/icons/moldatk-icon-512-v5.png']) {
+  if (!fs.existsSync(iconPath) || fs.statSync(iconPath).size < 1000) throw new Error(`Generated PWA icon missing: ${iconPath}`);
+}
 
-console.log('Final release guard preserved core features, enforced the calm internal theme, Google Play legal surfaces, cabinet sync safety and collector cabinet assignments.');
+console.log('Final release guard preserved core features, enforced the calm internal theme, Google Play legal surfaces, cabinet sync safety, collector cabinet assignments, and the new iOS/PWA icon set.');
