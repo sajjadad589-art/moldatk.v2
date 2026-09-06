@@ -16,6 +16,7 @@ import {
   Users,
   WalletCards,
   Wifi,
+  Zap,
 } from 'lucide-react';
 
 const features = [
