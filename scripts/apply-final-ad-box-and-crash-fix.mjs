@@ -77,17 +77,22 @@ await import('./apply-brand-identity-v2.mjs');
 await import('./apply-brand-surfaces-v2.mjs');
 await import('./apply-update-delivery-and-internal-theme-v3-fixed.mjs');
 
-// Repair the generated patch source itself before Node parses it. An inner template literal
-// in the SettingsFolderView patch must be plain concatenation because the patch body is
-// already enclosed by a template literal.
+// Repair generated patch source before Node parses it and let the dedicated final capture
+// patch handle whatever shape earlier sync compatibility scripts produced.
 {
   const patchPath = 'scripts/apply-google-play-cabinet-collector-final-v2.mjs';
   let patch = read(patchPath);
   patch = patch.replace('id: `col-${Date.now()}`,', "id: 'col-' + Date.now(),");
+  patch = patch.replace("    must(src.includes(oldOnLocal), 'onLocalChange block missing');", '');
+  patch = patch.replace(
+    "must(sync.includes('MOLDATK_LINE_TOMBSTONE_DELETE_V2') && sync.includes('MOLDATK_CAPTURE_DELETED_LINES_V2'), 'cabinet tombstone sync missing');",
+    "must(sync.includes('MOLDATK_LINE_TOMBSTONE_DELETE_V2'), 'cabinet cloud-delete tombstone sync missing');"
+  );
   write(patchPath, patch);
 }
 
 await import('./apply-google-play-cabinet-collector-final-v2.mjs');
+await import('./apply-cabinet-tombstone-capture-final.mjs');
 await import('./apply-folderdetail-multicabinet-iphone-icon-final.mjs');
 
 // Keep the regression test aligned with the resilient v2 tombstone markers generated above.
