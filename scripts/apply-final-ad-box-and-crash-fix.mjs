@@ -84,8 +84,31 @@ for (const path of ['public/sw.js', 'src/main.tsx']) {
   const current = read(path);
   if (current) write(path, current.replaceAll('1.3.17', '1.3.18'));
 }
+
+// Legacy brand patches still rewrite the web manifest to the old PNGs. Reassert the versioned Moldatk icon set last.
+write('public/manifest.webmanifest', JSON.stringify({
+  id: '/?pwa=5',
+  name: 'مولدتك',
+  short_name: 'مولدتك',
+  description: 'نظام إدارة المولدات الكهربائية والاشتراكات والجباية',
+  lang: 'ar',
+  dir: 'rtl',
+  start_url: '/?pwa=5',
+  scope: '/',
+  display: 'standalone',
+  orientation: 'portrait-primary',
+  background_color: '#0B1F3B',
+  theme_color: '#0B1F3B',
+  icons: [
+    { src: '/icons/moldatk-icon-192-v5.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+    { src: '/icons/moldatk-icon-512-v5.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+    { src: '/icons/moldatk-icon-512-v5.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+  ]
+}, null, 2) + '\n');
+
 if (!read('public/sw.js').includes('moldatk-shell-v4-1.3.18')) throw new Error('1.3.18 service worker cache version missing');
 if (!read('src/main.tsx').includes('/sw.js?v=1.3.18')) throw new Error('1.3.18 service worker registration missing');
+if (!read('public/manifest.webmanifest').includes('moldatk-icon-192-v5.png')) throw new Error('Versioned PWA manifest icon missing');
 for (const iconPath of ['public/icons/moldatk-apple-touch-v5.png', 'public/icons/moldatk-icon-192-v5.png', 'public/icons/moldatk-icon-512-v5.png']) {
   if (!fs.existsSync(iconPath) || fs.statSync(iconPath).size < 1000) throw new Error(`Generated PWA icon missing: ${iconPath}`);
 }
