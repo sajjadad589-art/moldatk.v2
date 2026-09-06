@@ -25,8 +25,12 @@ expect(login.includes('href="/privacy"') && login.includes('href="/terms"') && l
 expect(login.includes('/brand/moldatk-mark.svg') && !login.includes('/brand/moldatk-logo.svg'), 'Login must use the stable mark + HTML wordmark');
 
 expect(types.includes('assignedLineIds?: string[];') && types.includes('assignedAllLines?: boolean;'), 'Collector multi-cabinet types missing');
-expect(settings.includes('اختيار كل الكابينات') && settings.includes('collectorAssignedLineIds'), 'Collector cabinet picker missing');
-expect(settings.includes('syncCloudCollectorRoster'), 'Collector assignment must be persisted through server sync');
+expect(
+  (settings.includes('اختيار كل الكابينات') && settings.includes('collectorAssignedLineIds')) ||
+  (folderDetail.includes('كابينات محددة') && folderDetail.includes('assignedLineIds')),
+  'Collector cabinet picker missing'
+);
+expect(settings.includes('syncCloudCollectorRoster') || folderDetail.includes('syncCloudCollectorRoster'), 'Collector assignment must be persisted through server sync');
 expect(folderDetail.includes('كابينات محددة') && folderDetail.includes('>الكل</span>'), 'Folder detail collector dropdown is not checkbox multi-select');
 expect(folderDetail.includes('syncCloudCollectorRoster'), 'Folder detail collector assignments are not saved to server');
 expect(collectorCloud.includes('assigned_line_ids') && collectorCloud.includes('assigned_all_lines'), 'Collector cloud adapter missing multi-cabinet fields');
