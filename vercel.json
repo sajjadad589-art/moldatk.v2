@@ -6,6 +6,47 @@
   "rewrites": [
     { "source": "/download", "destination": "/" },
     { "source": "/about", "destination": "/" },
-    { "source": "/order", "destination": "/" }
+    { "source": "/order", "destination": "/" },
+    { "source": "/privacy", "destination": "/" },
+    { "source": "/terms", "destination": "/" },
+    { "source": "/delete-account", "destination": "/" }
+  ],
+  "headers": [
+    {
+      "source": "/sw.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate, max-age=0" }
+      ]
+    },
+    {
+      "source": "/manifest.webmanifest",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate, max-age=0" }
+      ]
+    },
+    {
+      "source": "/pwa-recovery-v5.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate, max-age=0" }
+      ]
+    },
+    {
+      "source": "/icons/moldatk-apple-touch-v5.png",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/icons/moldatk-icon-192-v5.png",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/icons/moldatk-icon-512-v5.png",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    }
   ]
 }
