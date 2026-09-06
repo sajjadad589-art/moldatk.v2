@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">مولدتك</title>
+  <desc id="desc">رمز مولدة كهربائية مبسط لهوية مولدتك</desc>
+  <g fill="none" stroke-linejoin="round">
+    <path d="M25 34h78a9 9 0 0 1 9 9v47a9 9 0 0 1-9 9H25a9 9 0 0 1-9-9V43a9 9 0 0 1 9-9Z" fill="#F8FAFC" stroke="#0B1F3B" stroke-width="6"/>
+    <path d="M32 34v-7a7 7 0 0 1 7-7h28a7 7 0 0 1 7 7v7" stroke="#0B1F3B" stroke-width="6" stroke-linecap="round"/>
+    <path d="M77 34h26a9 9 0 0 1 9 9v47a9 9 0 0 1-9 9H77Z" fill="#F2B544" stroke="#0B1F3B" stroke-width="6"/>
+    <path d="M29 52h27M29 64h27M29 76h27" stroke="#0B1F3B" stroke-width="6" stroke-linecap="round"/>
+    <path d="M92 48 82 67h8l-6 16 18-24h-9l7-11Z" fill="#0B1F3B" stroke="#0B1F3B" stroke-width="2"/>
+    <path d="M29 99v8M99 99v8" stroke="#0B1F3B" stroke-width="7" stroke-linecap="round"/>
+    <path d="M16 111h96" stroke="#D89A21" stroke-width="5" stroke-linecap="round"/>
+  </g>
+</svg>
