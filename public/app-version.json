@@ -1,9 +1,9 @@
 {
   "enabled": true,
-  "versionCode": 17,
-  "versionName": "1.3.13",
-  "minimumVersionCode": 5,
-  "force": false,
-  "apkUrl": "https://github.com/sajjadad589-art/moldatk.v2/releases/download/v1.3.13/Moldatk-Android-Release.apk",
-  "notes": "نسخة 1.3.13: آخر تحديثات الإعدادات، الذكاء الاصطناعي، مركز المساعدات، الطلبات والتقارير."
+  "versionCode": 18,
+  "versionName": "1.3.14",
+  "minimumVersionCode": 18,
+  "force": true,
+  "apkUrl": "https://github.com/sajjadad589-art/moldatk.v2/releases/download/v1.3.14/Moldatk-Android-Release.apk",
+  "notes": "تحديث إلزامي: تفعيل إشعارات Android عبر Firebase وإصلاح ظهور بيانات Super Admin داخل تطبيق Android."
 }
