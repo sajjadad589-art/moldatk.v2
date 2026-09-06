@@ -113,4 +113,7 @@ for (const iconPath of ['public/icons/moldatk-apple-touch-v5.png', 'public/icons
   if (!fs.existsSync(iconPath) || fs.statSync(iconPath).size < 1000) throw new Error(`Generated PWA icon missing: ${iconPath}`);
 }
 
-console.log('Final release guard preserved core features, enforced the calm internal theme, Google Play legal surfaces, cabinet sync safety, collector cabinet assignments, and the new iOS/PWA icon set.');
+// User-visible collector picker and iPhone icon correction must run after every legacy patch and after the v5 compatibility assertions.
+await import('./apply-folder-collector-picker-ios-v6.mjs');
+
+console.log('Final release guard preserved core features, enforced the calm internal theme, Google Play legal surfaces, cabinet sync safety, collector cabinet assignments, and the corrected iOS/PWA icon set.');
