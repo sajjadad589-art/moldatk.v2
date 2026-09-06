@@ -78,4 +78,12 @@ await import('./apply-brand-surfaces-v2.mjs');
 await import('./apply-update-delivery-and-internal-theme-v3-fixed.mjs');
 await import('./apply-google-play-cabinet-collector-final.mjs');
 
+// The update-delivery compatibility guard still targets 1.3.17 internally. Rewrite its generated artifacts at the very end for this release.
+for (const path of ['public/sw.js', 'src/main.tsx']) {
+  const current = read(path);
+  if (current) write(path, current.replaceAll('1.3.17', '1.3.18'));
+}
+if (!read('public/sw.js').includes('moldatk-shell-v4-1.3.18')) throw new Error('1.3.18 service worker cache version missing');
+if (!read('src/main.tsx').includes('/sw.js?v=1.3.18')) throw new Error('1.3.18 service worker registration missing');
+
 console.log('Final release guard preserved core features, enforced the calm internal theme, Google Play legal surfaces, cabinet sync safety and collector cabinet assignments.');
