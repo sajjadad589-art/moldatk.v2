@@ -60,6 +60,7 @@ await import('./apply-sales-agent-ai-upgrade.mjs');
 await import('./apply-owner-ai-help-center.mjs');
 await import('./apply-lazy-xlsx.mjs');
 await import('./apply-android-push-superadmin-data-fix.mjs');
+await import('./apply-superadmin-notifications-delete-generator-fix.mjs');
 
 // Re-apply the reports cleanup after every build-time transform so no earlier script
 // can bring the reports advertisement back.
@@ -69,10 +70,14 @@ const finalDashboard = read(dashboardPath);
 const finalReports = read(reportsPath);
 const finalSlider = read(sliderPath);
 const finalSettings = read(settingsPath);
+const finalSuperAdmin = read('src/components/SuperAdminDashboard.tsx');
 if (!finalDashboard.includes('<MobileAdSlider className="mt-1" />')) throw new Error('Dashboard ad slider missing');
 if (finalReports.includes('MobileAdSlider')) throw new Error('Reports must not contain an ad slider');
 if (!finalSlider.includes('3500')) throw new Error('Mobile slider interval missing');
 if (!finalSettings.includes('f.folderKey') || !finalSettings.includes('f.titleAr')) throw new Error('Mobile settings folder labels missing');
 if (!finalSettings.includes('<OwnerAIAssistant') || !finalSettings.includes('<HelpCenter')) throw new Error('Owner AI/help center missing from mobile settings');
+if (finalSuperAdmin.includes('<SeasonalCampaignManager />')) throw new Error('Duplicate seasonal manager remains in Super Admin');
+if (!finalSuperAdmin.includes('SUPER_ADMIN_NOTIFICATIONS_LAYOUT_V2')) throw new Error('Super Admin notifications layout fix missing');
+if (!finalSuperAdmin.includes('deleteGeneratorAccount')) throw new Error('Super Admin generator delete control missing');
 
-console.log('Final release guard preserved full settings, kept dashboard ads, removed report ads, applied AI/help features, and finalized Android push/Super Admin recovery.');
+console.log('Final release guard preserved full settings, kept dashboard ads, removed report ads, applied AI/help features, Android push/Super Admin recovery, and finalized Super Admin notifications/delete controls.');
