@@ -3,12 +3,11 @@ import fs from 'node:fs';
 const read = (path) => fs.readFileSync(path, 'utf8');
 const write = (path, content) => fs.writeFileSync(path, content, 'utf8');
 
-// 1) Register push notifications for every authenticated Android app role,
-// not only the generator owner. Locate the push useEffect structurally because
-// earlier build transforms can rewrite the exact guard text.
+// 1) Register push notifications for every authenticated Android app role while
+// preserving the existing native-push feature flag required by the launch audit.
 const appPath = 'src/App.tsx';
 let app = read(appPath);
-const allRolesPushGuard = "if (!['generator_admin', 'collector', 'super_admin', 'super_admin_manager'].includes(String(userSession?.role || '')) || !Capacitor.isNativePlatform()) return;";
+const allRolesPushGuard = "if (!ENABLE_NATIVE_PUSH || !['generator_admin', 'collector', 'super_admin', 'super_admin_manager'].includes(String(userSession?.role || '')) || !Capacitor.isNativePlatform()) return;";
 
 if (!app.includes(allRolesPushGuard)) {
   const setupIndex = app.indexOf('const setupPushNotifications = async () => {');
@@ -17,7 +16,7 @@ if (!app.includes(allRolesPushGuard)) {
   if (effectStart < 0) throw new Error('Push notification useEffect not found');
 
   const beforeSetup = app.slice(effectStart, setupIndex);
-  const guardRegex = /if\s*\([^\n;]*Capacitor\.isNativePlatform\(\)[^\n;]*\)\s*return;/;
+  const guardRegex = /if\s*\([^\n;]*(?:ENABLE_NATIVE_PUSH|Capacitor\.isNativePlatform\(\))[^\n;]*\)\s*return;/;
   if (!guardRegex.test(beforeSetup)) {
     throw new Error('Android push native guard not found near setup block');
   }
@@ -26,6 +25,7 @@ if (!app.includes(allRolesPushGuard)) {
 }
 
 if (!app.includes(allRolesPushGuard)) throw new Error('Android push role guard was not applied');
+if (!app.includes("VITE_ENABLE_NATIVE_PUSH === 'true'")) throw new Error('Native push feature flag declaration missing');
 write(appPath, app);
 
 // 2) On Android cold start, React/localStorage can restore the Super Admin shell
@@ -55,7 +55,6 @@ if (!superAdmin.includes('SUPER_ADMIN_AUTH_READY_V1') || !superAdmin.includes('S
   throw new Error('Super Admin auth/session recovery was not applied');
 }
 
-// Prevent the native phone viewport from being forced to a desktop-only canvas.
 superAdmin = superAdmin.replace(/min-w-\[1100px\]/g, 'min-w-0 overflow-x-auto');
 write(superPath, superAdmin);
 
