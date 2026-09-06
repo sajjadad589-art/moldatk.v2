@@ -34,8 +34,8 @@ jobs:
       VITE_SUPABASE_URL: https://adluynhkikoodjljoxeu.supabase.co
       VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CObjK2Uua18kVkXCkxdRog_keQLIDiE
       VITE_ENABLE_NATIVE_PUSH: 'true'
-      CURRENT_VERSION: 1.3.18
-      CURRENT_VERSION_CODE: 22
+      CURRENT_VERSION: 1.3.19
+      CURRENT_VERSION_CODE: 23
       SHOULD_RELEASE: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release')) }}
 
     steps:
@@ -68,7 +68,9 @@ jobs:
           grep -q 'moldatk-mark.svg' src/LandingPage.tsx
           grep -q 'MOLDATK_CALM_BRAND_V2' src/index.css
           grep -q 'MOLDATK_INTERNAL_CALM_THEME_V3' src/index.css
-          grep -q 'moldatk-shell-v4-1.3.18' public/sw.js
+          grep -q 'moldatk-shell-v4-1.3.19' public/sw.js
+          grep -q 'moldatk-apple-touch-v6.png' index.html
+          grep -q 'moldatk-icon-192-v6.png' public/manifest.webmanifest
 
       - name: Google Play legal, cabinets and collector regression test
         run: npx tsx scripts/google-play-cabinet-collector-smoke-test.ts
@@ -187,7 +189,7 @@ jobs:
           else
             gh release create "$TAG" release/Moldatk-Android-Release.apk release/Moldatk-Android-Release.aab \
               --title "مولدتك ${CURRENT_VERSION}" \
-              --notes "إضافة سياسة الخصوصية والشروط ومسار حذف الحساب لمتطلبات Google Play، تصحيح لوكو شاشة الدخول، دعم تخصيص عدة كابينات أو كل الكابينات للجابي، تثبيت حذف وترتيب الكابينات في المزامنة، وإصلاح بناء Android."
+              --notes "إصلاح واجهة الجباة الفعلية: اختيار عدة كابينات بمربعات تأشير أو اختيار الكل، إخفاء الكابينات غير المسموحة من صفحة الجابي، حفظ التخصيص على السيرفر، وتصحيح أيقونة مولدتك على iPhone/PWA مع كسر الكاش القديم."
           fi
 
       - name: Activate in-app update manifest
@@ -204,7 +206,7 @@ jobs:
             minimumVersionCode: versionCode,
             force: true,
             apkUrl: `https://github.com/sajjadad589-art/moldatk.v2/releases/download/v${version}/Moldatk-Android-Release.apk`,
-            notes: 'تحديث Google Play: سياسة الخصوصية والشروط وحذف الحساب، تصحيح الهوية، تخصيص كابينات الجباة، وتثبيت حذف وترتيب الكابينات.'
+            notes: 'تحديث إلزامي: اختيار عدة كابينات أو الكل للجابي، إخفاء الكابينات غير المسموحة، وحل أيقونة مولدتك على iPhone/PWA.'
           };
           fs.writeFileSync('public/app-version.json', JSON.stringify(manifest, null, 2) + '\n');
           NODE
