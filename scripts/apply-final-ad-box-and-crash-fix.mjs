@@ -76,7 +76,7 @@ if (!finalSuperAdmin.includes('deleteGeneratorAccount')) throw new Error('Super 
 await import('./apply-brand-identity-v2.mjs');
 await import('./apply-brand-surfaces-v2.mjs');
 await import('./apply-update-delivery-and-internal-theme-v3-fixed.mjs');
-await import('./apply-google-play-cabinet-collector-final.mjs');
+await import('./apply-google-play-cabinet-collector-v2.mjs');
 
 // The update-delivery compatibility guard still targets 1.3.17 internally. Rewrite its generated artifacts at the very end for this release.
 for (const path of ['public/sw.js', 'src/main.tsx']) {
