@@ -28,7 +28,7 @@ expect(collectorCloud.includes('assigned_line_ids') && collectorCloud.includes('
 expect(pos.includes('accessibleSubscribers') && pos.includes('allowedLineIds'), 'Collector POS is not scoped to assigned cabinets');
 
 expect(sync.includes('MOLDATK_CAPTURE_DELETED_LINES_V1'), 'Cabinet deletion tombstone capture missing');
-expect(sync.includes('MOLDATK_LINE_TOMBSTONE_DELETE_V1'), 'Cabinet tombstone cloud delete missing');
+expect(sync.includes('MOLDATK_LINE_TOMBSTONE_DELETE_V2') || sync.includes('MOLDATK_LINE_TOMBSTONE_DELETE_V1'), 'Cabinet tombstone cloud delete missing');
 expect(sync.includes("order('sort_order'"), 'Cabinet manual ordering is not persisted from cloud');
 expect(sync.includes('lineToRow(generatorId, l, index)'), 'Cabinet sort order is not sent to cloud');
 
