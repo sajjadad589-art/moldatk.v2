@@ -19,10 +19,7 @@ const must = (condition, message) => { if (!condition) throw new Error(`iOS perf
     src = src.replace(bootstrapNeedle, scheduler + bootstrapNeedle);
   }
 
-  // Every table event used to issue its own full six-table pull. Collapse a burst into one pull.
   src = src.replace(/\(\) => void pull\(\)/g, 'schedulePull');
-
-  // Local changes already emit moldatk-local-sync immediately. The interval is only a safety net.
   src = src.replace(/window\.setInterval\(onLocalChange,\s*2500\)/g, "window.setInterval(() => { if (document.visibilityState === 'visible') onLocalChange(); }, 15000)");
   src = src.replace(/const visibility = \(\) => \{ if \(document\.visibilityState === 'visible'\) void pull\(\); \};/g, "const visibility = () => { if (document.visibilityState === 'visible') schedulePull(); };");
 
@@ -77,7 +74,6 @@ const must = (condition, message) => { if (!condition) throw new Error(`iOS perf
   let src = read(path);
   must(src, 'MobileSubscribers source missing');
 
-  // Extend whichever React named-import shape the patch chain produced.
   src = src.replace(/import React, \{([^}]*)\} from 'react';/, (match, names) => {
     const items = String(names).split(',').map(x => x.trim()).filter(Boolean);
     for (const item of ['useDeferredValue', 'useEffect']) if (!items.includes(item)) items.push(item);
@@ -91,9 +87,9 @@ const must = (condition, message) => { if (!condition) throw new Error(`iOS perf
 
     src = src.replace(/const needle = searchTerm\.trim\(\)\.toLowerCase\(\);/g, 'const needle = deferredSearchTerm.trim().toLowerCase();');
 
-    const countNeedle = "  const paidCount = subscribers.filter(s => s.paymentStatus === 'paid').length;";
-    must(src.includes(countNeedle), 'mobile list count marker missing');
-    src = src.replace(countNeedle, `  useEffect(() => {\n    setVisibleLimit(60);\n  }, [deferredSearchTerm, statusFilter, lineFilter]);\n\n  const visibleSubscribers = filteredSubscribers.slice(0, visibleLimit);\n\n${countNeedle}`);
+    const componentReturnNeedle = "\n  return (\n    <div";
+    must(src.includes(componentReturnNeedle), 'mobile component return marker missing');
+    src = src.replace(componentReturnNeedle, `\n  useEffect(() => {\n    setVisibleLimit(60);\n  }, [deferredSearchTerm, statusFilter, lineFilter]);\n\n  const visibleSubscribers = filteredSubscribers.slice(0, visibleLimit);\n${componentReturnNeedle}`);
 
     src = src.replace(/filteredSubscribers\.map\(sub => \{/g, 'visibleSubscribers.map(sub => {');
 
@@ -141,7 +137,6 @@ const must = (condition, message) => { if (!condition) throw new Error(`iOS perf
   const path = 'public/sw.js';
   let src = read(path);
   must(src, 'service worker source missing');
-  // Previous worker navigated every open client on activation, which can interrupt an active Safari/PWA session.
   src = src.replace(/\n\s*const windows = await self\.clients\.matchAll\(\{ type: 'window', includeUncontrolled: true \}\);\n\s*for \(const client of windows\) \{[\s\S]*?\n\s*\}\n(?=\s*\}\)\(\)\);)/, '\n    // MOLDATK_IOS_NO_FORCED_CLIENT_RELOAD_V1: active pages adopt the worker without forced navigation.\n');
   must(!src.includes('client.navigate(client.url)'), 'forced service-worker client reload remains');
   write(path, src);
