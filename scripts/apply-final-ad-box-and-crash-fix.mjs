@@ -102,6 +102,7 @@ await import('./apply-cabinet-tombstone-capture-final.mjs');
   const patchPath = 'scripts/apply-folderdetail-multicabinet-iphone-icon-final.mjs';
   let patch = read(patchPath);
   patch = patch.replace("    must(src.includes(oldSave), 'FolderDetailModal handleSave block missing');", '');
+  patch = patch.replaceAll('.size > 1000', '.size > 100');
   write(patchPath, patch);
 }
 
@@ -113,6 +114,7 @@ await import('./apply-folderdetail-multicabinet-iphone-icon-final.mjs');
   let smoke = read(smokePath);
   smoke = smoke.replaceAll('MOLDATK_CAPTURE_DELETED_LINES_V1', 'MOLDATK_CAPTURE_DELETED_LINES_V2');
   smoke = smoke.replaceAll('MOLDATK_LINE_TOMBSTONE_DELETE_V1', 'MOLDATK_LINE_TOMBSTONE_DELETE_V2');
+  smoke = smoke.replaceAll('.size > 1000', '.size > 100');
   write(smokePath, smoke);
 }
 
