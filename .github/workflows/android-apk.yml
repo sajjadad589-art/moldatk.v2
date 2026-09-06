@@ -34,8 +34,8 @@ jobs:
       VITE_SUPABASE_URL: https://adluynhkikoodjljoxeu.supabase.co
       VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CObjK2Uua18kVkXCkxdRog_keQLIDiE
       VITE_ENABLE_NATIVE_PUSH: 'true'
-      CURRENT_VERSION: 1.3.14
-      CURRENT_VERSION_CODE: 18
+      CURRENT_VERSION: 1.3.15
+      CURRENT_VERSION_CODE: 19
       SHOULD_RELEASE: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release') }}
 
     steps:
@@ -174,7 +174,7 @@ jobs:
           else
             gh release create "$TAG" release/Moldatk-Android-Release.apk release/Moldatk-Android-Release.aab \
               --title "Moldatk ${CURRENT_VERSION}" \
-              --notes "نسخة Android موقعة: تفعيل Firebase Push، إذن إشعارات Android، وإصلاح تحميل بيانات Super Admin داخل التطبيق."
+              --notes "نسخة Android موقعة: ترتيب واجهة إشعارات Super Admin، إزالة تكرار المواسم والمناسبات، وإضافة حذف محمي لحساب صاحب المولدة."
           fi
 
       - name: Activate in-app update manifest
@@ -191,7 +191,7 @@ jobs:
             minimumVersionCode: versionCode,
             force: true,
             apkUrl: `https://github.com/sajjadad589-art/moldatk.v2/releases/download/v${version}/Moldatk-Android-Release.apk`,
-            notes: 'تحديث إلزامي: تفعيل إشعارات Android عبر Firebase وإصلاح ظهور بيانات Super Admin داخل تطبيق Android.'
+            notes: 'تحديث إلزامي: ترتيب إشعارات Super Admin، إزالة تكرار المواسم والمناسبات، وإضافة حذف محمي لحساب صاحب المولدة.'
           };
           fs.writeFileSync('public/app-version.json', JSON.stringify(manifest, null, 2) + '\n');
           NODE
