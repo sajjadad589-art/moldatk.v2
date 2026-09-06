@@ -72,8 +72,9 @@ if (finalSuperAdmin.includes('<SeasonalCampaignManager />')) throw new Error('Du
 if (!finalSuperAdmin.includes('SUPER_ADMIN_NOTIFICATIONS_LAYOUT_V2')) throw new Error('Super Admin notifications layout fix missing');
 if (!finalSuperAdmin.includes('deleteGeneratorAccount')) throw new Error('Super Admin generator delete control missing');
 
-// Branding runs absolutely last so earlier compatibility scripts cannot restore the previous visual identity.
+// Branding and update-delivery guards run absolutely last so earlier compatibility scripts cannot restore the previous UI/cache/update behavior.
 await import('./apply-brand-identity-v2.mjs');
 await import('./apply-brand-surfaces-v2.mjs');
+await import('./apply-update-delivery-and-internal-theme-v3.mjs');
 
-console.log('Final release guard preserved core features and applied the complete Moldatk calm identity after all legacy transforms.');
+console.log('Final release guard preserved core features, enforced the calm internal theme, and repaired Android/browser update delivery.');
