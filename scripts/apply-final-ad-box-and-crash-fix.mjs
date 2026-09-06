@@ -93,6 +93,18 @@ await import('./apply-update-delivery-and-internal-theme-v3-fixed.mjs');
 
 await import('./apply-google-play-cabinet-collector-final-v2.mjs');
 await import('./apply-cabinet-tombstone-capture-final.mjs');
+
+// FolderDetailModal is already converted to an async cloud-backed onUpdateCollectors callback
+// by apply-collector-account-save-login-fix.mjs. The final UI patch should only replace the
+// single select with the checkbox dropdown and generate the iPhone/PWA icons, not require the
+// obsolete pre-cloud handleSave source shape.
+{
+  const patchPath = 'scripts/apply-folderdetail-multicabinet-iphone-icon-final.mjs';
+  let patch = read(patchPath);
+  patch = patch.replace("    must(src.includes(oldSave), 'FolderDetailModal handleSave block missing');", '');
+  write(patchPath, patch);
+}
+
 await import('./apply-folderdetail-multicabinet-iphone-icon-final.mjs');
 
 // Keep the regression test aligned with the resilient v2 tombstone markers generated above.
