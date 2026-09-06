@@ -75,6 +75,6 @@ if (!finalSuperAdmin.includes('deleteGeneratorAccount')) throw new Error('Super 
 // Branding and update-delivery guards run absolutely last so earlier compatibility scripts cannot restore the previous UI/cache/update behavior.
 await import('./apply-brand-identity-v2.mjs');
 await import('./apply-brand-surfaces-v2.mjs');
-await import('./apply-update-delivery-and-internal-theme-v3.mjs');
+await import('./apply-update-delivery-and-internal-theme-v3-fixed.mjs');
 
 console.log('Final release guard preserved core features, enforced the calm internal theme, and repaired Android/browser update delivery.');
