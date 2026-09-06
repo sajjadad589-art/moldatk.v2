@@ -28,34 +28,30 @@ if (!app.includes(allRolesPushGuard)) {
 if (!app.includes(allRolesPushGuard)) throw new Error('Android push role guard was not applied');
 write(appPath, app);
 
-// 2) On Android cold start, React localStorage can restore the Super Admin UI a moment
-// before Supabase restores its persisted JWT. The old dashboard queried immediately,
-// so RLS returned empty data and the page looked blank. Wait for a real auth session,
-// retry it, and reload automatically when Supabase restores/refreshes the session.
+// 2) On Android cold start, React/localStorage can restore the Super Admin shell
+// before Supabase has rehydrated its persisted JWT. RLS queries made during that gap
+// can look empty. Make load() wait for auth and add an independent retry listener.
 const superPath = 'src/components/SuperAdminDashboard.tsx';
 let superAdmin = read(superPath);
 
 if (!superAdmin.includes('SUPER_ADMIN_AUTH_READY_V1')) {
   const loadStartRegex = /  const load = async \(\) => \{\n\s*setLoading\(true\);\n\s*setError\(null\);/;
-  const guardedLoadStart = `  const load = async () => {\n    setLoading(true);\n    setError(null);\n\n    // SUPER_ADMIN_AUTH_READY_V1: Android WebView may restore the React session before Supabase JWT hydration.\n    let authSession = (await supabase.auth.getSession()).data.session;\n    if (!authSession) {\n      await new Promise(resolve => window.setTimeout(resolve, 250));\n      authSession = (await supabase.auth.getSession()).data.session;\n    }\n    if (!authSession) {\n      try {\n        const refreshed = await supabase.auth.refreshSession();\n        authSession = refreshed.data.session;\n      } catch {}\n    }\n    if (!authSession) {\n      setError('جلسة السوبر أدمن غير جاهزة. سجّل الدخول من جديد إذا استمرت المشكلة.');\n      setLoading(false);\n      return;\n    }`;
+  const guardedLoadStart = `  const load = async () => {\n    setLoading(true);\n    setError(null);\n\n    // SUPER_ADMIN_AUTH_READY_V1: Android WebView may restore UI before Supabase JWT hydration.\n    let authSession = (await supabase.auth.getSession()).data.session;\n    if (!authSession) {\n      await new Promise(resolve => window.setTimeout(resolve, 250));\n      authSession = (await supabase.auth.getSession()).data.session;\n    }\n    if (!authSession) {\n      try {\n        const refreshed = await supabase.auth.refreshSession();\n        authSession = refreshed.data.session;\n      } catch {}\n    }\n    if (!authSession) {\n      setError('جلسة السوبر أدمن غير جاهزة. سجّل الدخول من جديد إذا استمرت المشكلة.');\n      setLoading(false);\n      return;\n    }`;
 
   if (!loadStartRegex.test(superAdmin)) throw new Error('Super Admin load() start not found');
   superAdmin = superAdmin.replace(loadStartRegex, guardedLoadStart);
 }
 
 if (!superAdmin.includes('SUPER_ADMIN_AUTH_LISTENER_V1')) {
-  const legacyEffectRegex = /  useEffect\(\(\) => \{\s*void load\(\);\s*\}, \[\]\);/;
-  if (legacyEffectRegex.test(superAdmin)) {
-    const resilientEffect = `  // SUPER_ADMIN_AUTH_LISTENER_V1\n  useEffect(() => {\n    let active = true;\n    const runLoad = () => { if (active) void load(); };\n    const firstTimer = window.setTimeout(runLoad, 120);\n\n    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {\n      if (active && session) window.setTimeout(runLoad, 0);\n    });\n\n    const onVisible = () => {\n      if (document.visibilityState === 'visible') runLoad();\n    };\n    document.addEventListener('visibilitychange', onVisible);\n\n    return () => {\n      active = false;\n      window.clearTimeout(firstTimer);\n      authListener.subscription.unsubscribe();\n      document.removeEventListener('visibilitychange', onVisible);\n    };\n  }, []);`;
-    superAdmin = superAdmin.replace(legacyEffectRegex, resilientEffect);
-  } else if (superAdmin.includes('supabase.auth.onAuthStateChange')) {
-    superAdmin = superAdmin.replace('supabase.auth.onAuthStateChange', '/* SUPER_ADMIN_AUTH_LISTENER_V1 */ supabase.auth.onAuthStateChange');
-  } else {
-    throw new Error('Super Admin initial load effect not found');
-  }
+  const statsMarker = '  const stats = useMemo(() => {';
+  if (!superAdmin.includes(statsMarker)) throw new Error('Super Admin stats marker not found for auth listener injection');
+
+  const resilientEffect = `  // SUPER_ADMIN_AUTH_LISTENER_V1\n  useEffect(() => {\n    let active = true;\n    const runLoad = () => { if (active) void load(); };\n    const firstTimer = window.setTimeout(runLoad, 180);\n\n    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {\n      if (active && session) window.setTimeout(runLoad, 0);\n    });\n\n    const onVisible = () => {\n      if (document.visibilityState === 'visible') runLoad();\n    };\n    document.addEventListener('visibilitychange', onVisible);\n\n    return () => {\n      active = false;\n      window.clearTimeout(firstTimer);\n      authListener.subscription.unsubscribe();\n      document.removeEventListener('visibilitychange', onVisible);\n    };\n  }, []);\n\n`;
+
+  superAdmin = superAdmin.replace(statsMarker, resilientEffect + statsMarker);
 }
 
-if (!superAdmin.includes('SUPER_ADMIN_AUTH_READY_V1') || !superAdmin.includes('supabase.auth.onAuthStateChange')) {
+if (!superAdmin.includes('SUPER_ADMIN_AUTH_READY_V1') || !superAdmin.includes('SUPER_ADMIN_AUTH_LISTENER_V1') || !superAdmin.includes('supabase.auth.onAuthStateChange')) {
   throw new Error('Super Admin auth/session recovery was not applied');
 }
 
