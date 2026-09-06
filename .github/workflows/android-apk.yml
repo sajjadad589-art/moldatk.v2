@@ -34,8 +34,8 @@ jobs:
       VITE_SUPABASE_URL: https://adluynhkikoodjljoxeu.supabase.co
       VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CObjK2Uua18kVkXCkxdRog_keQLIDiE
       VITE_ENABLE_NATIVE_PUSH: 'true'
-      CURRENT_VERSION: 1.3.15
-      CURRENT_VERSION_CODE: 19
+      CURRENT_VERSION: 1.3.16
+      CURRENT_VERSION_CODE: 20
       SHOULD_RELEASE: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release') }}
 
     steps:
@@ -59,6 +59,14 @@ jobs:
 
       - name: Typecheck launch build
         run: npm run lint
+
+      - name: Verify calm brand identity
+        run: |
+          grep -q '<string name="app_name">مولدتك</string>' android/app/src/main/res/values/strings.xml
+          grep -q "appName: 'مولدتك'" capacitor.config.ts
+          grep -q 'com.mwaldatk.app' capacitor.config.ts
+          grep -q 'moldatk-mark.svg' src/LandingPage.tsx
+          grep -q 'MOLDATK_CALM_BRAND_V2' src/index.css
 
       - name: Android Firebase and Super Admin regression test
         run: npx tsx scripts/android-push-superadmin-smoke-test.ts
@@ -173,8 +181,8 @@ jobs:
             gh release upload "$TAG" release/Moldatk-Android-Release.apk release/Moldatk-Android-Release.aab --clobber
           else
             gh release create "$TAG" release/Moldatk-Android-Release.apk release/Moldatk-Android-Release.aab \
-              --title "Moldatk ${CURRENT_VERSION}" \
-              --notes "نسخة Android موقعة: ترتيب واجهة إشعارات Super Admin، إزالة تكرار المواسم والمناسبات، وإضافة حذف محمي لحساب صاحب المولدة."
+              --title "مولدتك ${CURRENT_VERSION}" \
+              --notes "نسخة الهوية البصرية الجديدة: اسم التطبيق بالعربي مولدتك، أيقونة مولدة هادئة، ألوان كحلي وعاجي وذهبي، وتجربة موحدة على الويب وAndroid مع الحفاظ على الحسابات والمزامنة والطباعة."
           fi
 
       - name: Activate in-app update manifest
@@ -191,7 +199,7 @@ jobs:
             minimumVersionCode: versionCode,
             force: true,
             apkUrl: `https://github.com/sajjadad589-art/moldatk.v2/releases/download/v${version}/Moldatk-Android-Release.apk`,
-            notes: 'تحديث إلزامي: ترتيب إشعارات Super Admin، إزالة تكرار المواسم والمناسبات، وإضافة حذف محمي لحساب صاحب المولدة.'
+            notes: 'تحديث الهوية الرسمية لمولدتك: اسم عربي، أيقونة جديدة، وثيم هادئ موحد على Android والويب.'
           };
           fs.writeFileSync('public/app-version.json', JSON.stringify(manifest, null, 2) + '\n');
           NODE
