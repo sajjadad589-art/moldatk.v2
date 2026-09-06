@@ -50,12 +50,15 @@ const mergeKnownLocalPins = (generatorId: string, incoming: Collector[], preferr
     }
   };
 
-  remember(preferred);
+  // Load the old cache first, then let the values from the save request win.
+  // Previously this order was reversed, so an old cached PIN overwrote the new
+  // PIN immediately after the server successfully changed the collector password.
   try {
     const raw = localStorage.getItem(`moldatk_collectors_${generatorId}`);
     const cached = raw ? JSON.parse(raw) : [];
     if (Array.isArray(cached)) remember(cached);
   } catch (e) {}
+  remember(preferred);
 
   return incoming.map(item => ({
     ...item,
