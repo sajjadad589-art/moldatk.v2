@@ -59,6 +59,7 @@ await import('./apply-final-ad-syntax-repair.mjs');
 await import('./apply-sales-agent-ai-upgrade.mjs');
 await import('./apply-owner-ai-help-center.mjs');
 await import('./apply-lazy-xlsx.mjs');
+await import('./apply-android-push-superadmin-data-fix.mjs');
 
 // Re-apply the reports cleanup after every build-time transform so no earlier script
 // can bring the reports advertisement back.
@@ -74,4 +75,4 @@ if (!finalSlider.includes('3500')) throw new Error('Mobile slider interval missi
 if (!finalSettings.includes('f.folderKey') || !finalSettings.includes('f.titleAr')) throw new Error('Mobile settings folder labels missing');
 if (!finalSettings.includes('<OwnerAIAssistant') || !finalSettings.includes('<HelpCenter')) throw new Error('Owner AI/help center missing from mobile settings');
 
-console.log('Final release guard preserved full settings, kept dashboard ads, removed report ads, and applied AI/help features safely.');
+console.log('Final release guard preserved full settings, kept dashboard ads, removed report ads, applied AI/help features, and finalized Android push/Super Admin recovery.');
