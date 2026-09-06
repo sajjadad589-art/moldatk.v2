@@ -34,8 +34,8 @@ jobs:
       VITE_SUPABASE_URL: https://adluynhkikoodjljoxeu.supabase.co
       VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CObjK2Uua18kVkXCkxdRog_keQLIDiE
       VITE_ENABLE_NATIVE_PUSH: 'true'
-      CURRENT_VERSION: 1.3.16
-      CURRENT_VERSION_CODE: 20
+      CURRENT_VERSION: 1.3.17
+      CURRENT_VERSION_CODE: 21
       SHOULD_RELEASE: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release')) }}
 
     steps:
@@ -67,6 +67,8 @@ jobs:
           grep -q 'com.mwaldatk.app' capacitor.config.ts
           grep -q 'moldatk-mark.svg' src/LandingPage.tsx
           grep -q 'MOLDATK_CALM_BRAND_V2' src/index.css
+          grep -q 'MOLDATK_INTERNAL_CALM_THEME_V3' src/index.css
+          grep -q 'moldatk-shell-v4-1.3.17' public/sw.js
 
       - name: Android Firebase and Super Admin regression test
         run: npx tsx scripts/android-push-superadmin-smoke-test.ts
@@ -182,7 +184,7 @@ jobs:
           else
             gh release create "$TAG" release/Moldatk-Android-Release.apk release/Moldatk-Android-Release.aab \
               --title "مولدتك ${CURRENT_VERSION}" \
-              --notes "نسخة الهوية البصرية الجديدة: اسم التطبيق بالعربي مولدتك، أيقونة مولدة هادئة، ألوان كحلي وعاجي وذهبي، وتجربة موحدة على الويب وAndroid مع الحفاظ على الحسابات والمزامنة والطباعة."
+              --notes "إصلاح وصول التحديثات للمتصفح وAndroid، فرض الثيم الداخلي الهادئ، وتحديث تلقائي موثوق مع الحفاظ على الحسابات والمزامنة والطباعة."
           fi
 
       - name: Activate in-app update manifest
@@ -199,7 +201,7 @@ jobs:
             minimumVersionCode: versionCode,
             force: true,
             apkUrl: `https://github.com/sajjadad589-art/moldatk.v2/releases/download/v${version}/Moldatk-Android-Release.apk`,
-            notes: 'تحديث الهوية الرسمية لمولدتك: اسم عربي، أيقونة جديدة، وثيم هادئ موحد على Android والويب.'
+            notes: 'إصلاح وصول التحديثات وفرض الثيم الداخلي الجديد على Android والويب.'
           };
           fs.writeFileSync('public/app-version.json', JSON.stringify(manifest, null, 2) + '\n');
           NODE
