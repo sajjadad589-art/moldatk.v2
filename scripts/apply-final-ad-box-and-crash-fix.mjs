@@ -76,8 +76,28 @@ if (!finalSuperAdmin.includes('deleteGeneratorAccount')) throw new Error('Super 
 await import('./apply-brand-identity-v2.mjs');
 await import('./apply-brand-surfaces-v2.mjs');
 await import('./apply-update-delivery-and-internal-theme-v3-fixed.mjs');
+
+// Repair the generated patch source itself before Node parses it. An inner template literal
+// in the SettingsFolderView patch must be plain concatenation because the patch body is
+// already enclosed by a template literal.
+{
+  const patchPath = 'scripts/apply-google-play-cabinet-collector-final-v2.mjs';
+  let patch = read(patchPath);
+  patch = patch.replace('id: `col-${Date.now()}`,', "id: 'col-' + Date.now(),");
+  write(patchPath, patch);
+}
+
 await import('./apply-google-play-cabinet-collector-final-v2.mjs');
 await import('./apply-folderdetail-multicabinet-iphone-icon-final.mjs');
+
+// Keep the regression test aligned with the resilient v2 tombstone markers generated above.
+{
+  const smokePath = 'scripts/google-play-cabinet-collector-smoke-test.ts';
+  let smoke = read(smokePath);
+  smoke = smoke.replaceAll('MOLDATK_CAPTURE_DELETED_LINES_V1', 'MOLDATK_CAPTURE_DELETED_LINES_V2');
+  smoke = smoke.replaceAll('MOLDATK_LINE_TOMBSTONE_DELETE_V1', 'MOLDATK_LINE_TOMBSTONE_DELETE_V2');
+  write(smokePath, smoke);
+}
 
 // The update-delivery compatibility guard still targets 1.3.17 internally. Rewrite its generated artifacts at the very end for this release.
 for (const path of ['public/sw.js', 'src/main.tsx']) {
