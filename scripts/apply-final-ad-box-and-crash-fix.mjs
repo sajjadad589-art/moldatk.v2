@@ -29,7 +29,6 @@ if (dashboard.includes(dashboardMarker) && !dashboard.includes('<MobileAdSlider 
 }
 write(dashboardPath, dashboard);
 
-// Reports must remain clean: no advertisement carousel in the monthly reports screen.
 const reportsPath = 'src/components/mobile/MobileMonthlyReports.tsx';
 removeMobileSlider(reportsPath);
 
@@ -44,15 +43,12 @@ if (slider) {
   write(sliderPath, slider);
 }
 
-// IMPORTANT: never overwrite MobileSettings here. The real component contains
-// ads, device compatibility, subscription info, pricing and every settings folder.
 const settingsPath = 'src/components/mobile/MobileSettings.tsx';
 const sourceSettings = read(settingsPath);
 if (!sourceSettings.includes('f.folderKey') || !sourceSettings.includes('f.titleAr')) {
   throw new Error('MobileSettings lost its real SettingsFolderItem bindings');
 }
 
-// Run build-safety repairs first, then inject owner-facing features last.
 await import('./apply-final-ad-syntax-repair.mjs');
 await import('./apply-sales-agent-ai-upgrade.mjs');
 await import('./apply-owner-ai-help-center.mjs');
@@ -60,8 +56,6 @@ await import('./apply-lazy-xlsx.mjs');
 await import('./apply-android-push-superadmin-data-fix.mjs');
 await import('./apply-superadmin-notifications-delete-generator-fix.mjs');
 
-// Re-apply the reports cleanup after every build-time transform so no earlier script
-// can bring the reports advertisement back.
 removeMobileSlider(reportsPath);
 
 const finalDashboard = read(dashboardPath);
@@ -78,7 +72,8 @@ if (finalSuperAdmin.includes('<SeasonalCampaignManager />')) throw new Error('Du
 if (!finalSuperAdmin.includes('SUPER_ADMIN_NOTIFICATIONS_LAYOUT_V2')) throw new Error('Super Admin notifications layout fix missing');
 if (!finalSuperAdmin.includes('deleteGeneratorAccount')) throw new Error('Super Admin generator delete control missing');
 
-// Branding is deliberately last so old build-time fix scripts cannot restore the previous blue identity.
+// Branding runs absolutely last so earlier compatibility scripts cannot restore the previous visual identity.
 await import('./apply-brand-identity-v2.mjs');
+await import('./apply-brand-surfaces-v2.mjs');
 
-console.log('Final release guard preserved core features and applied the final Moldatk calm brand identity after all legacy transforms.');
+console.log('Final release guard preserved core features and applied the complete Moldatk calm identity after all legacy transforms.');
