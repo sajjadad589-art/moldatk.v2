@@ -1,9 +1,9 @@
 {
   "enabled": true,
-  "versionCode": 20,
-  "versionName": "1.3.16",
-  "minimumVersionCode": 20,
+  "versionCode": 22,
+  "versionName": "1.3.18",
+  "minimumVersionCode": 22,
   "force": true,
-  "apkUrl": "https://github.com/sajjadad589-art/moldatk.v2/releases/download/v1.3.16/Moldatk-Android-Release.apk",
-  "notes": "تحديث الهوية الرسمية لمولدتك: اسم عربي، أيقونة جديدة، وثيم هادئ موحد على Android والويب."
+  "apkUrl": "https://github.com/sajjadad589-art/moldatk.v2/releases/download/v1.3.18/Moldatk-Android-Release.apk",
+  "notes": "تحديث Google Play: سياسة الخصوصية والشروط وحذف الحساب، تصحيح الهوية، تخصيص كابينات الجباة، وتثبيت حذف وترتيب الكابينات."
 }
