@@ -76,5 +76,6 @@ if (!finalSuperAdmin.includes('deleteGeneratorAccount')) throw new Error('Super 
 await import('./apply-brand-identity-v2.mjs');
 await import('./apply-brand-surfaces-v2.mjs');
 await import('./apply-update-delivery-and-internal-theme-v3-fixed.mjs');
+await import('./apply-google-play-cabinet-collector-final.mjs');
 
-console.log('Final release guard preserved core features, enforced the calm internal theme, and repaired Android/browser update delivery.');
+console.log('Final release guard preserved core features, enforced the calm internal theme, Google Play legal surfaces, cabinet sync safety and collector cabinet assignments.');
