@@ -12,7 +12,7 @@ on:
           - release
           - debug
   push:
-    branches: [main, brand-identity-1.3.16]
+    branches: [main, brand-identity-1.3.16, fix-google-play-cabinet-collector-1.3.18]
     paths:
       - 'src/**'
       - 'public/**'
@@ -22,6 +22,7 @@ on:
       - 'package.json'
       - '.github/workflows/android-apk.yml'
       - 'scripts/**'
+      - 'index.html'
 
 permissions:
   contents: write
@@ -187,7 +188,7 @@ jobs:
           else
             gh release create "$TAG" release/Moldatk-Android-Release.apk release/Moldatk-Android-Release.aab \
               --title "مولدتك ${CURRENT_VERSION}" \
-              --notes "إضافة سياسة الخصوصية والشروط ومسار حذف الحساب لمتطلبات Google Play، تصحيح لوكو شاشة الدخول، دعم تخصيص عدة كابينات أو كل الكابينات للجابي، تثبيت حذف وترتيب الكابينات في المزامنة، وإصلاح بناء Android."
+              --notes "إضافة سياسة الخصوصية والشروط ومسار حذف الحساب لمتطلبات Google Play، تصحيح لوكو شاشة الدخول وiPhone/PWA، دعم تخصيص عدة كابينات أو كل الكابينات للجابي، تثبيت حذف وترتيب الكابينات في المزامنة، وإصلاح بناء Android."
           fi
 
       - name: Activate in-app update manifest
@@ -204,7 +205,7 @@ jobs:
             minimumVersionCode: versionCode,
             force: true,
             apkUrl: `https://github.com/sajjadad589-art/moldatk.v2/releases/download/v${version}/Moldatk-Android-Release.apk`,
-            notes: 'تحديث Google Play: سياسة الخصوصية والشروط وحذف الحساب، تصحيح الهوية، تخصيص كابينات الجباة، وتثبيت حذف وترتيب الكابينات.'
+            notes: 'تحديث Google Play: سياسة الخصوصية والشروط وحذف الحساب، تصحيح الهوية وiPhone، تخصيص كابينات الجباة، وتثبيت حذف وترتيب الكابينات.'
           };
           fs.writeFileSync('public/app-version.json', JSON.stringify(manifest, null, 2) + '\n');
           NODE
