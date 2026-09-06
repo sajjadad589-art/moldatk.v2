@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "629112923994",
+    "project_id": "molidatk",
+    "storage_bucket": "molidatk.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:629112923994:android:34175a9fd9c91a98d0f563",
+        "android_client_info": {
+          "package_name": "com.mwaldatk.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDws0LUkXmwlaAInzG_Js_DoNqIfGqt0w4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
