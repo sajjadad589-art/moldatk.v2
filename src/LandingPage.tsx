@@ -1,261 +1,237 @@
 import React from 'react';
 import {
-  Zap,
-  Smartphone,
-  Apple,
-  Monitor,
-  ShieldCheck,
-  RefreshCw,
-  Database,
-  ReceiptText,
-  Users,
-  Download,
   ArrowLeft,
-  CheckCircle2,
-  Share2,
-  PlusSquare,
-  Wifi,
-  LockKeyhole,
-  Layers3,
   BadgeCheck,
-  HelpCircle,
+  BarChart3,
+  CheckCircle2,
   ChevronDown,
-  Globe2,
+  Download,
+  FileText,
+  Gauge,
+  Monitor,
+  ReceiptText,
+  RefreshCw,
+  ShieldCheck,
+  Smartphone,
+  Users,
+  WalletCards,
+  Wifi,
 } from 'lucide-react';
 
 const features = [
-  { icon: Database, title: 'بياناتك بكل مكان', text: 'نفس الحساب ونفس البيانات على Android وiPhone والكمبيوتر.' },
-  { icon: ReceiptText, title: 'جباية وفواتير', text: 'تسديدات، إيصالات وسجل فواتير مرتبط مباشرة بالمولدة.' },
-  { icon: Users, title: 'إدارة الجباة', text: 'حسابات وصلاحيات لكل جابي مع مزامنة مركزية.' },
-  { icon: RefreshCw, title: 'تحديثات Android', text: 'التطبيق يتحقق من الإصدار الجديد ويعرض التحديث من داخل التطبيق.' },
-  { icon: ShieldCheck, title: 'حماية وعزل البيانات', text: 'كل مولدة تشوف بياناتها فقط من خلال نظام صلاحيات مركزي.' },
-  { icon: Smartphone, title: 'مصمم للموبايل', text: 'واجهة عملية لأجهزة SUNMI والهواتف والأجهزة اللوحية.' },
+  { icon: Users, title: 'إدارة المشتركين', text: 'إضافة وتعديل ومتابعة حالة كل مشترك بصورة واضحة وسريعة.' },
+  { icon: WalletCards, title: 'الجباية والديون', text: 'تسديدات شهرية، ديون مرحلة، وقاصة مرتبطة بالحركات المالية الفعلية.' },
+  { icon: BarChart3, title: 'تقارير شهرية', text: 'أرشيف لكل شهر مع المسددين وغير المسددين والمبالغ والتفاصيل.' },
+  { icon: ReceiptText, title: 'إيصالات احترافية', text: 'إيصال واضح ومهيأ للطباعة على أجهزة SUNMI والطابعات الحرارية.' },
+  { icon: RefreshCw, title: 'مزامنة بين الأجهزة', text: 'نفس الحساب والبيانات على Android والويب بدون تكرار العمل.' },
+  { icon: ShieldCheck, title: 'عزل وحماية البيانات', text: 'كل صاحب مولدة وطاقمه يعملون ضمن بيانات حسابهم وصلاحياتهم.' },
 ];
 
 const faq = [
-  ['هل أحتاج حساب مختلف لكل جهاز؟', 'لا. تدخل بنفس الحساب وتشوف نفس بيانات المولدة من أي جهاز مسموح له بالدخول.'],
-  ['هل نسخة iPhone تحتاج App Store؟', 'لا. تفتح مولدتك من Safari وتضيفه إلى الشاشة الرئيسية كتطبيق ويب مصغّر.'],
-  ['هل البيانات تبقى فقط على الجهاز؟', 'لا. البيانات التشغيلية الأساسية مربوطة بقاعدة بيانات مركزية حتى تظل موحّدة بين الأجهزة.'],
-  ['هل Android يحتاج Google Play؟', 'لا. نسخة Android مصممة حتى تُثبت مباشرة، ونظام التحديث الداخلي يقدر يتحقق من الإصدارات الجديدة.'],
-  ['هل الجابي يشوف كل إعدادات النظام؟', 'لا. صلاحيات الجابي منفصلة ويمكن التحكم بما يستطيع مشاهدته أو تنفيذه.'],
+  ['هل أستطيع استخدام مولدتك على أكثر من جهاز؟', 'نعم. الحساب يعمل على Android والويب، والبيانات الأساسية تبقى متزامنة بين الأجهزة المصرح لها.'],
+  ['هل التطبيق مخصص لصاحب المولدة والجابي؟', 'نعم. توجد واجهة للإدارة وواجهة للكادر الميداني مع صلاحيات منفصلة.'],
+  ['هل يدعم الطباعة الحرارية؟', 'نعم. توجد طباعة مهيأة لأجهزة SUNMI والطابعات الحرارية المدعومة.'],
+  ['هل الديون تضيع عند فتح شهر جديد؟', 'لا. النظام الشهري يحتفظ بديون الأشهر السابقة ويرحلها حسب الحسابات المسجلة.'],
 ];
 
-const iphoneSteps = [
-  { icon: Globe2, title: '1. افتح مولدتك بـ Safari', text: 'افتح رابط النظام من متصفح Safari على iPhone.' },
-  { icon: Share2, title: '2. اضغط مشاركة', text: 'من شريط Safari اضغط زر المشاركة.' },
-  { icon: PlusSquare, title: '3. إضافة إلى الشاشة الرئيسية', text: 'اختار Add to Home Screen حتى يظهر مولدتك مثل أي تطبيق.' },
-  { icon: BadgeCheck, title: '4. سجل دخولك', text: 'ادخل بنفس الحساب وستظهر بياناتك المتزامنة مباشرة.' },
-];
+const apkUrl = 'https://github.com/sajjadad589-art/moldatk.v2/releases/latest/download/Moldatk-Android-Release.apk';
+
+const BrandLockup = ({ compact = false }: { compact?: boolean }) => (
+  <div className="flex items-center gap-3" dir="rtl">
+    <img src="/brand/moldatk-mark.svg" alt="" className={compact ? 'w-11 h-11' : 'w-16 h-16 sm:w-20 sm:h-20'} />
+    <div className="leading-none">
+      <div className={`${compact ? 'text-2xl' : 'text-4xl sm:text-5xl'} font-black tracking-tight text-[#0B1F3B]`}>مولدتك</div>
+      <div className={`${compact ? 'text-[10px]' : 'text-xs sm:text-sm'} mt-2 font-bold text-[#667689]`}>إدارة المولدات بسهولة</div>
+    </div>
+  </div>
+);
 
 export default function LandingPage() {
   const appUrl = `${window.location.origin}/`;
 
   return (
-    <div dir="rtl" className="min-h-screen bg-[#071126] text-white font-['Cairo',sans-serif] selection:bg-blue-500 selection:text-white">
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#071126]/90 backdrop-blur-xl">
-        <div className="max-w-6xl mx-auto px-5 py-3 flex items-center justify-between gap-4">
-          <a href="#top" className="flex items-center shrink-0 rounded-2xl bg-white px-2.5 py-1 shadow-lg shadow-black/10">
-            <img src="/brand/moldatk-logo.svg" alt="مولدتك" className="h-12 w-auto object-contain" />
-          </a>
+    <div dir="rtl" className="min-h-screen bg-[#F7F9FC] text-[#0B1F3B] font-['Cairo',sans-serif] selection:bg-[#F2B544] selection:text-[#0B1F3B]">
+      <header className="sticky top-0 z-40 border-b border-[#DCE4EC] bg-white/95 backdrop-blur-xl">
+        <div className="max-w-7xl mx-auto px-5 lg:px-8 h-[78px] flex items-center justify-between gap-6">
+          <a href="#top" aria-label="مولدتك" className="shrink-0"><BrandLockup compact /></a>
 
-          <nav className="hidden md:flex items-center gap-5 text-xs font-bold text-slate-300">
-            <a href="#features" className="hover:text-white transition-colors">المزايا</a>
-            <a href="#platforms" className="hover:text-white transition-colors">الأجهزة</a>
-            <a href="#iphone" className="hover:text-white transition-colors">iPhone</a>
-            <a href="#release" className="hover:text-white transition-colors">الإصدار</a>
-            <a href="#faq" className="hover:text-white transition-colors">الأسئلة</a>
+          <nav className="hidden lg:flex items-center gap-8 text-sm font-bold text-[#526274]">
+            <a href="#features" className="hover:text-[#0B1F3B] transition-colors">المزايا</a>
+            <a href="#workflow" className="hover:text-[#0B1F3B] transition-colors">طريقة العمل</a>
+            <a href="#platforms" className="hover:text-[#0B1F3B] transition-colors">الأجهزة</a>
+            <a href="#faq" className="hover:text-[#0B1F3B] transition-colors">الأسئلة</a>
           </nav>
 
-          <a href={appUrl} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-sm font-bold transition-all shrink-0">
-            دخول النظام <ArrowLeft className="w-4 h-4" />
-          </a>
+          <div className="flex items-center gap-2">
+            <a href={appUrl} className="hidden sm:inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#CBD6E2] bg-white text-sm font-black text-[#0B1F3B] hover:bg-[#F2F5F8] transition-colors">
+              تسجيل الدخول
+            </a>
+            <a href={appUrl} className="inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl bg-[#0B1F3B] text-white text-sm font-black hover:bg-[#142A45] transition-colors shadow-sm">
+              ابدأ الآن <ArrowLeft className="w-4 h-4 text-[#F2B544]" />
+            </a>
+          </div>
         </div>
       </header>
 
       <main id="top">
-        <section className="max-w-6xl mx-auto px-5 pt-14 pb-20 grid lg:grid-cols-2 gap-12 items-center">
-          <div className="space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-600/15 border border-blue-500/20 text-blue-300 text-xs font-bold">
-              <Wifi className="w-4 h-4" /> نظام واحد لكل أجهزتك
-            </div>
-            <div className="inline-flex rounded-[2rem] bg-white p-3 shadow-2xl shadow-blue-950/20">
-              <img src="/brand/moldatk-logo.svg" alt="شعار مولدتك" className="w-[230px] sm:w-[280px] h-auto" />
-            </div>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black leading-[1.2]">
-              إدارة المولدة والجباية<br/><span className="text-amber-400">من أي جهاز</span>
-            </h1>
-            <p className="text-slate-300 leading-8 max-w-xl text-sm sm:text-base">
-              مولدتك يجمع المشتركين، التسديدات، الفواتير، الجباة والإعدادات في نظام واحد. استخدمه على Android أو iPhone أو الكمبيوتر بدون ما تنفصل بياناتك بين جهاز وجهاز.
-            </p>
+        <section className="relative overflow-hidden border-b border-[#E3E9EF] bg-gradient-to-b from-white to-[#F7F9FC]">
+          <div className="absolute -top-24 right-[16%] w-80 h-80 rounded-full bg-[#F2B544]/10 blur-3xl pointer-events-none" />
+          <div className="max-w-7xl mx-auto px-5 lg:px-8 py-14 lg:py-20 grid lg:grid-cols-[0.9fr_1.1fr] gap-12 items-center">
+            <div className="relative order-2 lg:order-1">
+              <div className="rounded-[32px] border border-[#D8E1EA] bg-white p-4 sm:p-6 shadow-[0_24px_80px_rgba(11,31,59,0.10)]">
+                <div className="rounded-[24px] bg-[#0B1F3B] p-4 sm:p-6 text-white overflow-hidden relative">
+                  <div className="absolute -left-12 -bottom-16 w-52 h-52 rounded-full bg-[#F2B544]/15 blur-2xl" />
+                  <div className="relative flex items-center justify-between gap-3 pb-5 border-b border-white/10">
+                    <div>
+                      <p className="text-[11px] text-slate-300 font-bold">لوحة التحكم</p>
+                      <h3 className="font-black mt-1">ملخص هذا الشهر</h3>
+                    </div>
+                    <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center"><img src="/brand/moldatk-mark.svg" className="w-9 h-9" alt="" /></div>
+                  </div>
 
-            <div className="flex flex-wrap gap-3">
-              <a href={appUrl} className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-amber-400 text-slate-950 font-black hover:bg-amber-300 transition-all">
-                فتح النظام الآن <ArrowLeft className="w-5 h-5" />
-              </a>
-              <a href="#release" className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/10 border border-white/15 text-white font-black hover:bg-white/15 transition-all">
-                <Download className="w-5 h-5" /> نسخة Android
-              </a>
+                  <div className="relative grid grid-cols-2 gap-3 mt-5">
+                    <div className="rounded-2xl bg-white/8 border border-white/10 p-4">
+                      <Users className="w-5 h-5 text-[#F2B544]" />
+                      <span className="block text-[10px] text-slate-300 mt-3">المشتركون</span>
+                      <strong className="block text-xl mt-1">إدارة كاملة</strong>
+                    </div>
+                    <div className="rounded-2xl bg-white/8 border border-white/10 p-4">
+                      <WalletCards className="w-5 h-5 text-[#F2B544]" />
+                      <span className="block text-[10px] text-slate-300 mt-3">التحصيل</span>
+                      <strong className="block text-xl mt-1">لحظي وواضح</strong>
+                    </div>
+                    <div className="rounded-2xl bg-white/8 border border-white/10 p-4">
+                      <BarChart3 className="w-5 h-5 text-[#F2B544]" />
+                      <span className="block text-[10px] text-slate-300 mt-3">التقارير</span>
+                      <strong className="block text-xl mt-1">أرشيف شهري</strong>
+                    </div>
+                    <div className="rounded-2xl bg-white/8 border border-white/10 p-4">
+                      <ReceiptText className="w-5 h-5 text-[#F2B544]" />
+                      <span className="block text-[10px] text-slate-300 mt-3">الإيصالات</span>
+                      <strong className="block text-xl mt-1">جاهزة للطباعة</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-3 gap-2">
+                  {['الرئيسية', 'المشتركون', 'التقارير'].map((item, i) => (
+                    <div key={item} className={`rounded-xl border px-2 py-3 text-center text-[11px] font-black ${i === 0 ? 'border-[#F2B544]/50 bg-[#FFF8E7] text-[#A66D00]' : 'border-[#E0E7EE] bg-[#F8FAFC] text-[#637286]'}`}>
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
 
-            <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-400 pt-1">
-              <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> مزامنة مركزية</span>
-              <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> صلاحيات منفصلة</span>
-              <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> دعم SUNMI</span>
+            <div className="order-1 lg:order-2 space-y-7">
+              <div className="inline-flex items-center gap-2 rounded-full bg-[#FFF7E3] border border-[#F2B544]/35 px-3.5 py-2 text-xs font-black text-[#946100]">
+                <Gauge className="w-4 h-4" /> نظام عملي لإدارة المولدات والاشتراكات
+              </div>
+
+              <BrandLockup />
+
+              <div>
+                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black leading-[1.18] tracking-tight text-[#0B1F3B]">
+                  كل شيء<br/><span className="relative inline-block">تحت السيطرة<span className="absolute right-0 -bottom-2 w-24 h-1.5 rounded-full bg-[#F2B544]" /></span>
+                </h1>
+                <p className="mt-7 max-w-xl text-[#526274] text-sm sm:text-base leading-8 font-medium">
+                  مولدتك يجمع المشتركين، الجباية، التسعيرات، الديون، التقارير والطباعة في مكان واحد واضح ومريح لصاحب المولدة والكادر.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <a href={appUrl} className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-[#0B1F3B] text-white font-black hover:bg-[#142A45] transition-colors shadow-lg shadow-[#0B1F3B]/10">
+                  فتح النظام <ArrowLeft className="w-5 h-5 text-[#F2B544]" />
+                </a>
+                <a href={apkUrl} className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-white border border-[#CBD6E2] text-[#0B1F3B] font-black hover:bg-[#F4F7FA] transition-colors">
+                  <Download className="w-5 h-5 text-[#D89A21]" /> تنزيل Android
+                </a>
+              </div>
+
+              <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs font-bold text-[#68798C]">
+                <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-600" /> مزامنة مركزية</span>
+                <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-600" /> صلاحيات منفصلة</span>
+                <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-600" /> دعم الطباعة</span>
+              </div>
             </div>
           </div>
+        </section>
 
-          <div className="relative">
-            <div className="absolute -inset-8 bg-amber-400/10 blur-3xl rounded-full" />
-            <div className="relative bg-white/5 border border-white/10 rounded-[2rem] p-6 shadow-2xl">
-              <div className="grid grid-cols-3 gap-3 mb-5">
-                {[['Android', Smartphone], ['iPhone', Apple], ['Computer', Monitor]].map(([name, Icon]: any) => (
-                  <div key={name} className="rounded-2xl bg-white/5 border border-white/10 p-4 text-center">
-                    <Icon className="w-7 h-7 mx-auto mb-2 text-amber-300" />
-                    <div className="text-xs font-bold">{name}</div>
+        <section id="features" className="scroll-mt-24 max-w-7xl mx-auto px-5 lg:px-8 py-20">
+          <div className="text-center max-w-2xl mx-auto mb-12">
+            <span className="text-[#B57600] text-xs font-black">إدارة أسهل، معلومات أوضح</span>
+            <h2 className="text-3xl sm:text-4xl font-black mt-2">المزايا الأساسية</h2>
+            <p className="text-[#69798B] mt-4 text-sm leading-7">واجهة هادئة، لكن خلفها كل الأدوات التي يحتاجها تشغيل المولدة يومياً.</p>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {features.map(({ icon: Icon, title, text }) => (
+              <div key={title} className="rounded-3xl bg-white border border-[#E0E7EE] p-6 shadow-[0_12px_34px_rgba(11,31,59,0.045)] hover:-translate-y-1 transition-transform">
+                <div className="w-11 h-11 rounded-2xl bg-[#FFF6DE] text-[#C88709] flex items-center justify-center mb-5"><Icon className="w-5 h-5" /></div>
+                <h3 className="font-black text-lg">{title}</h3>
+                <p className="text-[#6A7A8C] text-sm leading-7 mt-2">{text}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section id="workflow" className="scroll-mt-24 border-y border-[#E1E8EF] bg-white">
+          <div className="max-w-7xl mx-auto px-5 lg:px-8 py-20 grid lg:grid-cols-2 gap-12 items-center">
+            <div className="rounded-[30px] border border-[#DDE5EC] bg-[#F7F9FC] p-5 sm:p-8">
+              <div className="grid gap-3">
+                {[
+                  ['01', 'أضف المشتركين', 'سجل البيانات، الأمبير والفئة بصورة منظمة.'],
+                  ['02', 'اعتمد التسعيرة الشهرية', 'كل شهر يبدأ بدورة حساب مستقلة ويحافظ على الديون السابقة.'],
+                  ['03', 'استلم واطبع', 'سجل الدفعة واطبع الإيصال وراقب القاصة والتقارير.'],
+                ].map(([n, title, text]) => (
+                  <div key={n} className="flex items-start gap-4 rounded-2xl bg-white border border-[#E1E8EF] p-4">
+                    <span className="w-10 h-10 rounded-xl bg-[#0B1F3B] text-[#F2B544] flex items-center justify-center font-black shrink-0">{n}</span>
+                    <div><h3 className="font-black">{title}</h3><p className="text-[#718092] text-xs leading-6 mt-1">{text}</p></div>
                   </div>
                 ))}
               </div>
-              <div className="rounded-2xl bg-[#0b1731] border border-white/10 p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400 text-xs">حالة البيانات</span>
-                  <span className="inline-flex items-center gap-1.5 text-emerald-400 text-xs font-black"><span className="w-2 h-2 rounded-full bg-emerald-400" /> متصلة</span>
-                </div>
-                <div className="h-px bg-white/10" />
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-xl bg-white/5 p-4"><div className="text-[11px] text-slate-400">المشتركون</div><div className="font-black text-xl mt-1">Cloud</div></div>
-                  <div className="rounded-xl bg-white/5 p-4"><div className="text-[11px] text-slate-400">التسديدات</div><div className="font-black text-xl mt-1">Realtime</div></div>
-                  <div className="rounded-xl bg-white/5 p-4"><div className="text-[11px] text-slate-400">الجباة</div><div className="font-black text-xl mt-1">Secure</div></div>
-                  <div className="rounded-xl bg-white/5 p-4"><div className="text-[11px] text-slate-400">الفواتير</div><div className="font-black text-xl mt-1">Shared</div></div>
-                </div>
-              </div>
+            </div>
+            <div>
+              <span className="text-[#B57600] text-xs font-black">نظام شهري واضح</span>
+              <h2 className="text-3xl sm:text-4xl font-black mt-2 leading-tight">من التسعيرة إلى التحصيل<br/>بدون ضياع بالحسابات</h2>
+              <p className="text-[#667689] leading-8 mt-5 text-sm">كل شهر محفوظ بسجله، وحالة التسديد والديون تبقى قابلة للمراجعة من التقارير. الهدف أن يعرف صاحب المولدة والجابي أين وصل الحساب بدون جداول منفصلة.</p>
             </div>
           </div>
         </section>
 
-        <section id="features" className="scroll-mt-24 border-y border-white/10 bg-white/[0.025]">
-          <div className="max-w-6xl mx-auto px-5 py-20">
-            <div className="max-w-2xl mx-auto text-center mb-11">
-              <span className="text-amber-300 text-xs font-black">كل شغلك بمكان واحد</span>
-              <h2 className="text-2xl sm:text-3xl font-black mt-2">مزايا مولدتك</h2>
-              <p className="text-slate-400 text-sm leading-7 mt-3">مصمم حتى يقلل التكرار ويخلي صاحب المولدة والجابي يشتغلون على نفس المعلومات.</p>
-            </div>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {features.map(({ icon: Icon, title, text }) => (
-                <div key={title} className="rounded-2xl bg-white/5 border border-white/10 p-5 hover:bg-white/[0.07] transition-colors">
-                  <div className="w-10 h-10 rounded-xl bg-amber-400/10 flex items-center justify-center mb-4"><Icon className="w-5 h-5 text-amber-300" /></div>
-                  <h3 className="font-black mb-2">{title}</h3>
-                  <p className="text-sm leading-6 text-slate-400">{text}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section id="platforms" className="scroll-mt-24 max-w-6xl mx-auto px-5 py-20">
+        <section id="platforms" className="scroll-mt-24 max-w-7xl mx-auto px-5 lg:px-8 py-20">
           <div className="grid lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-3 mb-5 text-center">
-              <h2 className="text-2xl sm:text-3xl font-black">اختار الجهاز اللي يناسبك</h2>
-              <p className="text-slate-400 text-sm mt-3">كلهم يوصلون لنفس الحساب ونفس قاعدة البيانات.</p>
-            </div>
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-              <Smartphone className="w-9 h-9 text-amber-300 mb-5" />
-              <h3 className="text-lg font-black">Android</h3>
-              <p className="text-sm text-slate-400 leading-7 mt-2">تطبيق مخصص لأجهزة Android وSUNMI مع دعم الخصائص الأصلية مثل الطباعة والتحديث.</p>
-            </div>
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-              <Apple className="w-9 h-9 text-amber-300 mb-5" />
-              <h3 className="text-lg font-black">iPhone</h3>
-              <p className="text-sm text-slate-400 leading-7 mt-2">نسخة ويب مصغّرة تنضاف إلى الشاشة الرئيسية وتفتح كتطبيق مستقل من Safari.</p>
-            </div>
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-              <Monitor className="w-9 h-9 text-amber-300 mb-5" />
-              <h3 className="text-lg font-black">الكمبيوتر</h3>
-              <p className="text-sm text-slate-400 leading-7 mt-2">لوحة تحكم كاملة من المتصفح لمتابعة المشتركين والجباية والتقارير والإعدادات.</p>
-            </div>
+            <div className="lg:col-span-3 mb-6 text-center"><h2 className="text-3xl sm:text-4xl font-black">اشتغل من الجهاز المناسب إلك</h2><p className="text-[#6D7D8F] text-sm mt-3">نفس النظام والهوية على الموبايل والكمبيوتر.</p></div>
+            {[
+              [Smartphone, 'Android', 'تطبيق مخصص للموبايل وأجهزة SUNMI مع الطباعة والتحديثات.'],
+              [Monitor, 'الكمبيوتر', 'واجهة واسعة للإدارة، التقارير، المشتركين والإعدادات.'],
+              [Wifi, 'الويب', 'دخول مباشر من المتصفح مع نفس بيانات الحساب المتزامنة.'],
+            ].map(([Icon, title, text]: any) => (
+              <div key={title} className="rounded-3xl bg-white border border-[#E0E7EE] p-7">
+                <Icon className="w-8 h-8 text-[#D89A21] mb-5" /><h3 className="text-xl font-black">{title}</h3><p className="text-sm text-[#6A7A8C] leading-7 mt-2">{text}</p>
+              </div>
+            ))}
           </div>
         </section>
 
-        <section id="iphone" className="scroll-mt-24 border-y border-white/10 bg-white/[0.025]">
-          <div className="max-w-6xl mx-auto px-5 py-20">
-            <div className="grid lg:grid-cols-[0.8fr_1.2fr] gap-10 items-start">
-              <div>
-                <div className="w-12 h-12 rounded-2xl bg-white text-black flex items-center justify-center mb-5"><Apple className="w-6 h-6" /></div>
-                <h2 className="text-2xl sm:text-3xl font-black">ثبت مولدتك على iPhone بدون App Store</h2>
-                <p className="text-slate-400 leading-7 mt-4 text-sm">ما تحتاج تحمل ملف أو تدخل متجر. فقط تضيف نسخة الويب إلى الشاشة الرئيسية وبعدها تستخدمها مثل تطبيق مستقل.</p>
-                <a href={appUrl} className="inline-flex mt-6 items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-slate-950 font-black text-sm">فتح مولدتك على Safari <ArrowLeft className="w-4 h-4" /></a>
-              </div>
-              <div className="grid sm:grid-cols-2 gap-4">
-                {iphoneSteps.map(({ icon: Icon, title, text }) => (
-                  <div key={title} className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                    <Icon className="w-5 h-5 text-amber-300 mb-4" />
-                    <h3 className="font-black text-sm">{title}</h3>
-                    <p className="text-xs text-slate-400 leading-6 mt-2">{text}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section id="release" className="scroll-mt-24 max-w-5xl mx-auto px-5 py-20">
-          <div className="rounded-[2rem] border border-amber-400/20 bg-gradient-to-br from-amber-400/10 to-white/[0.03] p-6 sm:p-8">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div>
-                <div className="inline-flex items-center gap-2 text-emerald-300 text-xs font-black mb-3"><CheckCircle2 className="w-4 h-4" /> تم بناء أول نسخة Android تجريبية بنجاح</div>
-                <h2 className="text-2xl font-black">نسخة Android</h2>
-                <p className="text-slate-400 text-sm leading-7 mt-2 max-w-2xl">النسخة التجريبية صارت جاهزة للاختبار. زر التنزيل العام راح يتفعّل هنا بعد اعتماد نسخة Release موقعة بشكل ثابت حتى تشتغل التحديثات المستقبلية بدون تعارض.</p>
-              </div>
-              <div className="shrink-0 text-center md:text-left">
-                <button disabled className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-amber-400/60 text-slate-950/70 font-black cursor-not-allowed">
-                  <Download className="w-5 h-5" /> التحميل العام قريباً
-                </button>
-                <div className="text-[11px] text-slate-500 mt-2">الإصدار التجريبي: 1.1.0</div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="max-w-6xl mx-auto px-5 pb-20">
-          <div className="grid md:grid-cols-3 gap-4">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5"><LockKeyhole className="w-5 h-5 text-amber-300 mb-3"/><h3 className="font-black text-sm">حسابات آمنة</h3><p className="text-xs leading-6 text-slate-400 mt-2">دخول الإدارة والجباة مربوط بنظام مصادقة مركزي وصلاحيات منفصلة.</p></div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5"><Layers3 className="w-5 h-5 text-amber-300 mb-3"/><h3 className="font-black text-sm">قاعدة بيانات مشتركة</h3><p className="text-xs leading-6 text-slate-400 mt-2">المشتركين والتسديدات والفواتير والإعدادات الأساسية تبقى موحدة بين الأجهزة.</p></div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5"><RefreshCw className="w-5 h-5 text-amber-300 mb-3"/><h3 className="font-black text-sm">تحديث مستمر</h3><p className="text-xs leading-6 text-slate-400 mt-2">نسخة الويب تتحدث مباشرة وAndroid مهيأ لفحص الإصدارات الجديدة.</p></div>
-          </div>
-        </section>
-
-        <section id="faq" className="scroll-mt-24 border-t border-white/10 bg-white/[0.025]">
+        <section id="faq" className="scroll-mt-24 bg-[#0B1F3B] text-white">
           <div className="max-w-4xl mx-auto px-5 py-20">
-            <div className="text-center mb-9">
-              <HelpCircle className="w-8 h-8 text-amber-300 mx-auto mb-3" />
-              <h2 className="text-2xl sm:text-3xl font-black">أسئلة شائعة</h2>
-            </div>
+            <div className="text-center mb-10"><span className="text-[#F2B544] text-xs font-black">قبل ما تبدأ</span><h2 className="text-3xl font-black mt-2">أسئلة شائعة</h2></div>
             <div className="space-y-3">
               {faq.map(([q, a]) => (
-                <details key={q} className="group rounded-2xl border border-white/10 bg-white/5 p-5 open:bg-white/[0.07]">
-                  <summary className="cursor-pointer list-none flex items-center justify-between gap-4 font-black text-sm">
-                    <span>{q}</span><ChevronDown className="w-4 h-4 text-slate-400 transition-transform group-open:rotate-180" />
-                  </summary>
-                  <p className="text-sm text-slate-400 leading-7 mt-4 border-t border-white/10 pt-4">{a}</p>
+                <details key={q} className="group rounded-2xl border border-white/10 bg-white/[0.045] open:bg-white/[0.07]">
+                  <summary className="list-none cursor-pointer p-5 flex items-center justify-between gap-4 font-black text-sm"><span>{q}</span><ChevronDown className="w-5 h-5 text-[#F2B544] transition-transform group-open:rotate-180" /></summary>
+                  <p className="px-5 pb-5 text-sm leading-7 text-slate-300">{a}</p>
                 </details>
               ))}
             </div>
           </div>
         </section>
-
-        <section className="max-w-5xl mx-auto px-5 py-20 text-center">
-          <div className="rounded-[2rem] bg-[#0b2b59] border border-amber-400/20 p-8 sm:p-10 shadow-2xl shadow-black/30">
-            <div className="inline-flex rounded-2xl bg-white p-2 mb-5"><img src="/brand/moldatk-logo.svg" alt="مولدتك" className="w-40 h-auto" /></div>
-            <h2 className="text-2xl sm:text-3xl font-black">مولدتك وياك وين ما تشتغل</h2>
-            <p className="text-slate-300 text-sm leading-7 mt-3 max-w-xl mx-auto">افتح النظام من جهازك الحالي وسجل دخولك بنفس الحساب حتى تبقى كل بياناتك مرتبطة بمكان واحد.</p>
-            <a href={appUrl} className="inline-flex mt-6 items-center gap-2 px-5 py-3 rounded-2xl bg-amber-400 text-slate-950 font-black">دخول النظام <ArrowLeft className="w-5 h-5" /></a>
-          </div>
-        </section>
       </main>
 
-      <footer className="border-t border-white/10">
-        <div className="max-w-6xl mx-auto px-5 py-7 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
-          <span>مولدتك — نظام إدارة المولدات الكهربائية</span>
-          <span>Android • iPhone • Web</span>
+      <footer className="bg-[#081521] text-slate-400 border-t border-white/10">
+        <div className="max-w-7xl mx-auto px-5 lg:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <BrandLockup compact />
+          <div className="text-xs text-center sm:text-left">مولدتك — نظام إدارة المولدات والاشتراكات</div>
         </div>
       </footer>
     </div>
