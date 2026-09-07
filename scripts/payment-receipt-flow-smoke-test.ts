@@ -64,7 +64,7 @@ const first = applySubscriberPayment(makeSubscriber(), pricing, 10000, {
   now: new Date('2026-09-07T07:00:00.000Z'),
 });
 
-assert.equal(first.meta.totalDebtBefore, 25000);
+assert.equal(first.meta.totalOutstandingBefore, 25000);
 assert.equal(first.meta.previousPaidBefore, 0);
 assert.equal(first.meta.paymentAmount, 10000);
 assert.equal(first.meta.totalOutstandingAfter, 15000);
@@ -92,7 +92,7 @@ const second = applySubscriberPayment(first.updatedSubscriber, pricing, 15000, {
   now: secondNow,
 });
 
-assert.equal(second.meta.totalDebtBefore, 15000);
+assert.equal(second.meta.totalOutstandingBefore, 15000);
 assert.equal(second.meta.previousPaidBefore, 10000);
 assert.equal(second.meta.paymentAmount, 15000);
 assert.equal(second.meta.totalOutstandingAfter, 0);
