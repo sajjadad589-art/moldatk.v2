@@ -126,6 +126,7 @@ await import('./apply-folder-collector-picker-ios-v6.mjs');
 await import('./apply-payment-receipt-precondition-v1.mjs');
 await import('./apply-payment-receipt-input-fix-v1.mjs');
 await import('./apply-owner-mobile-direct-payment-v1.mjs');
+await import('./apply-sunmi-payment-receipt-java-dedupe-v1.mjs');
 await import('./apply-payment-cloud-sync-v1.mjs');
 await import('./apply-payment-release-version-1.3.20.mjs');
 
