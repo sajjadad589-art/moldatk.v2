@@ -7,45 +7,65 @@ const must = (condition, message) => { if (!condition) throw new Error(message);
 
 let src = read();
 
-// Collectors only see their assigned cabins. They must never run the owner's
-// destructive reconciliation over the entire generator subscriber/invoice set.
-const subscriberDelete = "        await replaceMissingRows('generator_subscribers', generatorId, subscribers.map(s => s.id));";
-if (src.includes(subscriberDelete) && !src.includes('PAYMENT_COLLECTOR_NO_DESTRUCTIVE_RECONCILE')) {
+// Some earlier release guards deliberately remove destructive reconciliation
+// altogether. If an older form survives, keep it owner-only; if it is already
+// absent, that is the safer state for collectors and needs no extra mutation.
+const guardReconcile = (table, marker) => {
+  if (src.includes(marker)) return;
+  const escaped = table.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`^(\\s*)await replaceMissingRows\\('${escaped}',[^\\n]+\\);`, 'm');
+  const match = src.match(re);
+  if (!match) return;
+  const original = match[0].trimStart();
+  const indent = match[1] || '';
+  src = src.replace(re, `${indent}// ${marker}\n${indent}if (session?.role === 'generator_admin') {\n${indent}  ${original}\n${indent}}`);
+};
+
+guardReconcile('generator_subscribers', 'PAYMENT_COLLECTOR_NO_DESTRUCTIVE_RECONCILE');
+guardReconcile('generator_invoices', 'PAYMENT_COLLECTOR_NO_INVOICE_RECONCILE');
+
+// A realtime event fired by our own subscriber upsert must not pull an older
+// invoice snapshot while that same payment push is still writing its invoice.
+if (!src.includes('PAYMENT_PUSH_PULL_RACE_GUARD')) {
+  const pullAnchor = /(^\s*)if \(refreshing\.current(?: \|\| pushing\.current)?\) return;/m;
+  const match = src.match(pullAnchor);
+  must(match, 'Cloud pull guard anchor missing');
+  const indent = match[1] || '';
   src = src.replace(
-    subscriberDelete,
-    `        // PAYMENT_COLLECTOR_NO_DESTRUCTIVE_RECONCILE\n        if (session?.role === 'generator_admin') {\n          await replaceMissingRows('generator_subscribers', generatorId, subscribers.map(s => s.id));\n        }`
+    pullAnchor,
+    `${indent}// PAYMENT_PUSH_PULL_RACE_GUARD\n${indent}if (refreshing.current || pushing.current) return;`
   );
 }
 
-const invoiceDelete = "        await replaceMissingRows('generator_invoices', generatorId, invoices.map(i => i.id));";
-if (src.includes(invoiceDelete) && !src.includes('PAYMENT_COLLECTOR_NO_INVOICE_RECONCILE')) {
-  src = src.replace(
-    invoiceDelete,
-    `        // PAYMENT_COLLECTOR_NO_INVOICE_RECONCILE\n        if (session?.role === 'generator_admin') {\n          await replaceMissingRows('generator_invoices', generatorId, invoices.map(i => i.id));\n        }`
-  );
+// Collector audit rows are append-only. Re-sending an existing row through a
+// normal UPSERT can require UPDATE permission and make a later payment push fail.
+if (!src.includes('PAYMENT_COLLECTOR_APPEND_ONLY_AUDIT')) {
+  const auditRe = /(^\s*)const \{ error \} = await supabase\.from\('generator_audit_logs'\)\.upsert\(rows, \{ onConflict: 'generator_id,id' \}\);\n\1if \(error\) throw error;/m;
+  const match = src.match(auditRe);
+  if (match) {
+    const indent = match[1] || '';
+    src = src.replace(
+      auditRe,
+      `${indent}// PAYMENT_COLLECTOR_APPEND_ONLY_AUDIT\n${indent}if (session?.role === 'collector') {\n${indent}  const { error } = await supabase.from('generator_audit_logs').upsert(rows, { onConflict: 'generator_id,id', ignoreDuplicates: true });\n${indent}  if (error) throw error;\n${indent}} else {\n${indent}  const { error } = await supabase.from('generator_audit_logs').upsert(rows, { onConflict: 'generator_id,id' });\n${indent}  if (error) throw error;\n${indent}}`
+    );
+  }
 }
 
-// A realtime event fired by our own subscriber upsert must not pull the old
-// invoice snapshot while the same payment push is still in progress.
-src = src.replace(
-  '      if (refreshing.current) return;\n      refreshing.current = true;',
-  `      if (refreshing.current || pushing.current) return;\n      refreshing.current = true;`
-);
+// Verify the dangerous collector-wide deletes are either gone or owner-scoped.
+const unsafeSubscriberDelete = /await replaceMissingRows\('generator_subscribers'/.test(src) &&
+  !/PAYMENT_COLLECTOR_NO_DESTRUCTIVE_RECONCILE[\s\S]{0,180}session\?\.role === 'generator_admin'[\s\S]{0,180}replaceMissingRows\('generator_subscribers'/.test(src);
+const unsafeInvoiceDelete = /await replaceMissingRows\('generator_invoices'/.test(src) &&
+  !/PAYMENT_COLLECTOR_NO_INVOICE_RECONCILE[\s\S]{0,180}session\?\.role === 'generator_admin'[\s\S]{0,180}replaceMissingRows\('generator_invoices'/.test(src);
 
-// Collector audit entries are append-only. Re-sending an existing audit row with
-// UPSERT would require UPDATE permission and can poison every later payment sync.
-const auditUpsert = "          const { error } = await supabase.from('generator_audit_logs').upsert(rows, { onConflict: 'generator_id,id' });\n          if (error) throw error;";
-if (src.includes(auditUpsert)) {
-  src = src.replace(
-    auditUpsert,
-    `          if (session?.role === 'collector') {\n            const { error } = await supabase.from('generator_audit_logs').upsert(rows, { onConflict: 'generator_id,id', ignoreDuplicates: true });\n            if (error) throw error;\n          } else {\n            const { error } = await supabase.from('generator_audit_logs').upsert(rows, { onConflict: 'generator_id,id' });\n            if (error) throw error;\n          }`
-  );
+must(!unsafeSubscriberDelete, 'Unsafe collector subscriber reconciliation remains');
+must(!unsafeInvoiceDelete, 'Unsafe collector invoice reconciliation remains');
+must(src.includes('PAYMENT_PUSH_PULL_RACE_GUARD') && src.includes('refreshing.current || pushing.current'), 'Payment push/pull race guard missing');
+
+// The audit guard is required only while the generic audit UPSERT is present.
+const genericAuditUpsertRemains = /supabase\.from\('generator_audit_logs'\)\.upsert\(rows, \{ onConflict: 'generator_id,id' \}\)/.test(src);
+if (genericAuditUpsertRemains) {
+  must(src.includes('PAYMENT_COLLECTOR_APPEND_ONLY_AUDIT') && src.includes('ignoreDuplicates: true'), 'Collector append-only audit guard missing');
 }
-
-must(src.includes('PAYMENT_COLLECTOR_NO_DESTRUCTIVE_RECONCILE'), 'Collector subscriber reconciliation guard missing');
-must(src.includes('PAYMENT_COLLECTOR_NO_INVOICE_RECONCILE'), 'Collector invoice reconciliation guard missing');
-must(src.includes('if (refreshing.current || pushing.current) return;'), 'Payment push/pull race guard missing');
-must(src.includes('ignoreDuplicates: true'), 'Collector append-only audit guard missing');
 
 write(src);
-console.log('Applied cloud-safe payment persistence: collectors cannot delete unseen rows, payment pushes cannot be overwritten mid-flight, and collector audit retries are append-only.');
+console.log('Applied cloud-safe payment persistence: payment writes cannot be overwritten mid-flight, collector reconciliation is non-destructive, and audit retries are append-only when needed.');
