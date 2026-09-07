@@ -118,4 +118,9 @@ for (const iconPath of ['public/icons/moldatk-apple-touch-v5.png', 'public/icons
 // User-visible collector picker and iPhone icon correction must run after every legacy patch and after the v5 compatibility assertions.
 await import('./apply-folder-collector-picker-ios-v6.mjs');
 
+// Subscriber profile/payment UI and the on-screen print animation must be the last
+// visual patch so older compatibility scripts cannot restore the two-page flow or
+// the previous top-to-bottom receipt motion.
+await import('./apply-subscriber-first-page-print-motion.mjs');
+
 console.log('Final release guard preserved core features, enforced the calm internal theme, Google Play legal surfaces, cabinet sync safety, collector cabinet assignments, and the corrected iOS/PWA icon set.');
