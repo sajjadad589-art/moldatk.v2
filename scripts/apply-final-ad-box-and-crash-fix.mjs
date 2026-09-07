@@ -123,8 +123,13 @@ await import('./apply-folder-collector-picker-ios-v6.mjs');
 // the previous top-to-bottom receipt motion.
 await import('./apply-subscriber-first-page-print-motion.mjs');
 
-// Absolute last pass: payment button performs accounting first, first page owns all
-// payment actions, and edit mode is limited to update/delete controls.
+// Payment button performs accounting first, first page owns all payment actions,
+// and edit mode is limited to update/delete controls.
 await import('./apply-subscriber-payment-ux-final.mjs');
+
+// Absolute last pass: legacy Workmode scripts may inject a second subscriber detail
+// page on mobile. Remove it after every other patch so tapping a subscriber card
+// opens the canonical SubscriberModal directly.
+await import('./apply-remove-mobile-subscriber-intermediate-page.mjs');
 
 console.log('Final release guard preserved core features, enforced the calm internal theme, Google Play legal surfaces, cabinet sync safety, collector cabinet assignments, and the corrected iOS/PWA icon set.');
