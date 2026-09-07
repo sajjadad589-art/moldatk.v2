@@ -47,3 +47,8 @@ if (!source.includes('onClick={() => onOpenSubscriberModal(sub)}')) {
 
 fs.writeFileSync(path, source, 'utf8');
 console.log('Removed redundant mobile subscriber detail page; subscriber cards now open the canonical subscriber interface directly.');
+
+// This file is already the absolute last release pass. Keep dashboard accounting
+// consistency here as well so older build-time patches cannot restore stale counters
+// or a different cashbox formula afterwards.
+await import('./apply-dashboard-wallet-consistency-fix.mjs');
