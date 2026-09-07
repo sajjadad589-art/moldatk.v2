@@ -51,9 +51,10 @@ jobs:
           grep -q 'المتبقي بعد الدفعة' src/components/InvoiceReceiptModal.tsx
           grep -q "useState<number | ''>('')" src/components/SubscriberModal.tsx
           grep -q 'inputMode="numeric"' src/components/SubscriberModal.tsx
-          grep -q 'PAYMENT_COLLECTOR_NO_DESTRUCTIVE_RECONCILE' src/lib/useGeneratorCloudSync.ts
-          grep -q 'PAYMENT_COLLECTOR_NO_INVOICE_RECONCILE' src/lib/useGeneratorCloudSync.ts
-          grep -q 'if (refreshing.current || pushing.current) return;' src/lib/useGeneratorCloudSync.ts
+          ! grep -q "replaceMissingRows('generator_subscribers'" src/lib/useGeneratorCloudSync.ts
+          ! grep -q "replaceMissingRows('generator_invoices'" src/lib/useGeneratorCloudSync.ts
+          grep -q 'PAYMENT_PUSH_PULL_RACE_GUARD' src/lib/useGeneratorCloudSync.ts
+          grep -q 'if (pushing.current) return;' src/lib/useGeneratorCloudSync.ts
           grep -q 'ignoreDuplicates: true' src/lib/useGeneratorCloudSync.ts
           grep -q 'moldatk-shell-v4-1.3.20' public/sw.js
           grep -q '/sw.js?v=1.3.20' src/main.tsx
