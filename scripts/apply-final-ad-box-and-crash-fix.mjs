@@ -118,8 +118,10 @@ for (const iconPath of ['public/icons/moldatk-apple-touch-v5.png', 'public/icons
 // User-visible collector picker and iPhone icon correction must run after every legacy patch and after the v5 compatibility assertions.
 await import('./apply-folder-collector-picker-ios-v6.mjs');
 
-// Payment, receipt, dashboard and numeric-input correction is the final functional mutation so no legacy patch can restore the broken partial-payment behavior.
+// Payment and owner-mobile corrections must be the final functional mutations.
+await import('./apply-payment-receipt-precondition-v1.mjs');
 await import('./apply-payment-receipt-input-fix-v1.mjs');
+await import('./apply-owner-mobile-direct-payment-v1.mjs');
 await import('./apply-payment-release-version-1.3.20.mjs');
 
-console.log('Final release guard preserved core features and applied the final partial-payment, historical receipt, dashboard balance, numeric-input and 1.3.20 update-delivery corrections.');
+console.log('Final release guard preserved core features and applied real owner-mobile payments, direct edit flow, receipt feed animation, partial-payment accounting and 1.3.20 update delivery.');
