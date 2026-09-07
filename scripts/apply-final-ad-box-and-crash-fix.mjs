@@ -79,12 +79,16 @@ await import('./apply-update-delivery-and-internal-theme-v3-fixed.mjs');
 await import('./apply-google-play-cabinet-collector-v2.mjs');
 await import('./generate-pwa-brand-icons.mjs');
 
-// The legacy compatibility assertions still target 1.3.18. Normalize either the
-// older generated 1.3.17 output or a previous 1.3.19 pass back to 1.3.18, run the
-// legacy assertions, then the v6 finalizer below upgrades everything to 1.3.19.
+// The legacy compatibility assertions still target 1.3.18. Normalize any already-generated
+// newer shell back to 1.3.18 for those assertions. The final 1.3.20 release patch runs later.
 for (const path of ['public/sw.js', 'src/main.tsx']) {
   const current = read(path);
-  if (current) write(path, current.replaceAll('1.3.17', '1.3.18').replaceAll('1.3.19', '1.3.18'));
+  if (current) {
+    write(path, current
+      .replaceAll('1.3.17', '1.3.18')
+      .replaceAll('1.3.19', '1.3.18')
+      .replaceAll('1.3.20', '1.3.18'));
+  }
 }
 
 // Legacy brand patches still rewrite the web manifest to the old PNGs. Reassert the versioned Moldatk icon set last.
@@ -122,6 +126,7 @@ await import('./apply-folder-collector-picker-ios-v6.mjs');
 await import('./apply-payment-receipt-precondition-v1.mjs');
 await import('./apply-payment-receipt-input-fix-v1.mjs');
 await import('./apply-owner-mobile-direct-payment-v1.mjs');
+await import('./apply-payment-cloud-sync-v1.mjs');
 await import('./apply-payment-release-version-1.3.20.mjs');
 
-console.log('Final release guard preserved core features and applied real owner-mobile payments, direct edit flow, receipt feed animation, partial-payment accounting and 1.3.20 update delivery.');
+console.log('Final release guard preserved core features and applied real owner-mobile payments, direct edit flow, receipt feed animation, cloud-safe collector payments, partial-payment accounting and 1.3.20 update delivery.');
