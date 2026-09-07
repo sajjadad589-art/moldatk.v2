@@ -20,12 +20,14 @@ src = src.replace(/  const finalized = Boolean\([^;]+;/, "  const finalized = Bo
 src = src.replace(/  const statusText = [^;]+;/, "  const statusText = isCancelled ? 'ملغي' : isFree ? 'مجاني' : receiptSnapshot ? (remainingAmount > 0 ? 'تسديد جزئي' : 'مسدد بالكامل') : isPaid ? 'مسدد' : isPartial ? 'تسديد جزئي' : 'غير مسدد';");
 
 // Inject accounting rows directly inside the printable receipt, independent of labels.
-if (!src.includes('المسدد سابقاً')) {
+if (!src.includes('المسدد سابقاً') || !src.includes('المتبقي بعد الدفعة')) {
   const idAt = src.indexOf('id="thermal-receipt-printable"');
   if (idAt < 0) throw new Error('Printable receipt anchor missing');
   const openTagEnd = src.indexOf('>', idAt);
   if (openTagEnd < 0) throw new Error('Printable receipt opening tag is malformed');
-  const insertion = `\n            {receiptMeta && <Row label="المسدد سابقاً" value={formatCurrency(receiptMeta.previousPaidBefore)} strong />}\n            {receiptMeta && <Row label="المتبقي قبل الدفعة" value={formatCurrency(receiptMeta.totalOutstandingBefore)} strong />}`;
+  let insertion = '';
+  if (!src.includes('المسدد سابقاً')) insertion += `\n            {receiptMeta && <Row label="المسدد سابقاً" value={formatCurrency(receiptMeta.previousPaidBefore)} strong />}\n            {receiptMeta && <Row label="المتبقي قبل الدفعة" value={formatCurrency(receiptMeta.totalOutstandingBefore)} strong />}`;
+  if (!src.includes('المتبقي بعد الدفعة')) insertion += `\n            {receiptMeta && <Row label="المتبقي بعد الدفعة" value={formatCurrency(receiptMeta.totalOutstandingAfter)} strong />}`;
   src = src.slice(0, openTagEnd + 1) + insertion + src.slice(openTagEnd + 1);
 }
 
