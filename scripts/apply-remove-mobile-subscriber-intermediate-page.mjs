@@ -52,3 +52,7 @@ console.log('Removed redundant mobile subscriber detail page; subscriber cards n
 // consistency here as well so older build-time patches cannot restore stale counters
 // or a different cashbox formula afterwards.
 await import('./apply-dashboard-wallet-consistency-fix-v3.mjs');
+
+// Final dashboard status rule: unpaid/partial subscribers and any real outstanding
+// balance must remain visible as unpaid even when the current-month tariff row is absent.
+await import('./apply-dashboard-outstanding-status-fix.mjs');
