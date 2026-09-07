@@ -51,4 +51,4 @@ console.log('Removed redundant mobile subscriber detail page; subscriber cards n
 // This file is already the absolute last release pass. Keep dashboard accounting
 // consistency here as well so older build-time patches cannot restore stale counters
 // or a different cashbox formula afterwards.
-await import('./apply-dashboard-wallet-consistency-fix-v2.mjs');
+await import('./apply-dashboard-wallet-consistency-fix-v3.mjs');
