@@ -56,3 +56,7 @@ await import('./apply-dashboard-wallet-consistency-fix-v3.mjs');
 // Final dashboard status rule: unpaid/partial subscribers and any real outstanding
 // balance must remain visible as unpaid even when the current-month tariff row is absent.
 await import('./apply-dashboard-outstanding-status-fix.mjs');
+
+// Final subscriber action layout: large WhatsApp at the top of the first page,
+// no call action, and cancellation/custom payment controls moved to the lower action area.
+await import('./apply-subscriber-whatsapp-action-layout.mjs');
