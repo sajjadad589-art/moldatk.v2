@@ -126,7 +126,9 @@ for (const path of ['public/sw.js', 'src/main.tsx']) {
 if (!read('public/sw.js').includes('moldatk-shell-v4-1.3.18')) throw new Error('1.3.18 service worker cache version missing');
 if (!read('src/main.tsx').includes('/sw.js?v=1.3.18')) throw new Error('1.3.18 service worker registration missing');
 
-// Performance/stability must be the absolute final transform so earlier compatibility patches cannot restore heavy iPhone behavior.
+// Performance/stability must run before the audit correction. The audit correction is deliberately
+// the final transform so no earlier compatibility script can restore the reported owner-screen bugs.
 await import('./apply-ios-performance-stability-fix.mjs');
+await import('./apply-owner-audit-screenshot-fixes.mjs');
 
-console.log('Final release guard preserved core features, calm identity, Google Play legal/cabinet fixes and the iPhone performance stability pass.');
+console.log('Final release guard preserved core features, calm identity, Google Play legal/cabinet fixes, iPhone stability and owner audit corrections.');
