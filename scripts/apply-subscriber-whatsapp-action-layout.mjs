@@ -78,14 +78,6 @@ const firstPage = `        {activeView === 'profile' && !isEditing && subscriber
               </button>
             )}
 
-            <button
-              type="button"
-              onClick={() => setActiveView('history')}
-              className="w-full py-3.5 rounded-2xl bg-white dark:bg-[#101a33] border border-slate-200 dark:border-slate-800 text-sm font-black text-slate-800 dark:text-slate-100 flex items-center justify-center gap-2 mb-3"
-            >
-              <History className="w-5 h-5 text-blue-500" />الفواتير السابقة ({subscriberToEdit.invoicesHistory?.length || 0})
-            </button>
-
             <div className="bg-white dark:bg-[#101a33] border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-sm">
               <DetailRow label="رقم الهاتف" value={subscriberToEdit.phone ? <span dir="ltr">{subscriberToEdit.phone}</span> : '—'} />
               <DetailRow label="الكابينة" value={subscriberToEdit.lineName || subscriberToEdit.line || '—'} strong />
@@ -119,6 +111,15 @@ const firstPage = `        {activeView === 'profile' && !isEditing && subscriber
                   <Sliders className="w-5 h-5" />تسديد مخصص / جزئي
                 </button>
               )}
+
+              {/* PREVIOUS_INVOICES_BELOW_PAYMENT_V1 */}
+              <button
+                type="button"
+                onClick={() => setActiveView('history')}
+                className="w-full py-3.5 rounded-2xl bg-white dark:bg-[#101a33] border border-slate-200 dark:border-slate-800 text-sm font-black text-slate-800 dark:text-slate-100 flex items-center justify-center gap-2"
+              >
+                <History className="w-5 h-5 text-blue-500" />الفواتير السابقة ({subscriberToEdit.invoicesHistory?.length || 0})
+              </button>
             </div>
           </div>
 `;
@@ -130,8 +131,12 @@ if (source.includes('<Phone ')) throw new Error('Subscriber WhatsApp layout: pho
 if (!source.includes('WHATSAPP_PRIMARY_ACTION_V1')) throw new Error('Subscriber WhatsApp layout: primary WhatsApp action missing');
 if (!source.includes('disabled={!hasWhatsAppPhone}')) throw new Error('Subscriber WhatsApp layout: WhatsApp phone-state guard missing');
 if (!source.includes('LOWER_PAYMENT_ACTIONS_V1')) throw new Error('Subscriber WhatsApp layout: lower payment actions missing');
+if (!source.includes('PREVIOUS_INVOICES_BELOW_PAYMENT_V1')) throw new Error('Subscriber WhatsApp layout: previous invoices position marker missing');
 if (!source.includes('تسديد مخصص / جزئي')) throw new Error('Subscriber WhatsApp layout: custom payment action missing');
 if (!source.includes('إلغاء التسديد')) throw new Error('Subscriber WhatsApp layout: cancel payment action missing');
+const lowerActionsPos = source.indexOf('LOWER_PAYMENT_ACTIONS_V1');
+const invoiceButtonPos = source.indexOf('PREVIOUS_INVOICES_BELOW_PAYMENT_V1');
+if (lowerActionsPos < 0 || invoiceButtonPos <= lowerActionsPos) throw new Error('Subscriber WhatsApp layout: previous invoices must remain below payment actions');
 
 fs.writeFileSync(path, source, 'utf8');
-console.log('Subscriber profile now has a large phone-aware WhatsApp action, no call button, and lower cancel/custom payment actions.');
+console.log('Subscriber profile keeps payment behavior unchanged and shows previous invoices below cancel/custom payment actions.');
