@@ -128,14 +128,16 @@ if (!receipt.includes('MOLDATK_SCREEN_PRINT_MOTION_V2')) {
   receipt = receipt.slice(0, insertAt) + motion + receipt.slice(insertAt);
 }
 
-receipt = receipt.replace(
-  /<div id="thermal-receipt-printable" className="bg-white text-slate-950 rounded-xl p-3 shadow-lg border border-slate-300 w-\[260px\] text-xs">/,
-  `<div
+if (!receipt.includes('receipt-screen-printing')) {
+  receipt = receipt.replace(
+    /<div id="thermal-receipt-printable" className="([^"]+)">/,
+    (_match, baseClass) => `<div
             key={printAnimationKey}
             id="thermal-receipt-printable"
-            className={\`bg-white text-slate-950 rounded-xl p-3 shadow-lg border border-slate-300 w-[260px] text-xs \${autoPrint && printAnimationKey === 0 ? 'receipt-awaiting-print' : ''} \${printAnimationKey > 0 ? 'receipt-screen-printing' : ''}\`}
+            className={\`${baseClass} \${autoPrint && printAnimationKey === 0 ? 'receipt-awaiting-print' : ''} \${printAnimationKey > 0 ? 'receipt-screen-printing' : ''}\`}
           >`
-);
+  );
+}
 
 receipt = receipt.replace(
   "    const timer = window.setTimeout(() => { void handlePrint(); }, 450);",
@@ -146,7 +148,9 @@ write(receiptPath, receipt);
 const cssPath = 'src/index.css';
 let css = read(cssPath);
 if (!css) throw new Error('Subscriber first-page patch: index.css missing');
-const motionStart = css.indexOf('/*\n * حركة إيصال التسديد:');
+const oldMotionStart = css.indexOf('/*\n * حركة إيصال التسديد:');
+const ownMotionStart = css.indexOf('/*\n * MOLDATK_SCREEN_PRINT_MOTION_V2');
+const motionStart = ownMotionStart >= 0 ? ownMotionStart : oldMotionStart;
 const protectionStart = css.indexOf('/* حماية واجهة الهاتف', motionStart >= 0 ? motionStart : 0);
 const newMotionCss = `/*
  * MOLDATK_SCREEN_PRINT_MOTION_V2
