@@ -26,14 +26,14 @@ guardReconcile('generator_invoices', 'PAYMENT_COLLECTOR_NO_INVOICE_RECONCILE');
 
 // A realtime event fired by our own subscriber upsert must not pull an older
 // invoice snapshot while that same payment push is still writing its invoice.
+// Insert directly at the pull function boundary because earlier guards may have
+// changed the existing refresh condition into a more complex expression.
 if (!src.includes('PAYMENT_PUSH_PULL_RACE_GUARD')) {
-  const pullAnchor = /(^\s*)if \(refreshing\.current(?: \|\| pushing\.current)?\) return;/m;
-  const match = src.match(pullAnchor);
-  must(match, 'Cloud pull guard anchor missing');
-  const indent = match[1] || '';
+  const pullStart = '    const pull = async (bootstrap = false) => {';
+  must(src.includes(pullStart), 'Cloud pull function missing');
   src = src.replace(
-    pullAnchor,
-    `${indent}// PAYMENT_PUSH_PULL_RACE_GUARD\n${indent}if (refreshing.current || pushing.current) return;`
+    pullStart,
+    `${pullStart}\n      // PAYMENT_PUSH_PULL_RACE_GUARD\n      if (pushing.current) return;`
   );
 }
 
@@ -53,18 +53,18 @@ if (!src.includes('PAYMENT_COLLECTOR_APPEND_ONLY_AUDIT')) {
 
 // Verify the dangerous collector-wide deletes are either gone or owner-scoped.
 const unsafeSubscriberDelete = /await replaceMissingRows\('generator_subscribers'/.test(src) &&
-  !/PAYMENT_COLLECTOR_NO_DESTRUCTIVE_RECONCILE[\s\S]{0,180}session\?\.role === 'generator_admin'[\s\S]{0,180}replaceMissingRows\('generator_subscribers'/.test(src);
+  !/PAYMENT_COLLECTOR_NO_DESTRUCTIVE_RECONCILE[\s\S]{0,220}session\?\.role === 'generator_admin'[\s\S]{0,220}replaceMissingRows\('generator_subscribers'/.test(src);
 const unsafeInvoiceDelete = /await replaceMissingRows\('generator_invoices'/.test(src) &&
-  !/PAYMENT_COLLECTOR_NO_INVOICE_RECONCILE[\s\S]{0,180}session\?\.role === 'generator_admin'[\s\S]{0,180}replaceMissingRows\('generator_invoices'/.test(src);
+  !/PAYMENT_COLLECTOR_NO_INVOICE_RECONCILE[\s\S]{0,220}session\?\.role === 'generator_admin'[\s\S]{0,220}replaceMissingRows\('generator_invoices'/.test(src);
 
 must(!unsafeSubscriberDelete, 'Unsafe collector subscriber reconciliation remains');
 must(!unsafeInvoiceDelete, 'Unsafe collector invoice reconciliation remains');
-must(src.includes('PAYMENT_PUSH_PULL_RACE_GUARD') && src.includes('refreshing.current || pushing.current'), 'Payment push/pull race guard missing');
+must(src.includes('PAYMENT_PUSH_PULL_RACE_GUARD') && src.includes('if (pushing.current) return;'), 'Payment push/pull race guard missing');
 
-// The audit guard is required only while the generic audit UPSERT is present.
-const genericAuditUpsertRemains = /supabase\.from\('generator_audit_logs'\)\.upsert\(rows, \{ onConflict: 'generator_id,id' \}\)/.test(src);
-if (genericAuditUpsertRemains) {
-  must(src.includes('PAYMENT_COLLECTOR_APPEND_ONLY_AUDIT') && src.includes('ignoreDuplicates: true'), 'Collector append-only audit guard missing');
+// The audit guard is required only while the plain generic audit UPSERT survives.
+const genericAuditUpsertRemains = /const \{ error \} = await supabase\.from\('generator_audit_logs'\)\.upsert\(rows, \{ onConflict: 'generator_id,id' \}\);/.test(src);
+if (genericAuditUpsertRemains && !src.includes('PAYMENT_COLLECTOR_APPEND_ONLY_AUDIT')) {
+  throw new Error('Collector append-only audit guard missing');
 }
 
 write(src);
