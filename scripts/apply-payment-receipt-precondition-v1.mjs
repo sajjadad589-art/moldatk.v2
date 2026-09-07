@@ -31,8 +31,43 @@ if (!src.includes('المسدد سابقاً') || !src.includes('المتبقي 
   src = src.slice(0, openTagEnd + 1) + insertion + src.slice(openTagEnd + 1);
 }
 
+// Prepare a markup-independent receipt feed state before later visual patches run.
+if (!/\buseState\b/.test(src.split('\n')[0] || '')) {
+  src = src.replace(/import React, \{([^}]*)\} from 'react';/, (_m, names) => {
+    const parts = String(names).split(',').map(x => x.trim()).filter(Boolean);
+    if (!parts.includes('useState')) parts.push('useState');
+    return `import React, { ${parts.join(', ')} } from 'react';`;
+  });
+}
+if (!src.includes('const [isReceiptFeeding, setIsReceiptFeeding]')) {
+  src = src.replace(/(\s+const lastAutoPrintedReceiptRef = useRef\([^\n]+\);)/, `$1\n  const [isReceiptFeeding, setIsReceiptFeeding] = useState(false);`);
+}
+if (!src.includes('data-feed-animation="moldatk-receipt-feed"')) {
+  src = src.replace(
+    'id="thermal-receipt-printable"',
+    'id="thermal-receipt-printable" data-feed-animation="moldatk-receipt-feed" data-printing={isReceiptFeeding ? "true" : "false"}'
+  );
+}
+
+// Auto print from the real payment flow, animate for the same window, then close.
+if (!src.includes('MOLDATK_AUTO_CLOSE_AFTER_PRINT_V1')) {
+  src = src.replace(
+    /\s*const timer = window\.setTimeout\(\(\) => \{\s*void handlePrint\(\);\s*\},\s*\d+\);\s*return \(\) => window\.clearTimeout\(timer\);/,
+    `\n    // MOLDATK_AUTO_CLOSE_AFTER_PRINT_V1\n    setIsReceiptFeeding(true);\n    const timer = window.setTimeout(() => {\n      void handlePrint();\n      window.setTimeout(() => {\n        setIsReceiptFeeding(false);\n        onClose();\n      }, 2200);\n    }, 260);\n    return () => window.clearTimeout(timer);`
+  );
+}
+
 if (!src.includes('receiptSnapshot || isPaid')) throw new Error('Receipt snapshot finalized guard could not be wired');
+if (!src.includes('data-feed-animation="moldatk-receipt-feed"')) throw new Error('Receipt feed data marker could not be wired');
 fs.writeFileSync(path, src, 'utf8');
+
+// Add the animation using a data attribute so it survives arbitrary className rewrites.
+const cssPath = 'src/index.css';
+let css = fs.existsSync(cssPath) ? fs.readFileSync(cssPath, 'utf8') : '';
+if (!css.includes('MOLDATK_RECEIPT_FEED_DATA_V1')) {
+  css += `\n/* MOLDATK_RECEIPT_FEED_DATA_V1 */\n@keyframes moldatk-receipt-feed-data {\n  0% { transform: translateY(-38%); clip-path: inset(0 0 78% 0 round 12px); opacity:.72; }\n  35% { opacity:1; }\n  100% { transform:translateY(0); clip-path:inset(0 0 0 0 round 12px); opacity:1; }\n}\n#thermal-receipt-printable[data-printing="true"] { animation:moldatk-receipt-feed-data 1.85s cubic-bezier(.22,.8,.24,1) both; transform-origin:top center; }\n`;
+  fs.writeFileSync(cssPath, css, 'utf8');
+}
 
 // The established monthly dashboard code is already covered by the accountant audit and
 // intentionally uses active-month semantics. Older payment patches look for a different
@@ -46,4 +81,4 @@ for (const dashboardPath of ['src/components/DashboardView.tsx', 'src/components
   }
 }
 
-console.log('Prepared resilient payment receipt guards while preserving audited monthly dashboard semantics.');
+console.log('Prepared resilient payment receipt guards, animated feed and automatic close while preserving audited monthly dashboard semantics.');
