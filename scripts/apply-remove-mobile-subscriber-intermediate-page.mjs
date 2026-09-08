@@ -68,3 +68,8 @@ await import('./apply-subscriber-payment-button-position.mjs');
 // iPhone-only PWA install assistant. This runs last so earlier brand/PWA build patches
 // cannot remove the Safari installation helper from the final production HTML.
 await import('./apply-ios-safari-install.mjs');
+
+// Absolute final collector QA pass. Keep it after all historic POS/cloud mutations so
+// cash settlement, partial-payment carry, free-subscriber filtering and collector RLS
+// safety are the state that actually reaches Vite/production.
+await import('./apply-collector-payment-integrity-fix.mjs');
