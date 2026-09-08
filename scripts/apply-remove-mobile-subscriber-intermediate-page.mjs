@@ -64,3 +64,7 @@ await import('./apply-subscriber-whatsapp-action-layout.mjs');
 // Visual-only final pass: keep the existing payment handler untouched, but place the
 // main subscriber payment button directly below the details card (above custom/cancel).
 await import('./apply-subscriber-payment-button-position.mjs');
+
+// iPhone-only PWA install assistant. This runs last so earlier brand/PWA build patches
+// cannot remove the Safari installation helper from the final production HTML.
+await import('./apply-ios-safari-install.mjs');
