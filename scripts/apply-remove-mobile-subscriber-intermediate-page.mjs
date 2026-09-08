@@ -60,3 +60,7 @@ await import('./apply-dashboard-outstanding-status-fix.mjs');
 // Final subscriber action layout: large WhatsApp at the top of the first page,
 // no call action, and cancellation/custom payment controls moved to the lower action area.
 await import('./apply-subscriber-whatsapp-action-layout.mjs');
+
+// Visual-only final pass: keep the existing payment handler untouched, but place the
+// main subscriber payment button directly below the details card (above custom/cancel).
+await import('./apply-subscriber-payment-button-position.mjs');
