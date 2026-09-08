@@ -11,9 +11,13 @@ source = source.replace(/\n\s*const handleCall = \(\) => \{[\s\S]*?\n\s*\};\n/, 
 
 // WhatsApp availability follows the stored phone value. Keep the button visible even
 // when unavailable, but disable it until a phone number containing digits is present.
-const whatsappStart = source.indexOf('  const handleWhatsApp = () => {');
+// This pass runs more than once in CI (lint, then build), so replace the ENTIRE helper
+// region rather than starting at handleWhatsApp and accidentally duplicating constants.
+const helperStart = source.indexOf('  const whatsappDigits =');
+const handlerStart = source.indexOf('  const handleWhatsApp = () => {');
+const whatsappStart = helperStart >= 0 && helperStart < handlerStart ? helperStart : handlerStart;
 const whatsappEnd = whatsappStart >= 0 ? source.indexOf('\n\n  const handleDelete', whatsappStart) : -1;
-if (whatsappStart < 0 || whatsappEnd < 0) throw new Error('Subscriber WhatsApp layout: handleWhatsApp block missing');
+if (whatsappStart < 0 || whatsappEnd < 0) throw new Error('Subscriber WhatsApp layout: WhatsApp helper block missing');
 
 const whatsappHandler = `  const whatsappDigits = subscriberToEdit?.phone?.replace(/\\D/g, '') || '';
   const hasWhatsAppPhone = whatsappDigits.length > 0;
@@ -138,5 +142,12 @@ const lowerActionsPos = source.indexOf('LOWER_PAYMENT_ACTIONS_V1');
 const invoiceButtonPos = source.indexOf('PREVIOUS_INVOICES_BELOW_PAYMENT_V1');
 if (lowerActionsPos < 0 || invoiceButtonPos <= lowerActionsPos) throw new Error('Subscriber WhatsApp layout: previous invoices must remain below payment actions');
 
+const whatsappDigitsCount = (source.match(/const whatsappDigits =/g) || []).length;
+const hasWhatsAppPhoneCount = (source.match(/const hasWhatsAppPhone =/g) || []).length;
+const handleWhatsAppCount = (source.match(/const handleWhatsApp =/g) || []).length;
+if (whatsappDigitsCount !== 1 || hasWhatsAppPhoneCount !== 1 || handleWhatsAppCount !== 1) {
+  throw new Error(`Subscriber WhatsApp layout: helper declarations must be unique (digits=${whatsappDigitsCount}, enabled=${hasWhatsAppPhoneCount}, handler=${handleWhatsAppCount})`);
+}
+
 fs.writeFileSync(path, source, 'utf8');
-console.log('Subscriber profile keeps payment behavior unchanged and shows previous invoices below cancel/custom payment actions.');
+console.log('Subscriber profile WhatsApp/payment layout is idempotent and preserves one phone-state helper set.');
