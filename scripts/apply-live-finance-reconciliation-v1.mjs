@@ -54,9 +54,11 @@ const must = (v, m) => { if (!v) throw new Error(`Live finance reconciliation: $
       s = s.replace(baseInvoices, "const invoices = subscribers.flatMap(sub => (sub.invoicesHistory || []).map(inv => normalizeInvoiceForSubscriber(sub, inv)));");
     }
 
-    const pullBlock = `        writeLocal(localKeys.subscribers, (subs.data || []).map((row: any) => {\n          const subscriber = rowToSubscriber(row);\n          return { ...subscriber, invoicesHistory: invoiceMap.get(subscriber.id) || [] };\n        }));`;
-    must(s.includes(pullBlock), 'cloud subscriber pull assembly missing');
-    s = s.replace(pullBlock, `        writeLocal(localKeys.subscribers, (subs.data || []).map((row: any) => {\n          const subscriber = rowToSubscriber(row);\n          const history = (invoiceMap.get(subscriber.id) || []).map(inv => normalizeInvoiceForSubscriber(subscriber, inv));\n          if (isPermanentFreeSubscriber(subscriber)) {\n            return { ...subscriber, paymentStatus: 'free', amountDue: 0, amountPaid: 0, invoicesHistory: history };\n          }\n          return { ...subscriber, invoicesHistory: history };\n        }));`);
+    // Tombstone patches may add a .filter(...) before this map, so patch the stable
+    // map return rather than requiring the whole writeLocal expression to match exactly.
+    const pullReturn = "          return { ...subscriber, invoicesHistory: invoiceMap.get(subscriber.id) || [] };";
+    must(s.includes(pullReturn), 'cloud subscriber pull return missing');
+    s = s.replace(pullReturn, `          const history = (invoiceMap.get(subscriber.id) || []).map(inv => normalizeInvoiceForSubscriber(subscriber, inv));\n          if (isPermanentFreeSubscriber(subscriber)) {\n            return { ...subscriber, paymentStatus: 'free', amountDue: 0, amountPaid: 0, invoicesHistory: history };\n          }\n          return { ...subscriber, invoicesHistory: history };`);
   }
 
   // A previous installed collector build may leave moldatk_pending_sync=1 even though all
