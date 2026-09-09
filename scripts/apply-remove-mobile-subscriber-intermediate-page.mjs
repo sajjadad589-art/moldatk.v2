@@ -74,6 +74,10 @@ await import('./apply-ios-safari-install.mjs');
 // safety are the state that actually reaches Vite/production.
 await import('./apply-collector-payment-integrity-fix.mjs');
 
+// Make the final finance scripts safe when lint and build mutate the same checkout.
+// This prevents a second collector accounting block from being injected on build.
+await import('./patch-final-finance-idempotence-v2.mjs');
+
 // Collector dashboard numbers must be derived after the payment/ledger finalizer so
 // every headline card and every debtor row uses the exact same canonical balances.
 await import('./apply-collector-dashboard-accounting-fix.mjs');
