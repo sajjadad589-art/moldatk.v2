@@ -90,3 +90,8 @@ await import('./apply-onboarding-debt-lump-settlement-final.mjs');
 // A zero-current-charge onboarding marker is a billing decision, not a payment. Prevent
 // the ordinary paid-state UI from offering a fake cancellation that would recreate debt.
 await import('./apply-onboarding-payment-guard.mjs');
+
+// Absolute final collector/manager parity pass. It removes free settlement from the
+// collector UI, preserves custom + lump settlement, and closes the cloud-sync race that
+// could otherwise drop an audit/payment detail written during an active push.
+await import('./apply-collector-manager-sync-payment-parity-final.mjs');
