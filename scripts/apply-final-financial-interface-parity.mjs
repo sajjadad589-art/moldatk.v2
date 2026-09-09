@@ -29,6 +29,9 @@ const must = (v, m) => { if (!v) throw new Error(`Final financial parity: ${m}`)
   const replacement = `  // COLLECTOR_OWNER_ACCOUNTING_PARITY_V2
   // Same classifier used by MobileDashboard/DashboardView/WalletView. The collector
   // only narrows the population by assigned cabinets; payment status semantics stay identical.
+  const billingCycleActive = pricingTiers.some(t =>
+    t.type !== 'free' && (Number(t.pricePerAmpere || 0) > 0 || Number(t.fixedFee || 0) > 0)
+  );
   const collectorAccountingRows = collectibleSubscribers.map(sub => {
     const row = getSubscriberFinancialRow(sub, pricingTiers, activeMonthId);
     return {
@@ -45,9 +48,10 @@ const must = (v, m) => { if (!v) throw new Error(`Final financial parity: ${m}`)
     collectorAccountingRows.map(row => [row.sub.id, row] as const)
   );
 
-  const dashboardAccountingRows = selectedLineFilter === 'all'
+  const cabinetAccountingRows = selectedLineFilter === 'all'
     ? collectorAccountingRows
     : collectorAccountingRows.filter(row => row.sub.lineId === selectedLineFilter);
+  const dashboardAccountingRows = billingCycleActive ? cabinetAccountingRows : [];
 
   const totalCollected = dashboardAccountingRows.reduce((sum, row) => sum + row.collected, 0);
   const totalUnpaid = dashboardAccountingRows.reduce((sum, row) => sum + row.outstanding, 0);
@@ -55,14 +59,14 @@ const must = (v, m) => { if (!v) throw new Error(`Final financial parity: ${m}`)
     row.status === 'paid' && row.outstanding === 0 && row.billed > 0
   );
 
-  const paidSubscribersList = filteredSubs.filter(sub => {
+  const paidSubscribersList = billingCycleActive ? filteredSubs.filter(sub => {
     const row = collectorAccountingById.get(sub.id);
     return Boolean(row && row.status === 'paid' && row.outstanding === 0 && row.billed > 0);
-  });
-  const unpaidSubscribersList = filteredSubs.filter(sub => {
+  }) : [];
+  const unpaidSubscribersList = billingCycleActive ? filteredSubs.filter(sub => {
     const row = collectorAccountingById.get(sub.id);
     return Boolean(row && (row.outstanding > 0 || row.status === 'unpaid' || row.status === 'partial'));
-  });
+  }) : [];
 
   const activeTier = pricingTiers.find(t => t.type === 'normal')
     || pricingTiers.find(t => t.type !== 'free');
@@ -77,6 +81,63 @@ const must = (v, m) => { if (!v) throw new Error(`Final financial parity: ${m}`)
   must(s.includes('const totalCollected = dashboardAccountingRows.reduce'), 'collector collected amount is not authoritative');
   must(s.includes('const totalUnpaid = dashboardAccountingRows.reduce'), 'collector outstanding amount is not authoritative');
 
+  write(p, s);
+}
+
+// -----------------------------------------------------------------------------
+// Owner dashboards: keep the authoritative accounting source while restoring the
+// monthly-cycle invariant: with no live tariff, CURRENT-month dashboard counters and
+// amounts are zero. Historical invoices remain preserved in reports/history.
+// -----------------------------------------------------------------------------
+{
+  const p = 'src/components/mobile/MobileDashboard.tsx';
+  let s = read(p);
+  const start = s.indexOf('  // AUTHORITATIVE_FINANCE_V2');
+  const end = start >= 0 ? s.indexOf('\n\n  const circleLength =', start) : -1;
+  must(start >= 0 && end > start, 'mobile authoritative block missing');
+  const block = `  // AUTHORITATIVE_FINANCE_V2
+  const billingCycleActive = pricingTiers.some(t =>
+    t.type !== 'free' && (Number(t.pricePerAmpere || 0) > 0 || Number(t.fixedFee || 0) > 0)
+  );
+  const dashboardSummary = summarizeSubscribers(subscribers, pricingTiers, activeMonthId);
+  const dashboardRowById = new Map(dashboardSummary.rows.map(row => [row.sub.id, row] as const));
+  const isPaidThisMonth = (sub: Subscriber) => {
+    const row = dashboardRowById.get(sub.id);
+    return Boolean(row && row.status === 'paid' && row.outstanding === 0 && row.bill > 0);
+  };
+  const isUnpaidThisMonth = (sub: Subscriber) => {
+    const row = dashboardRowById.get(sub.id);
+    return Boolean(row && (row.outstanding > 0 || row.status === 'unpaid' || row.status === 'partial'));
+  };
+  const totalSubscribers = subscribers.length;
+  const paidSubs = billingCycleActive ? subscribers.filter(isPaidThisMonth) : [];
+  const unpaidSubs = billingCycleActive ? subscribers.filter(isUnpaidThisMonth) : [];
+  const totalCollectedRevenue = billingCycleActive ? dashboardSummary.collected : 0;
+  const totalUnpaidDebt = billingCycleActive ? dashboardSummary.outstanding : 0;
+  const currentMonthTotal = billingCycleActive ? dashboardSummary.monthTotal : 0;`;
+  s = s.slice(0, start) + block + s.slice(end);
+  write(p, s);
+}
+
+{
+  const p = 'src/components/DashboardView.tsx';
+  let s = read(p);
+  const start = s.indexOf('  // AUTHORITATIVE_FINANCE_V2');
+  const end = start >= 0 ? s.indexOf('\n\n  return (', start) : -1;
+  must(start >= 0 && end > start, 'desktop authoritative block missing');
+  const block = `  // AUTHORITATIVE_FINANCE_V2
+  const billingCycleActive = pricingTiers.some(t =>
+    t.type !== 'free' && (Number(t.pricePerAmpere || 0) > 0 || Number(t.fixedFee || 0) > 0)
+  );
+  const dashboardSummary = summarizeSubscribers(subscribers, pricingTiers, activeMonthId);
+  const totalCount = subscribers.length;
+  const paidSubscribers = billingCycleActive ? dashboardSummary.paidSubscribers : [];
+  const unpaidSubscribers = billingCycleActive ? dashboardSummary.unpaidSubscribers : [];
+  const totalUnpaidDebt = billingCycleActive ? dashboardSummary.outstanding : 0;
+  const totalCollectedRevenue = billingCycleActive
+    ? reconciledCashbox(dashboardSummary.collected, auditLogs, walletResetTimestamp, activeMonthId)
+    : 0;`;
+  s = s.slice(0, start) + block + s.slice(end);
   write(p, s);
 }
 
@@ -137,10 +198,17 @@ const must = (v, m) => { if (!v) throw new Error(`Final financial parity: ${m}`)
 
   must(ownerMobile.includes('summarizeSubscribers('), 'mobile owner dashboard not using authoritative accounting');
   must(ownerDesktop.includes('summarizeSubscribers('), 'desktop owner dashboard not using authoritative accounting');
+  must(ownerMobile.includes('const billingCycleActive = pricingTiers.some'), 'mobile zero-tariff gate missing');
+  must(ownerMobile.includes('const paidSubs = billingCycleActive ? subscribers.filter(isPaidThisMonth) : [];'), 'mobile paid counter not gated by live tariff');
+  must(ownerMobile.includes('const currentMonthTotal = billingCycleActive'), 'mobile monthly total not gated by live tariff');
+  must(ownerDesktop.includes('const billingCycleActive = pricingTiers.some'), 'desktop zero-tariff gate missing');
+  must(ownerDesktop.includes('const paidSubscribers = billingCycleActive'), 'desktop paid counter not gated by live tariff');
+  must(ownerDesktop.includes('const totalUnpaidDebt = billingCycleActive'), 'desktop unpaid amount not gated by live tariff');
   must(wallet.includes('summarizeSubscribers('), 'cashbox/wallet not using authoritative accounting');
   must(wallet.includes('pricingTiers,'), 'wallet missing pricing tiers binding');
   must(wallet.includes('activeMonthId,'), 'wallet missing active month binding');
   must(pos.includes('getSubscriberFinancialRow('), 'collector dashboard not using owner financial classifier');
+  must(pos.includes('const billingCycleActive = pricingTiers.some'), 'collector zero-tariff gate missing');
   must(accounting.includes("r.status === 'paid' && r.outstanding === 0 && r.bill > 0"), 'owner paid classifier invariant missing');
   must(accounting.includes("r.outstanding > 0 || r.status === 'unpaid' || r.status === 'partial'"), 'owner unpaid classifier invariant missing');
 
@@ -162,4 +230,4 @@ const must = (v, m) => { if (!v) throw new Error(`Final financial parity: ${m}`)
   must(!mobileSubscribers.includes('if (selectedSubscriber)'), 'redundant mobile subscriber page returned');
 }
 
-console.log('Final financial/interface parity passed: owner and collector share one paid/unpaid classifier; wallet bindings, payment, receipt and realtime-sync invariants are intact.');
+console.log('Final financial/interface parity passed: owner and collector share one paid/unpaid classifier; zero-tariff dashboard state, wallet bindings, payment, receipt and realtime-sync invariants are intact.');
