@@ -77,3 +77,7 @@ await import('./apply-collector-payment-integrity-fix.mjs');
 // Collector dashboard numbers must be derived after the payment/ledger finalizer so
 // every headline card and every debtor row uses the exact same canonical balances.
 await import('./apply-collector-dashboard-accounting-fix.mjs');
+
+// Final accounting source of truth for owner/mobile/desktop dashboards, subscriber
+// cards and the wallet balance. This must run after every historic accounting patch.
+await import('./apply-authoritative-financial-summary-v1.mjs');
