@@ -100,27 +100,48 @@ const replaceBlock = (src, pattern, replacement, label) => {
   write(path, s);
 }
 
-// 4) Dashboard wallet: القاصة تعتمد على السجل بعد التصفير وتطرح الإلغاءات.
+// 4) Dashboard wallet: legacy dashboard used an audit-log subtraction formula. Newer
+// authoritative finance owns cancellation reconciliation through reconciledCashbox().
+// During lint -> build the same tree is mutated twice, so never overwrite/fail the
+// authoritative form on the second pass.
 {
   const path = 'src/components/DashboardView.tsx';
   let s = read(path);
+  const authoritativeDashboard =
+    s.includes('AUTHORITATIVE_FINANCE_V2') &&
+    s.includes('reconciledCashbox(') &&
+    s.includes('summarizeSubscribers(');
 
-  const dashboardReplacement = `  // القاصة تقرأ من سجل العمليات بعد آخر تصفير: التسديد يزيد، والإلغاء ينقص.\n  const totalCollectedRevenue = auditLogs\n    .filter(log => {\n      if (log.category !== 'payment' && log.category !== 'cancellation') return false;\n      if (resetTimeMs > 0) {\n        const logTime = log.timestamp ? new Date(log.timestamp).getTime() : 0;\n        if (logTime > 0 && logTime < resetTimeMs) return false;\n      }\n      return true;\n    })\n    .reduce((acc, log) => {\n      const amount = Math.abs(Number(log.amount) || 0);\n      return log.category === 'cancellation' ? acc - amount : acc + amount;\n    }, 0);`;
+  if (!authoritativeDashboard) {
+    const dashboardReplacement = `  // القاصة تقرأ من سجل العمليات بعد آخر تصفير: التسديد يزيد، والإلغاء ينقص.\n  const totalCollectedRevenue = auditLogs\n    .filter(log => {\n      if (log.category !== 'payment' && log.category !== 'cancellation') return false;\n      if (resetTimeMs > 0) {\n        const logTime = log.timestamp ? new Date(log.timestamp).getTime() : 0;\n        if (logTime > 0 && logTime < resetTimeMs) return false;\n      }\n      return true;\n    })\n    .reduce((acc, log) => {\n      const amount = Math.abs(Number(log.amount) || 0);\n      return log.category === 'cancellation' ? acc - amount : acc + amount;\n    }, 0);`;
 
-  s = s.replace(/  const totalCollectedRevenue = auditLogs[\s\S]*?\n\n  \/\/ حساب الديون/, `${dashboardReplacement}\n\n  // حساب الديون`);
-  must(s.includes("log.category !== 'payment' && log.category !== 'cancellation'"), 'Dashboard cancellation subtraction missing');
+    s = s.replace(/  const totalCollectedRevenue = auditLogs[\s\S]*?\n\n  \/\/ حساب الديون/, `${dashboardReplacement}\n\n  // حساب الديون`);
+    must(s.includes("log.category !== 'payment' && log.category !== 'cancellation'"), 'Dashboard cancellation subtraction missing');
+  } else {
+    console.log('skip: legacy dashboard cancellation formula; authoritative reconciliation already active');
+  }
   write(path, s);
 }
 
-// 5) Wallet page: القاصة تطرح الإلغاءات وتظهر المبلغ صحيح.
+// 5) Wallet page: legacy wallet uses audit rows directly. If authoritative wallet is
+// already present, preserve it; reconciledCashbox() includes cancellation/reset logic.
 {
   const path = 'src/components/WalletView.tsx';
   let s = read(path);
+  const authoritativeWallet =
+    s.includes('AUTHORITATIVE_WALLET_V2') &&
+    s.includes('reconciledCashbox(') &&
+    s.includes('summarizeSubscribers(');
 
-  const walletReplacement = `  const totalCollected = financialLogs\n    .filter(log => log.category === 'payment' || log.category === 'cancellation')\n    .reduce((acc, log) => {\n      const amount = Math.abs(Number(log.amount) || 0);\n      return log.category === 'cancellation' ? acc - amount : acc + amount;\n    }, 0);\n\n`;
+  if (!authoritativeWallet) {
+    const walletReplacement = `  const totalCollected = financialLogs\n    .filter(log => log.category === 'payment' || log.category === 'cancellation')\n    .reduce((acc, log) => {\n      const amount = Math.abs(Number(log.amount) || 0);\n      return log.category === 'cancellation' ? acc - amount : acc + amount;\n    }, 0);\n\n`;
 
-  s = s.replace(/  const totalCollected = financialLogs[\s\S]*?\n\n  return \(/, `${walletReplacement}  return (`);
+    s = s.replace(/  const totalCollected = financialLogs[\s\S]*?\n\n  return \(/, `${walletReplacement}  return (`);
+  } else {
+    console.log('skip: legacy wallet total; authoritative reconciliation already active');
+  }
 
+  // This is presentation-only and remains safe/idempotent in either accounting mode.
   s = s.replace(
     /\{log\.amount !== undefined && log\.amount > 0 && \([\s\S]*?<\/span>\s*\)\}/,
     `{log.amount !== undefined && Math.abs(Number(log.amount) || 0) > 0 && (\n                    <span className={\`text-sm font-black tabular-nums \${isPayment ? 'text-emerald-500' : 'text-rose-500'}\`} dir="ltr">\n                      {isPayment ? '+' : '-'}{Math.abs(Number(log.amount) || 0).toLocaleString()} {currency}\n                    </span>\n                  )}`
