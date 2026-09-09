@@ -78,6 +78,6 @@ await import('./apply-collector-payment-integrity-fix.mjs');
 // every headline card and every debtor row uses the exact same canonical balances.
 await import('./apply-collector-dashboard-accounting-fix.mjs');
 
-// Final accounting source of truth for owner/mobile/desktop dashboards, subscriber
-// cards and the wallet balance. This must run after every historic accounting patch.
-await import('./apply-authoritative-financial-summary-v1.mjs');
+// Final accounting source of truth for owner/mobile/desktop dashboards and wallet.
+// Runs after every historic accounting patch so no stale formula survives the build.
+await import('./apply-authoritative-financial-summary-v2.mjs');
