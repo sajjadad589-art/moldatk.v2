@@ -159,7 +159,7 @@ jobs:
         if: env.SHOULD_RELEASE == 'true'
         env:
           MOLDATK_SIGNING_STORE_FILE: ${{ github.workspace }}/android/app/moldatk-release.keystore
-          MOLDATK_SIGNING_STORE_PASSWORD: ${{ secrets.MOLDATK_SIGNING_STORE_PASSWORD }}
+          MOLDATK_SIGNING_STORE_PASSWORD: ${{ secrets.MOLDATK_KEYSTORE_PASSWORD }}
           MOLDATK_SIGNING_KEY_ALIAS: ${{ secrets.MOLDATK_KEY_ALIAS }}
           MOLDATK_SIGNING_KEY_PASSWORD: ${{ secrets.MOLDATK_KEY_PASSWORD }}
         run: |
