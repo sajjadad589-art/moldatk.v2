@@ -93,6 +93,9 @@ jobs:
       - name: Accountant full app audit
         run: npx tsx scripts/accountant-app-audit.ts
 
+      - name: Owner collector numeric finance parity test
+        run: npx tsx scripts/financial-parity-smoke-test.ts
+
       - name: Destructive controls safety audit
         run: npx tsx scripts/secure-destructive-controls-audit.ts
 
