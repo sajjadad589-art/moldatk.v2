@@ -82,9 +82,10 @@ await import('./apply-collector-dashboard-accounting-fix.mjs');
 // Runs after every historic accounting patch so no stale formula survives the build.
 await import('./apply-authoritative-financial-summary-v2.mjs');
 
-// New subscriber onboarding debt decision and true negotiated lump settlement must be
-// the absolute final accounting pass. It also upgrades the source-of-truth helper so
-// settled amounts, not original tariff amounts, drive owner dashboard/cashbox totals.
+// The onboarding/lump finalizer must run after authoritative finance on every pass because
+// it upgrades authoritativeAccounting with settlement/onboarding semantics. Patch the
+// finalizer itself first so lint -> build execution in the same checkout is idempotent.
+await import('./patch-onboarding-finalizer-idempotence.mjs');
 await import('./apply-onboarding-debt-lump-settlement-final.mjs');
 
 // A zero-current-charge onboarding marker is a billing decision, not a payment. Prevent
