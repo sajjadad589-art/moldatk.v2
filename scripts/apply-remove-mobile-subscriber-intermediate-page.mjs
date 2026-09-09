@@ -104,3 +104,8 @@ await import('./apply-collector-manager-sync-payment-parity-final.mjs');
 // Final cross-interface accounting gate. Collector and owner must classify the same
 // subscriber status identically, and production is blocked if payment/sync invariants drift.
 await import('./apply-final-financial-interface-parity.mjs');
+
+// Live-data reconciliation is the final financial boundary. It repairs malformed free
+// invoices on pull/push and prevents a stale collector dirty flag from overwriting newer
+// server payment state after an app upgrade.
+await import('./apply-live-finance-reconciliation-v1.mjs');
