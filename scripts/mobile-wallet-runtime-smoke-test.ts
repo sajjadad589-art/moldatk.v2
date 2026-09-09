@@ -8,6 +8,7 @@ const assert = (value: unknown, message: string) => {
 const layout = read('src/components/mobile/MobileLayout.tsx');
 const app = read('src/App.tsx');
 const wallet = read('src/components/WalletView.tsx');
+const accounting = read('src/utils/authoritativeAccounting.ts');
 const dashboard = read('src/components/mobile/MobileDashboard.tsx');
 
 const walletTab = layout.indexOf("activeTab === 'wallet'");
@@ -29,7 +30,7 @@ assert(mobileBlock.includes('pricingTiers={pricingTiers}'), 'App pricing tiers n
 assert(mobileBlock.includes('activeMonthId={activeMonthRecord?.id}'), 'App active tariff month not passed to MobileLayout');
 
 assert(wallet.includes('summarizeSubscribers(subscribers, pricingTiers, activeMonthId)'), 'authoritative wallet accounting missing');
-assert(/pricingTiers\s*=\s*\[\],/.test(wallet), 'defensive wallet pricing fallback missing');
+assert(accounting.includes('tiers: SubscriptionTierPricing[] = []'), 'defensive authoritative pricing fallback missing');
 assert(dashboard.includes("onNavigateToTab('wallet')"), 'cashbox dashboard button no longer routes to wallet');
 
 console.log('Mobile cashbox runtime wiring regression: OK');
