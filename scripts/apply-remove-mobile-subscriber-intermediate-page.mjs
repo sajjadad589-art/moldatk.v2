@@ -81,3 +81,8 @@ await import('./apply-collector-dashboard-accounting-fix.mjs');
 // Final accounting source of truth for owner/mobile/desktop dashboards and wallet.
 // Runs after every historic accounting patch so no stale formula survives the build.
 await import('./apply-authoritative-financial-summary-v2.mjs');
+
+// New subscriber onboarding debt decision and true negotiated lump settlement must be
+// the absolute final accounting pass. It also upgrades the source-of-truth helper so
+// settled amounts, not original tariff amounts, drive owner dashboard/cashbox totals.
+await import('./apply-onboarding-debt-lump-settlement-final.mjs');
