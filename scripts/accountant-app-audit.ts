@@ -44,7 +44,7 @@ mustContain('src/components/mobile/MobileMonthlyReports.tsx', "setOpenList(openL
 mustContain('src/components/mobile/MobileMonthlyReports.tsx', "setOpenList(openList === 'outstanding' ? null : 'outstanding')", 'Outstanding report drill-down');
 
 // ---------------------------------------------------------------------------
-// Current-month accounting / debt carry / safe delete
+// Current-month accounting / debt carry / safe delete / interface parity
 // ---------------------------------------------------------------------------
 mustContain('src/App.tsx', 'activateMonthlyTariffForSubscribers', 'App must use tested rollover engine');
 mustContain('src/App.tsx', 'hasPaymentsInMonth', 'Deleting a paid month must be blocked');
@@ -61,17 +61,27 @@ mustContain('src/utils/monthlyAccounting.ts', 'export function activateMonthlyTa
 mustContain('src/utils/monthlyAccounting.ts', "return `${month}-${year}`;", 'Numeric month labels');
 mustContain('src/utils/monthlyTariffDeletion.ts', "throw new Error('MONTH_HAS_PAYMENTS')", 'Paid month deletion hard-stop');
 mustContain('src/components/mobile/MobileDashboard.tsx', 'activeMonthId = getMonthId()', 'Dashboard must be scoped to current month');
-mustContain('src/components/mobile/MobileDashboard.tsx', 'const currentAccount = (sub: Subscriber)', 'Dashboard current-month invoice selector');
+mustContain('src/components/mobile/MobileDashboard.tsx', 'summarizeSubscribers(subscribers, pricingTiers, activeMonthId)', 'Mobile dashboard must use authoritative current-month accounting');
 mustContain('src/components/mobile/MobileDashboard.tsx', 'const billingCycleActive = pricingTiers.some', 'Dashboard must know when no tariff is active');
 mustContain('src/components/mobile/MobileDashboard.tsx', 'const currentMonthTotal = billingCycleActive', 'Current month total must zero when tariffs are cleared');
 mustContain('src/components/mobile/MobileDashboard.tsx', 'const paidSubs = billingCycleActive', 'Paid dashboard count must zero when tariffs are cleared');
+mustContain('src/components/DashboardView.tsx', 'summarizeSubscribers(subscribers, pricingTiers, activeMonthId)', 'Desktop dashboard must use authoritative current-month accounting');
 mustContain('src/components/DashboardView.tsx', 'const paidSubscribers = billingCycleActive', 'Desktop paid dashboard count must zero when tariffs are cleared');
+mustContain('src/components/POSQuickView.tsx', 'getSubscriberFinancialRow(sub, pricingTiers, activeMonthId)', 'Collector dashboard must use the owner financial classifier');
+mustContain('src/components/POSQuickView.tsx', "row.status === 'paid' && row.outstanding === 0 && row.billed > 0", 'Collector paid rule must require authoritative paid status and zero debt');
+mustContain('src/utils/authoritativeAccounting.ts', "r.status === 'paid' && r.outstanding === 0 && r.bill > 0", 'Owner paid rule must require positive billed amount and zero debt');
+mustContain('src/utils/authoritativeAccounting.ts', "r.outstanding > 0 || r.status === 'unpaid' || r.status === 'partial'", 'Owner unpaid rule must preserve real debt/status');
 
 // ---------------------------------------------------------------------------
 // Payment path + receipt path
 // ---------------------------------------------------------------------------
 mustContain('src/components/POSQuickView.tsx', 'applyPaymentOldestFirst', 'Collector payment must allocate oldest debt first');
 mustContain('src/components/SubscriberModal.tsx', 'applyPaymentOldestFirst', 'Owner payment must allocate oldest debt first');
+mustContain('src/components/POSQuickView.tsx', 'COLLECTOR_LUMP_SETTLEMENT_V1', 'Collector lump settlement accounting');
+mustContain('src/components/SubscriberModal.tsx', 'handleLumpSettlement', 'Owner lump settlement accounting');
+mustContain('src/components/PaymentMethodModal.tsx', 'تسديد مخصص', 'Collector custom payment UI');
+mustContain('src/components/PaymentMethodModal.tsx', 'تسديد مقطوع', 'Collector lump payment UI');
+assert(!read('src/components/PaymentMethodModal.tsx').includes('<option value="free">'), 'Collector must not expose free/exemption settlement');
 mustContain('src/components/InvoiceReceiptModal.tsx', 'previousDebtBefore', 'Receipt previous debt');
 mustContain('src/components/InvoiceReceiptModal.tsx', 'appliedToPreviousDebt', 'Receipt old-debt allocation');
 mustContain('src/components/InvoiceReceiptModal.tsx', 'appliedToCurrentMonth', 'Receipt current-month allocation');
@@ -96,6 +106,12 @@ assert(allSrc.includes('moldatk-local-sync'), 'Local-first sync event must remai
 assert(allSrc.includes('refreshSession') || allSrc.includes('refresh_token') || allSrc.includes('getSession'), 'Auth/session recovery logic must remain present');
 assert(allSrc.includes('hideFloatingTriggers'), 'Floating notification trigger suppression must remain present');
 assert(allSrc.includes('moldatk-open-notifications'), 'Header notification event must remain present');
+mustContain('src/lib/useGeneratorCloudSync.ts', 'pendingPush.current = true', 'Payment/audit writes during an active sync must queue another push');
+mustContain('src/lib/useGeneratorCloudSync.ts', "table: 'generator_subscribers'", 'Realtime subscriber sync');
+mustContain('src/lib/useGeneratorCloudSync.ts', "table: 'generator_invoices'", 'Realtime invoice sync');
+mustContain('src/lib/useGeneratorCloudSync.ts', "table: 'generator_audit_logs'", 'Realtime audit sync');
+mustContain('src/lib/useGeneratorCloudSync.ts', 'COLLECTOR_SYNC_FREE_GUARD_V2', 'Collector must never resubmit owner exemptions');
+mustContain('src/components/WalletView.tsx', 'summarizeSubscribers(subscribers, pricingTiers, activeMonthId)', 'Wallet must use authoritative finance source');
 
 // ---------------------------------------------------------------------------
 // Approved subscriber status colors and free-payment protection
@@ -106,4 +122,4 @@ assert(allSrc.includes('#46515F') || allSrc.includes('slate'), 'Free state gray 
 assert(allSrc.includes('#8A2F3E') || allSrc.includes('rose'), 'Unpaid state burgundy/red styling must remain present');
 assert(allSrc.includes("paymentStatus === 'free'") || allSrc.includes("tier === 'free'"), 'Free account payment protection must remain present');
 
-console.log('Accountant app audit passed: pricing, numeric months, zero hidden fees, atomic monthly rollover, safe deletion, zero-dashboard reset, reports, debt allocation, receipts, isolation, offline sync, deletion tombstones, cashbox, notifications, colors, and free-account safeguards.');
+console.log('Accountant app audit passed: owner/collector finance parity, pricing, numeric months, zero hidden fees, atomic monthly rollover, safe deletion, zero-dashboard reset, reports, custom/lump payments, debt allocation, receipts, isolation, race-safe realtime sync, cashbox, notifications, colors, and free-account safeguards.');
