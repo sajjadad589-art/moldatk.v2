@@ -86,3 +86,7 @@ await import('./apply-authoritative-financial-summary-v2.mjs');
 // the absolute final accounting pass. It also upgrades the source-of-truth helper so
 // settled amounts, not original tariff amounts, drive owner dashboard/cashbox totals.
 await import('./apply-onboarding-debt-lump-settlement-final.mjs');
+
+// A zero-current-charge onboarding marker is a billing decision, not a payment. Prevent
+// the ordinary paid-state UI from offering a fake cancellation that would recreate debt.
+await import('./apply-onboarding-payment-guard.mjs');
