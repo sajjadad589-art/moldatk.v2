@@ -95,3 +95,7 @@ await import('./apply-onboarding-payment-guard.mjs');
 // collector UI, preserves custom + lump settlement, and closes the cloud-sync race that
 // could otherwise drop an audit/payment detail written during an active push.
 await import('./apply-collector-manager-sync-payment-parity-final.mjs');
+
+// Final cross-interface accounting gate. Collector and owner must classify the same
+// subscriber status identically, and production is blocked if payment/sync invariants drift.
+await import('./apply-final-financial-interface-parity.mjs');
