@@ -38,6 +38,7 @@ await import('./apply-live-finance-reconciliation-v1.mjs');
 await import('./apply-release-version-1-3-20.mjs');
 
 await import('./patch-recurring-ampere-discount-finalizer.mjs');
+await import('./repair-ampere-discount-submit-after-onboarding.mjs');
 await import('./apply-recurring-ampere-discount-final.mjs');
 await import('./patch-discount-dashboard-finalizer.mjs');
 await import('./apply-discount-dashboard-boxes-final.mjs');
