@@ -73,3 +73,7 @@ await import('./apply-ios-safari-install.mjs');
 // cash settlement, partial-payment carry, free-subscriber filtering and collector RLS
 // safety are the state that actually reaches Vite/production.
 await import('./apply-collector-payment-integrity-fix.mjs');
+
+// Collector dashboard numbers must be derived after the payment/ledger finalizer so
+// every headline card and every debtor row uses the exact same canonical balances.
+await import('./apply-collector-dashboard-accounting-fix.mjs');
