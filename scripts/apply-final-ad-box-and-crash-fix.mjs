@@ -79,12 +79,12 @@ await import('./apply-update-delivery-and-internal-theme-v3-fixed.mjs');
 await import('./apply-google-play-cabinet-collector-v2.mjs');
 await import('./generate-pwa-brand-icons.mjs');
 
-// The legacy compatibility assertions still target 1.3.18. Normalize either the
-// older generated 1.3.17 output or a previous 1.3.19 pass back to 1.3.18, run the
-// legacy assertions, then the v6 finalizer below upgrades everything to 1.3.19.
+// The legacy compatibility assertions still target 1.3.18. Normalize any generated
+// release output back to 1.3.18, run the legacy assertions, then the v6 finalizer below
+// upgrades everything to the current release version.
 for (const path of ['public/sw.js', 'src/main.tsx']) {
   const current = read(path);
-  if (current) write(path, current.replaceAll('1.3.17', '1.3.18').replaceAll('1.3.19', '1.3.18'));
+  if (current) write(path, current.replaceAll('1.3.17', '1.3.18').replaceAll('1.3.19', '1.3.18').replaceAll('1.3.20', '1.3.18'));
 }
 
 // Legacy brand patches still rewrite the web manifest to the old PNGs. Reassert the versioned Moldatk icon set last.
