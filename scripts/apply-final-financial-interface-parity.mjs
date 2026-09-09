@@ -40,7 +40,10 @@ const must = (v, m) => { if (!v) throw new Error(`Final financial parity: ${m}`)
       isFree: row.isFree,
     };
   });
-  const collectorAccountingById = new Map(collectorAccountingRows.map(row => [row.sub.id, row]));
+  type CollectorAccountingRow = (typeof collectorAccountingRows)[number];
+  const collectorAccountingById = new Map<string, CollectorAccountingRow>(
+    collectorAccountingRows.map(row => [row.sub.id, row] as const)
+  );
 
   const dashboardAccountingRows = selectedLineFilter === 'all'
     ? collectorAccountingRows
@@ -78,6 +81,45 @@ const must = (v, m) => { if (!v) throw new Error(`Final financial parity: ${m}`)
 }
 
 // -----------------------------------------------------------------------------
+// Wallet/cashbox: older build mutations can add the authoritative calculation while
+// missing its component destructuring. Repair the final component signature so opening
+// the cashbox never hits an undefined pricingTiers/activeMonthId reference.
+// -----------------------------------------------------------------------------
+{
+  const p = 'src/components/WalletView.tsx';
+  let s = read(p);
+
+  if (!s.includes('SubscriptionTierPricing')) {
+    s = s.replace(
+      "import { Subscriber, Collector, AuditLogEntry } from '../types';",
+      "import { Subscriber, Collector, AuditLogEntry, SubscriptionTierPricing } from '../types';"
+    );
+  }
+  if (!s.includes('  pricingTiers: SubscriptionTierPricing[];')) {
+    s = s.replace('  subscribers: Subscriber[];', '  subscribers: Subscriber[];\n  pricingTiers: SubscriptionTierPricing[];');
+  }
+  if (!s.includes('  activeMonthId?: string;')) {
+    s = s.replace('  walletResetTimestamp?: string;', '  walletResetTimestamp?: string;\n  activeMonthId?: string;');
+  }
+
+  const componentStart = s.indexOf('export const WalletView: React.FC<WalletViewProps> = ({');
+  const componentBody = componentStart >= 0 ? s.indexOf('\n}) => {', componentStart) : -1;
+  must(componentStart >= 0 && componentBody > componentStart, 'WalletView component signature missing');
+  let signature = s.slice(componentStart, componentBody);
+  if (!/\n\s*pricingTiers,/.test(signature)) {
+    signature = signature.replace(/(\n\s*subscribers,)/, '$1\n  pricingTiers,');
+  }
+  if (!/\n\s*activeMonthId,/.test(signature)) {
+    signature = signature.replace(/(\n\s*walletResetTimestamp,)/, '$1\n  activeMonthId,');
+  }
+  s = s.slice(0, componentStart) + signature + s.slice(componentBody);
+
+  must(/export const WalletView[\s\S]*?\n\s*pricingTiers,/.test(s), 'WalletView pricingTiers is not destructured');
+  must(/export const WalletView[\s\S]*?\n\s*activeMonthId,/.test(s), 'WalletView activeMonthId is not destructured');
+  write(p, s);
+}
+
+// -----------------------------------------------------------------------------
 // Cross-interface release invariants. A production build fails instead of publishing
 // if any older mutation restores conflicting accounting/payment/sync behavior.
 // -----------------------------------------------------------------------------
@@ -96,6 +138,8 @@ const must = (v, m) => { if (!v) throw new Error(`Final financial parity: ${m}`)
   must(ownerMobile.includes('summarizeSubscribers('), 'mobile owner dashboard not using authoritative accounting');
   must(ownerDesktop.includes('summarizeSubscribers('), 'desktop owner dashboard not using authoritative accounting');
   must(wallet.includes('summarizeSubscribers('), 'cashbox/wallet not using authoritative accounting');
+  must(wallet.includes('pricingTiers,'), 'wallet missing pricing tiers binding');
+  must(wallet.includes('activeMonthId,'), 'wallet missing active month binding');
   must(pos.includes('getSubscriberFinancialRow('), 'collector dashboard not using owner financial classifier');
   must(accounting.includes("r.status === 'paid' && r.outstanding === 0 && r.bill > 0"), 'owner paid classifier invariant missing');
   must(accounting.includes("r.outstanding > 0 || r.status === 'unpaid' || r.status === 'partial'"), 'owner unpaid classifier invariant missing');
@@ -118,4 +162,4 @@ const must = (v, m) => { if (!v) throw new Error(`Final financial parity: ${m}`)
   must(!mobileSubscribers.includes('if (selectedSubscriber)'), 'redundant mobile subscriber page returned');
 }
 
-console.log('Final financial/interface parity passed: owner and collector share one paid/unpaid classifier; payment, receipt and realtime-sync invariants are intact.');
+console.log('Final financial/interface parity passed: owner and collector share one paid/unpaid classifier; wallet bindings, payment, receipt and realtime-sync invariants are intact.');
