@@ -22,6 +22,13 @@ assert(walletBlock.includes('activeMonthId={activeMonthId}'), 'active month not 
 assert(walletBlock.includes('auditLogs={auditLogs}'), 'audit logs not passed to wallet');
 assert(walletBlock.includes('walletResetTimestamp={walletResetTimestamp}'), 'cashbox reset timestamp not passed');
 
+const dashboardStart = layout.indexOf('<MobileDashboard');
+const dashboardEnd = layout.indexOf('/>', dashboardStart);
+assert(dashboardStart >= 0 && dashboardEnd > dashboardStart, 'MobileDashboard call missing');
+const dashboardBlock = layout.slice(dashboardStart, dashboardEnd + 2);
+assert(dashboardBlock.includes('activeMonthId={activeMonthId}'), 'active month not passed to dashboard');
+assert(dashboardBlock.includes('cashboxAmount={mobileCashboxAmount}'), 'reconciled cashbox not passed to dashboard');
+
 const mobileStart = app.indexOf('<MobileLayout');
 const mobileEnd = app.indexOf('/>', mobileStart);
 assert(mobileStart >= 0 && mobileEnd > mobileStart, 'App MobileLayout call missing');
@@ -29,8 +36,30 @@ const mobileBlock = app.slice(mobileStart, mobileEnd + 2);
 assert(mobileBlock.includes('pricingTiers={pricingTiers}'), 'App pricing tiers not passed to MobileLayout');
 assert(mobileBlock.includes('activeMonthId={activeMonthRecord?.id}'), 'App active tariff month not passed to MobileLayout');
 
+assert(layout.includes('MOBILE_CASHBOX_SINGLE_SOURCE_V3'), 'single-source cashbox calculation missing');
+assert(
+  layout.includes('reconciledCashbox(\n    mobileCashboxSummary.collected,\n    auditLogs,\n    walletResetTimestamp,\n    activeMonthId,'),
+  'dashboard cashbox does not use the same reconciliation inputs as WalletView'
+);
 assert(wallet.includes('summarizeSubscribers(subscribers, pricingTiers, activeMonthId)'), 'authoritative wallet accounting missing');
+assert(
+  wallet.includes('reconciledCashbox(walletSummary.collected, auditLogs, walletResetTimestamp, activeMonthId)'),
+  'WalletView reconciled cashbox calculation missing'
+);
 assert(accounting.includes('tiers: SubscriptionTierPricing[] = []'), 'defensive authoritative pricing fallback missing');
 assert(dashboard.includes("onNavigateToTab('wallet')"), 'cashbox dashboard button no longer routes to wallet');
 
-console.log('Mobile cashbox runtime wiring regression: OK');
+const cashboxStart = dashboard.indexOf('      {/* 3. Cashbox */}');
+const cashboxEnd = dashboard.indexOf('      {/* 4.', cashboxStart);
+assert(cashboxStart >= 0 && cashboxEnd > cashboxStart, 'dashboard cashbox section missing');
+const cashboxSection = dashboard.slice(cashboxStart, cashboxEnd);
+assert(
+  cashboxSection.includes('{formatCurrency(cashboxAmount, generatorSpecs.currency)}'),
+  'dashboard cashbox is not bound to the reconciled cashbox prop'
+);
+assert(
+  !cashboxSection.includes('{formatCurrency(totalCollectedRevenue, generatorSpecs.currency)}'),
+  'dashboard cashbox incorrectly uses unreconciled monthly collected total'
+);
+
+console.log('Mobile cashbox runtime + amount parity regression: OK');
