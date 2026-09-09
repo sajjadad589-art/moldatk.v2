@@ -34,8 +34,8 @@ jobs:
       VITE_SUPABASE_URL: https://adluynhkikoodjljoxeu.supabase.co
       VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CObjK2Uua18kVkXCkxdRog_keQLIDiE
       VITE_ENABLE_NATIVE_PUSH: 'true'
-      CURRENT_VERSION: 1.3.19
-      CURRENT_VERSION_CODE: 23
+      CURRENT_VERSION: 1.3.20
+      CURRENT_VERSION_CODE: 24
       SHOULD_RELEASE: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release')) }}
 
     steps:
@@ -68,7 +68,7 @@ jobs:
           grep -q 'moldatk-mark.svg' src/LandingPage.tsx
           grep -q 'MOLDATK_CALM_BRAND_V2' src/index.css
           grep -q 'MOLDATK_INTERNAL_CALM_THEME_V3' src/index.css
-          grep -q 'moldatk-shell-v4-1.3.19' public/sw.js
+          grep -q 'moldatk-shell-v4-1.3.20' public/sw.js
           grep -q 'moldatk-apple-touch-v6.png' index.html
           grep -q 'moldatk-icon-192-v6.png' public/manifest.webmanifest
 
@@ -95,6 +95,9 @@ jobs:
 
       - name: Owner collector numeric finance parity test
         run: npx tsx scripts/financial-parity-smoke-test.ts
+
+      - name: Live cloud-shape finance parity test
+        run: npx tsx scripts/live-shape-financial-parity-smoke-test.ts
 
       - name: Destructive controls safety audit
         run: npx tsx scripts/secure-destructive-controls-audit.ts
@@ -156,7 +159,7 @@ jobs:
         if: env.SHOULD_RELEASE == 'true'
         env:
           MOLDATK_SIGNING_STORE_FILE: ${{ github.workspace }}/android/app/moldatk-release.keystore
-          MOLDATK_SIGNING_STORE_PASSWORD: ${{ secrets.MOLDATK_KEYSTORE_PASSWORD }}
+          MOLDATK_SIGNING_STORE_PASSWORD: ${{ secrets.MOLDATK_SIGNING_STORE_PASSWORD }}
           MOLDATK_SIGNING_KEY_ALIAS: ${{ secrets.MOLDATK_KEY_ALIAS }}
           MOLDATK_SIGNING_KEY_PASSWORD: ${{ secrets.MOLDATK_KEY_PASSWORD }}
         run: |
@@ -192,7 +195,7 @@ jobs:
           else
             gh release create "$TAG" release/Moldatk-Android-Release.apk release/Moldatk-Android-Release.aab \
               --title "مولدتك ${CURRENT_VERSION}" \
-              --notes "إصلاح واجهة الجباة الفعلية: اختيار عدة كابينات بمربعات تأشير أو اختيار الكل، إخفاء الكابينات غير المسموحة من صفحة الجابي، حفظ التخصيص على السيرفر، وتصحيح أيقونة مولدتك على iPhone/PWA مع كسر الكاش القديم."
+              --notes "إصلاح محاسبي إلزامي: توحيد عدد المسددين وأرقام الجباية بين المدير والجابي، إصلاح مزامنة الحالة المالية القديمة، ومنع أي فاتورة مالية للمشترك المجاني من التأثير على الداشبورد أو القاصة."
           fi
 
       - name: Activate in-app update manifest
@@ -209,7 +212,7 @@ jobs:
             minimumVersionCode: versionCode,
             force: true,
             apkUrl: `https://github.com/sajjadad589-art/moldatk.v2/releases/download/v${version}/Moldatk-Android-Release.apk`,
-            notes: 'تحديث إلزامي: اختيار عدة كابينات أو الكل للجابي، إخفاء الكابينات غير المسموحة، وحل أيقونة مولدتك على iPhone/PWA.'
+            notes: 'تحديث إلزامي: توحيد أرقام المدير والجابي وإصلاح مزامنة حالة التسديد والفواتير المجانية.'
           };
           fs.writeFileSync('public/app-version.json', JSON.stringify(manifest, null, 2) + '\n');
           NODE
