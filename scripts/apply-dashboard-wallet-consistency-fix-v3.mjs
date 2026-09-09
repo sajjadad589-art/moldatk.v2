@@ -3,31 +3,41 @@ import fs from 'node:fs';
 const read = path => fs.readFileSync(path, 'utf8');
 const write = (path, content) => fs.writeFileSync(path, content, 'utf8');
 
-// Final mobile dashboard accounting source-of-truth.
+// Final mobile dashboard accounting source-of-truth for legacy builds. On the second
+// lint->build pass, the newer authoritative finance finalizer may already own this block;
+// preserve that newer source instead of looking for/overwriting legacy currentAccount.
 {
   const path = 'src/components/mobile/MobileDashboard.tsx';
   let source = read(path);
+  const authoritativeDashboard =
+    source.includes('AUTHORITATIVE_FINANCE_V2') &&
+    source.includes('summarizeSubscribers(subscribers, pricingTiers, activeMonthId)') &&
+    source.includes('const billingCycleActive = pricingTiers.some');
 
-  if (!source.includes('getMonthId')) {
-    source = source.replace(
-      "import { getInvoiceRemaining } from '../../utils/monthlyAccounting';",
-      "import { getInvoiceRemaining, getMonthId } from '../../utils/monthlyAccounting';"
-    );
+  if (!authoritativeDashboard) {
+    if (!source.includes('getMonthId')) {
+      source = source.replace(
+        "import { getInvoiceRemaining } from '../../utils/monthlyAccounting';",
+        "import { getInvoiceRemaining, getMonthId } from '../../utils/monthlyAccounting';"
+      );
+    }
+
+    const currentAccountStart = source.indexOf('  const currentAccount = (sub: Subscriber) =>');
+    const previousGuard = currentAccountStart >= 0
+      ? source.lastIndexOf('  const billingCycleActive = pricingTiers.some', currentAccountStart)
+      : -1;
+    const start = previousGuard >= 0 ? previousGuard : currentAccountStart;
+    const end = source.indexOf('  const circleLength =', currentAccountStart);
+    if (start < 0 || currentAccountStart < 0 || end < 0) {
+      throw new Error('Dashboard consistency v3: accounting bounds not found');
+    }
+
+    const block = `  // DASHBOARD_MONTH_ACCOUNTING_SINGLE_SOURCE_V3\n  const billingCycleActive = pricingTiers.some(t =>\n    t.type !== 'free' && (Number(t.pricePerAmpere || 0) > 0 || Number(t.fixedFee || 0) > 0)\n  );\n\n  const currentAccount = (sub: Subscriber) => {\n    if (!billingCycleActive) return undefined;\n    return (sub.invoicesHistory || [])\n      .filter(inv => inv.monthId === activeMonthId && inv.status !== 'cancelled')\n      .sort((a, b) => {\n        const aTime = a.paymentDate || a.issueDate || '';\n        const bTime = b.paymentDate || b.issueDate || '';\n        if (aTime !== bTime) return bTime.localeCompare(aTime);\n        const aPaid = Number(a.paidAmount || 0);\n        const bPaid = Number(b.paidAmount || 0);\n        if (aPaid !== bPaid) return bPaid - aPaid;\n        return String(b.id || '').localeCompare(String(a.id || ''));\n      })[0];\n  };\n\n  const legacyPaymentIsThisMonth = (sub: Subscriber) => {\n    if (!billingCycleActive || !sub.lastPaymentDate) return false;\n    const d = new Date(sub.lastPaymentDate);\n    return !Number.isNaN(d.getTime()) && getMonthId(d) === activeMonthId;\n  };\n\n  const currentMonthRows = billingCycleActive ? subscribers.map(sub => {\n    const invoice = currentAccount(sub);\n    const isFree = invoice?.status === 'free' || sub.tier === 'free' || Boolean(sub.isExempted);\n    const due = isFree ? 0 : Math.max(0, invoice\n      ? Number(invoice.totalAmount || 0)\n      : Number(calculateSubscriberBill(sub.amperes, sub.tier, pricingTiers).total || 0));\n    const rawPaid = invoice\n      ? Math.max(0, Number(invoice.paidAmount || 0))\n      : legacyPaymentIsThisMonth(sub) ? Math.max(0, Number(sub.amountPaid || 0)) : 0;\n    const paid = Math.min(due, rawPaid);\n    const remaining = Math.max(0, due - paid);\n    return { sub, isFree, due, paid, remaining };\n  }) : [];\n\n  const paidSubs = currentMonthRows\n    .filter(row => !row.isFree && row.due > 0 && row.remaining === 0)\n    .map(row => row.sub);\n  const unpaidSubs = currentMonthRows\n    .filter(row => !row.isFree && row.due > 0 && row.remaining > 0)\n    .map(row => row.sub);\n  const totalCollectedRevenue = currentMonthRows.reduce((sum, row) => sum + row.paid, 0);\n  const totalUnpaidDebt = currentMonthRows.reduce((sum, row) => sum + row.remaining, 0);\n  const currentMonthTotal = currentMonthRows.reduce((sum, row) => sum + row.due, 0);\n\n`;
+
+    source = source.slice(0, start) + block + source.slice(end);
+  } else {
+    console.log('skip: dashboard V3 legacy accounting block; authoritative finance already active');
   }
-
-  const currentAccountStart = source.indexOf('  const currentAccount = (sub: Subscriber) =>');
-  const previousGuard = currentAccountStart >= 0
-    ? source.lastIndexOf('  const billingCycleActive = pricingTiers.some', currentAccountStart)
-    : -1;
-  const start = previousGuard >= 0 ? previousGuard : currentAccountStart;
-  const end = source.indexOf('  const circleLength =', currentAccountStart);
-  if (start < 0 || currentAccountStart < 0 || end < 0) {
-    throw new Error('Dashboard consistency v3: accounting bounds not found');
-  }
-
-  const block = `  // DASHBOARD_MONTH_ACCOUNTING_SINGLE_SOURCE_V3\n  const billingCycleActive = pricingTiers.some(t =>\n    t.type !== 'free' && (Number(t.pricePerAmpere || 0) > 0 || Number(t.fixedFee || 0) > 0)\n  );\n\n  const currentAccount = (sub: Subscriber) => {\n    if (!billingCycleActive) return undefined;\n    return (sub.invoicesHistory || [])\n      .filter(inv => inv.monthId === activeMonthId && inv.status !== 'cancelled')\n      .sort((a, b) => {\n        const aTime = a.paymentDate || a.issueDate || '';\n        const bTime = b.paymentDate || b.issueDate || '';\n        if (aTime !== bTime) return bTime.localeCompare(aTime);\n        const aPaid = Number(a.paidAmount || 0);\n        const bPaid = Number(b.paidAmount || 0);\n        if (aPaid !== bPaid) return bPaid - aPaid;\n        return String(b.id || '').localeCompare(String(a.id || ''));\n      })[0];\n  };\n\n  const legacyPaymentIsThisMonth = (sub: Subscriber) => {\n    if (!billingCycleActive || !sub.lastPaymentDate) return false;\n    const d = new Date(sub.lastPaymentDate);\n    return !Number.isNaN(d.getTime()) && getMonthId(d) === activeMonthId;\n  };\n\n  const currentMonthRows = billingCycleActive ? subscribers.map(sub => {\n    const invoice = currentAccount(sub);\n    const isFree = invoice?.status === 'free' || sub.tier === 'free' || Boolean(sub.isExempted);\n    const due = isFree ? 0 : Math.max(0, invoice\n      ? Number(invoice.totalAmount || 0)\n      : Number(calculateSubscriberBill(sub.amperes, sub.tier, pricingTiers).total || 0));\n    const rawPaid = invoice\n      ? Math.max(0, Number(invoice.paidAmount || 0))\n      : legacyPaymentIsThisMonth(sub) ? Math.max(0, Number(sub.amountPaid || 0)) : 0;\n    const paid = Math.min(due, rawPaid);\n    const remaining = Math.max(0, due - paid);\n    return { sub, isFree, due, paid, remaining };\n  }) : [];\n\n  const paidSubs = currentMonthRows\n    .filter(row => !row.isFree && row.due > 0 && row.remaining === 0)\n    .map(row => row.sub);\n  const unpaidSubs = currentMonthRows\n    .filter(row => !row.isFree && row.due > 0 && row.remaining > 0)\n    .map(row => row.sub);\n  const totalCollectedRevenue = currentMonthRows.reduce((sum, row) => sum + row.paid, 0);\n  const totalUnpaidDebt = currentMonthRows.reduce((sum, row) => sum + row.remaining, 0);\n  const currentMonthTotal = currentMonthRows.reduce((sum, row) => sum + row.due, 0);\n\n`;
-
-  source = source.slice(0, start) + block + source.slice(end);
   write(path, source);
 }
 
@@ -78,11 +88,13 @@ const write = (path, content) => fs.writeFileSync(path, content, 'utf8');
   write(path, source);
 }
 
-// The authoritative wallet script runs earlier in the same build. Confirm its
-// resolved-cancellation implementation survived the remaining release patches.
+// Confirm either the legacy resolved-cancellation wallet implementation or the newer
+// authoritative reconciled cashbox survived the remaining release patches.
 {
   const wallet = read('src/components/WalletView.tsx');
-  if (!wallet.includes('walletResolvedAmounts') || !wallet.includes('unmatchedPayments')) {
+  const legacyWallet = wallet.includes('walletResolvedAmounts') && wallet.includes('unmatchedPayments');
+  const authoritativeWallet = wallet.includes('AUTHORITATIVE_WALLET_V2') && wallet.includes('reconciledCashbox(');
+  if (!legacyWallet && !authoritativeWallet) {
     throw new Error('Dashboard consistency v3: authoritative WalletView calculation missing');
   }
 }
