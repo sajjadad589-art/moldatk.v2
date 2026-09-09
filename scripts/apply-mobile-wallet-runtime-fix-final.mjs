@@ -79,27 +79,23 @@ const must = (value, message) => {
   write(path, source);
 }
 
-// Defensive compatibility: old or intermediate callers should never turn a missing tier
-// array into a hard runtime crash. The final mobile wiring above still supplies the real list.
+// Defensive compatibility belongs in the accounting helper rather than the WalletView
+// destructuring list. This keeps lint -> build idempotent because the authoritative pass
+// may rewrite WalletView's parameter list on every execution.
 {
-  const path = 'src/components/WalletView.tsx';
+  const path = 'src/utils/authoritativeAccounting.ts';
   let source = read(path);
-  const componentStart = source.indexOf('export const WalletView: React.FC<WalletViewProps> = ({');
-  const componentEnd = source.indexOf('\n}) => {', componentStart);
-  must(componentStart >= 0 && componentEnd > componentStart, 'WalletView signature missing');
-  let componentSignature = source.slice(componentStart, componentEnd);
-  if (!/\n\s*pricingTiers\s*=\s*\[\],/.test(componentSignature)) {
-    must(/\n\s*pricingTiers,/.test(componentSignature), 'WalletView authoritative pricing argument missing');
-    componentSignature = componentSignature.replace(/(\n\s*)pricingTiers,/, '$1pricingTiers = [],');
-    source = source.slice(0, componentStart) + componentSignature + source.slice(componentEnd);
-  }
-  must(source.includes('summarizeSubscribers(subscribers, pricingTiers, activeMonthId)'), 'authoritative wallet summary missing');
+  const from = 'export function summarizeSubscribers(subscribers: Subscriber[], tiers: SubscriptionTierPricing[], activeMonthId = getMonthId()) {';
+  const to = 'export function summarizeSubscribers(subscribers: Subscriber[], tiers: SubscriptionTierPricing[] = [], activeMonthId = getMonthId()) {';
+  if (source.includes(from)) source = source.replace(from, to);
+  must(source.includes(to), 'defensive authoritative pricing fallback missing');
   write(path, source);
 }
 
 const layout = read('src/components/mobile/MobileLayout.tsx');
 const app = read('src/App.tsx');
 const wallet = read('src/components/WalletView.tsx');
+const accounting = read('src/utils/authoritativeAccounting.ts');
 const dashboard = read('src/components/mobile/MobileDashboard.tsx');
 const walletTab = layout.indexOf("activeTab === 'wallet'");
 const walletStart = layout.indexOf('<WalletView', walletTab);
@@ -112,7 +108,8 @@ const mobileBlock = mobileStart >= 0 && mobileEnd > mobileStart ? app.slice(mobi
 must(walletBlock.includes('pricingTiers={pricingTiers}'), 'final mobile wallet pricing tiers are not wired');
 must(walletBlock.includes('activeMonthId={activeMonthId}'), 'final mobile wallet active month is not wired');
 must(mobileBlock.includes('activeMonthId={activeMonthRecord?.id}'), 'App active month is not wired into MobileLayout');
-must(/pricingTiers\s*=\s*\[\],/.test(wallet), 'WalletView defensive pricing default missing');
+must(wallet.includes('summarizeSubscribers(subscribers, pricingTiers, activeMonthId)'), 'authoritative wallet summary missing');
+must(accounting.includes('tiers: SubscriptionTierPricing[] = []'), 'accounting pricing fallback missing');
 must(dashboard.includes("onNavigateToTab('wallet')"), 'dashboard cashbox button lost its wallet route');
 
-console.log('Mobile cashbox runtime fixed: pricing tiers and active month are wired end-to-end with a defensive wallet default.');
+console.log('Mobile cashbox runtime fixed: pricing tiers and active month are wired end-to-end with an idempotent accounting fallback.');
