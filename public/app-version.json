@@ -5,5 +5,5 @@
   "minimumVersionCode": 24,
   "force": true,
   "apkUrl": "https://github.com/sajjadad589-art/moldatk.v2/releases/download/v1.3.20/Moldatk-Android-Release.apk",
-  "notes": "تحديث إلزامي: توحيد أرقام المدير والجابي، إصلاح مزامنة حالة التسديد، واستبعاد أي فاتورة مالية خاطئة للمشترك المجاني."
+  "notes": "تحديث إلزامي: توحيد أرقام المدير والجابي وإصلاح مزامنة حالة التسديد والفواتير المجانية."
 }
