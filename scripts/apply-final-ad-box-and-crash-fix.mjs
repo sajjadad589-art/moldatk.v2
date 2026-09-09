@@ -72,22 +72,23 @@ if (finalSuperAdmin.includes('<SeasonalCampaignManager />')) throw new Error('Du
 if (!finalSuperAdmin.includes('SUPER_ADMIN_NOTIFICATIONS_LAYOUT_V2')) throw new Error('Super Admin notifications layout fix missing');
 if (!finalSuperAdmin.includes('deleteGeneratorAccount')) throw new Error('Super Admin generator delete control missing');
 
-// Branding and update-delivery guards run absolutely last so earlier compatibility scripts cannot restore the previous UI/cache/update behavior.
 await import('./apply-brand-identity-v2.mjs');
 await import('./apply-brand-surfaces-v2.mjs');
 await import('./apply-update-delivery-and-internal-theme-v3-fixed.mjs');
 await import('./apply-google-play-cabinet-collector-v2.mjs');
 await import('./generate-pwa-brand-icons.mjs');
 
-// The legacy compatibility assertions still target 1.3.18. Normalize any generated
-// release output back to 1.3.18, run the legacy assertions, then the v6 finalizer below
-// upgrades everything to the current release version.
+// Legacy compatibility assertions still target 1.3.18. Every later release marker is
+// normalized temporarily, then the absolute final release pass upgrades it again.
 for (const path of ['public/sw.js', 'src/main.tsx']) {
   const current = read(path);
-  if (current) write(path, current.replaceAll('1.3.17', '1.3.18').replaceAll('1.3.19', '1.3.18').replaceAll('1.3.20', '1.3.18'));
+  if (current) write(path, current
+    .replaceAll('1.3.17', '1.3.18')
+    .replaceAll('1.3.19', '1.3.18')
+    .replaceAll('1.3.20', '1.3.18')
+    .replaceAll('1.3.21', '1.3.18'));
 }
 
-// Legacy brand patches still rewrite the web manifest to the old PNGs. Reassert the versioned Moldatk icon set last.
 write('public/manifest.webmanifest', JSON.stringify({
   id: '/?pwa=5',
   name: 'مولدتك',
@@ -115,21 +116,9 @@ for (const iconPath of ['public/icons/moldatk-apple-touch-v5.png', 'public/icons
   if (!fs.existsSync(iconPath) || fs.statSync(iconPath).size < 1000) throw new Error(`Generated PWA icon missing: ${iconPath}`);
 }
 
-// User-visible collector picker and iPhone icon correction must run after every legacy patch and after the v5 compatibility assertions.
 await import('./apply-folder-collector-picker-ios-v6.mjs');
-
-// Subscriber profile/payment UI and the on-screen print animation must be the last
-// visual patch so older compatibility scripts cannot restore the two-page flow or
-// the previous top-to-bottom receipt motion.
 await import('./apply-subscriber-first-page-print-motion.mjs');
-
-// Payment button performs accounting first, first page owns all payment actions,
-// and edit mode is limited to update/delete controls.
 await import('./apply-subscriber-payment-ux-final.mjs');
-
-// Absolute last pass: legacy Workmode scripts may inject a second subscriber detail
-// page on mobile. Remove it after every other patch so tapping a subscriber card
-// opens the canonical SubscriberModal directly.
 await import('./apply-remove-mobile-subscriber-intermediate-page.mjs');
 
 console.log('Final release guard preserved core features, enforced the calm internal theme, Google Play legal surfaces, cabinet sync safety, collector cabinet assignments, and the corrected iOS/PWA icon set.');
