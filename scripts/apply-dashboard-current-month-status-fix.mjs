@@ -4,13 +4,20 @@ const p = 'src/components/mobile/MobileDashboard.tsx';
 let c = fs.readFileSync(p, 'utf8');
 
 // The release QA runs `lint` and then `build` in the same working tree. Later final
-// passes may already have produced the stronger V3 dashboard block, so this patch
-// must be idempotent instead of trying to replace a block that no longer exists.
-const mobileAlreadyFinalized =
+// passes may already have produced either the legacy V3 block or the newer authoritative
+// finance block, so this patch must be idempotent instead of replacing either final form.
+const legacyFinalized =
   c.includes('DASHBOARD_OUTSTANDING_STATUS_SINGLE_SOURCE_V3') &&
   c.includes('const paidSubs = billingCycleActive ? subscribers.filter(isPaidThisMonth) : [];') &&
   c.includes('const unpaidSubs = billingCycleActive') &&
   c.includes('const currentMonthTotal = billingCycleActive');
+const authoritativeFinalized =
+  c.includes('AUTHORITATIVE_FINANCE_V2') &&
+  c.includes('summarizeSubscribers(subscribers, pricingTiers, activeMonthId)') &&
+  c.includes('const paidSubs = billingCycleActive ? subscribers.filter(isPaidThisMonth) : [];') &&
+  c.includes('const unpaidSubs = billingCycleActive') &&
+  c.includes('const currentMonthTotal = billingCycleActive');
+const mobileAlreadyFinalized = legacyFinalized || authoritativeFinalized;
 
 if (!mobileAlreadyFinalized) {
   const currentAccountStart = c.indexOf('  const currentAccount = (sub: Subscriber) =>');
