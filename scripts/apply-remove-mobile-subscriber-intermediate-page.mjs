@@ -109,3 +109,7 @@ await import('./apply-final-financial-interface-parity.mjs');
 // invoices on pull/push and prevents a stale collector dirty flag from overwriting newer
 // server payment state after an app upgrade.
 await import('./apply-live-finance-reconciliation-v1.mjs');
+
+// Release/version cache marker is deliberately last so installed Android/PWA clients
+// can actually detect this accounting fix as a new build instead of remaining on 1.3.19.
+await import('./apply-release-version-1-3-20.mjs');
