@@ -34,8 +34,8 @@ jobs:
       VITE_SUPABASE_URL: https://adluynhkikoodjljoxeu.supabase.co
       VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CObjK2Uua18kVkXCkxdRog_keQLIDiE
       VITE_ENABLE_NATIVE_PUSH: 'true'
-      CURRENT_VERSION: 1.3.21
-      CURRENT_VERSION_CODE: 25
+      CURRENT_VERSION: 1.3.22
+      CURRENT_VERSION_CODE: 26
       SHOULD_RELEASE: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release')) }}
 
     steps:
@@ -68,7 +68,7 @@ jobs:
           grep -q 'moldatk-mark.svg' src/LandingPage.tsx
           grep -q 'MOLDATK_CALM_BRAND_V2' src/index.css
           grep -q 'MOLDATK_INTERNAL_CALM_THEME_V3' src/index.css
-          grep -q 'moldatk-shell-v4-1.3.21' public/sw.js
+          grep -q 'moldatk-shell-v4-1.3.22' public/sw.js
           grep -q 'moldatk-apple-touch-v6.png' index.html
           grep -q 'moldatk-icon-192-v6.png' public/manifest.webmanifest
 
@@ -101,6 +101,9 @@ jobs:
 
       - name: Recurring ampere discount regression test
         run: npx tsx scripts/ampere-discount-regression.ts
+
+      - name: Mobile cashbox runtime wiring test
+        run: npx tsx scripts/mobile-wallet-runtime-smoke-test.ts
 
       - name: Destructive controls safety audit
         run: npx tsx scripts/secure-destructive-controls-audit.ts
@@ -198,7 +201,7 @@ jobs:
           else
             gh release create "$TAG" release/Moldatk-Android-Release.apk release/Moldatk-Android-Release.aab \
               --title "مولدتك ${CURRENT_VERSION}" \
-              --notes "تحديث محاسبي: خصم أمبيرات شهري دائم لكل مشترك، احتساب تلقائي مع التسعيرات الجديدة، صناديق ديون الشهر السابق والأمبيرات المحتسبة وقيمة الخصومات، مع الحفاظ على مزامنة المدير والجابي والتسديد المقطوع والمخصص."
+              --notes "إصلاح تشغيلي: إصلاح تعطل فتح القاصة على واجهة الهاتف وربطها بمصدر التسعير والشهر المحاسبي الصحيح، مع الحفاظ على خصم الأمبيرات والمزامنة والتسديدات وتطابق المدير والجابي."
           fi
 
       - name: Activate in-app update manifest
@@ -215,7 +218,7 @@ jobs:
             minimumVersionCode: versionCode,
             force: true,
             apkUrl: `https://github.com/sajjadad589-art/moldatk.v2/releases/download/v${version}/Moldatk-Android-Release.apk`,
-            notes: 'تحديث إلزامي: خصم الأمبيرات الشهري التلقائي، صناديق الديون والخصومات الجديدة، وتوحيد الأرقام المحاسبية بين المدير والجابي.'
+            notes: 'تحديث إلزامي: إصلاح فتح القاصة على الهاتف وربطها بمصدر التسعير والشهر المحاسبي الصحيح، مع الحفاظ على خصم الأمبيرات وتطابق المدير والجابي.'
           };
           fs.writeFileSync('public/app-version.json', JSON.stringify(manifest, null, 2) + '\n');
           NODE
