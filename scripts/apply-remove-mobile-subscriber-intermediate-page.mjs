@@ -113,3 +113,8 @@ await import('./apply-live-finance-reconciliation-v1.mjs');
 // Release/version cache marker is deliberately last so installed Android/PWA clients
 // can actually detect this accounting fix as a new build instead of remaining on 1.3.19.
 await import('./apply-release-version-1-3-20.mjs');
+
+// Recurring ampere discounts must run after every historical accounting/release mutator.
+// The first pass owns billing + cloud persistence; the second owns the three owner boxes.
+await import('./apply-recurring-ampere-discount-final.mjs');
+await import('./apply-discount-dashboard-boxes-final.mjs');
