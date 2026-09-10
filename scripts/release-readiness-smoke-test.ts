@@ -1,0 +1,44 @@
+import fs from 'node:fs';
+
+const read = (path: string) => fs.readFileSync(path, 'utf8');
+const assert = (condition: unknown, message: string) => {
+  if (!condition) throw new Error(`Release readiness smoke test: ${message}`);
+};
+
+const webPush = read('src/lib/webPush.ts');
+assert(webPush.includes('BF0RyOTwx_Cvu8APpq7JP18HCzBO_4UVi-e64aoTbP-YGytDh3szjwBrPrTRH4dKSA0OnASOKQu1D4zTvIVTjvU'), 'rotated public VAPID key missing');
+assert(webPush.includes('vapid_public_key: WEB_PUSH_VAPID_PUBLIC_KEY'), 'VAPID version is not sent to registration backend');
+assert(webPush.includes('await subscription.unsubscribe()'), 'old Web Push subscriptions are not rotated');
+
+const orders = read('src/components/CustomerOrdersPanel.tsx');
+assert(orders.includes('canManagePaymentSettings'), 'customer order payout settings role guard missing');
+assert(orders.includes("profile?.role === 'super_admin'"), 'payout settings are not restricted to owner Super Admin');
+assert(orders.includes('settings && canManagePaymentSettings && <section'), 'secondary manager can still render payout settings editor');
+
+const superAdmin = read('src/components/SuperAdminDashboard.tsx');
+assert(superAdmin.includes("[['notifications', 'الإشعارات', Bell]]"), 'notifications nav is not owner-gated');
+assert(!superAdmin.includes("    ['notifications', 'الإشعارات', Bell],"), 'unrestricted notifications nav remains');
+assert(superAdmin.includes("tab === 'notifications' && isOwnerSuperAdmin"), 'notifications page is not owner-gated');
+if (superAdmin.includes('WebsiteReleaseManager')) {
+  assert(superAdmin.includes("[['website', 'الموقع والتحديثات', Wrench]]"), 'release-management nav is not owner-gated');
+  assert(superAdmin.includes("tab === 'website' && isOwnerSuperAdmin"), 'release-management page is not owner-gated');
+}
+
+const sync = read('src/lib/useGeneratorCloudSync.ts');
+assert(sync.includes("amount_due: (s.invoicesHistory || []).filter(i => i.status !== 'cancelled')"), 'cloud amount_due is not derived from invoice ledger');
+assert(sync.includes('function dedupeInvoicesForCloud('), 'cloud invoice dedupe helper missing');
+assert(sync.includes('dedupeInvoicesForCloud(subscribers.flatMap'), 'cloud invoice dedupe is not wired');
+
+const gradle = read('android/app/build.gradle');
+assert(/versionCode\s+28\b/.test(gradle), 'Android versionCode is not 28');
+assert(/versionName\s+"1\.3\.24"/.test(gradle), 'Android versionName is not 1.3.24');
+
+const updaterFinalizer = read('scripts/apply-update-delivery-and-internal-theme-v3-fixed.mjs');
+assert(updaterFinalizer.includes('candidates.sort((a, b) => Number(b.versionCode) - Number(a.versionCode))[0]'), 'Android updater does not choose highest available version');
+
+const sw = read('public/sw.js');
+const main = read('src/main.tsx');
+assert(sw.includes('moldatk-shell-v4-1.3.24'), '1.3.24 service-worker cache marker missing');
+assert(main.includes('/sw.js?v=1.3.24'), '1.3.24 service-worker registration missing');
+
+console.log('Release readiness regression passed: versioning, update selection, Web Push rotation, Super Admin permissions, payout settings, cloud debt and duplicate-invoice protection are wired for 1.3.24.');
