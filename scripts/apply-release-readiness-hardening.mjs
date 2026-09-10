@@ -92,13 +92,19 @@ const must = (value, message) => { if (!value) throw new Error(`Release readines
     source = source.replace(anchor, helper + anchor);
   }
 
-  source = source.replace(
-    '        const invoices = subscribers.flatMap(s => s.invoicesHistory || []);',
-    '        const invoices = dedupeInvoicesForCloud(subscribers.flatMap(s => s.invoicesHistory || []));'
-  );
+  const normalizedCollectorInvoices = "        const invoices = writableSubscribers.flatMap(sub => (sub.invoicesHistory || []).map(inv => normalizeInvoiceForSubscriber(sub, inv)));";
+  const normalizedOwnerInvoices = "        const invoices = subscribers.flatMap(sub => (sub.invoicesHistory || []).map(inv => normalizeInvoiceForSubscriber(sub, inv)));";
+  const baseInvoices = '        const invoices = subscribers.flatMap(s => s.invoicesHistory || []);';
+  if (source.includes(normalizedCollectorInvoices)) {
+    source = source.replace(normalizedCollectorInvoices, "        const invoices = dedupeInvoicesForCloud(writableSubscribers.flatMap(sub => (sub.invoicesHistory || []).map(inv => normalizeInvoiceForSubscriber(sub, inv))));");
+  } else if (source.includes(normalizedOwnerInvoices)) {
+    source = source.replace(normalizedOwnerInvoices, "        const invoices = dedupeInvoicesForCloud(subscribers.flatMap(sub => (sub.invoicesHistory || []).map(inv => normalizeInvoiceForSubscriber(sub, inv))));");
+  } else if (source.includes(baseInvoices)) {
+    source = source.replace(baseInvoices, '        const invoices = dedupeInvoicesForCloud(subscribers.flatMap(s => s.invoicesHistory || []));');
+  }
 
   must(source.includes("amount_due: (s.invoicesHistory || []).filter(i => i.status !== 'cancelled')"), 'subscriber amount_due is not ledger-derived');
-  must(source.includes('dedupeInvoicesForCloud(subscribers.flatMap'), 'invoice push dedupe is not wired');
+  must(source.includes('const invoices = dedupeInvoicesForCloud('), 'invoice push dedupe is not wired');
   write(path, source);
 }
 
