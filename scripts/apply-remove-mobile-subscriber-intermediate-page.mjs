@@ -43,3 +43,4 @@ await import('./apply-recurring-ampere-discount-final.mjs');
 await import('./patch-discount-dashboard-finalizer.mjs');
 await import('./apply-discount-dashboard-boxes-final.mjs');
 await import('./apply-mobile-wallet-runtime-fix-final.mjs');
+await import('./apply-release-readiness-hardening.mjs');
