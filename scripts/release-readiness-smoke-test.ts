@@ -43,6 +43,13 @@ assert(app.includes("subscriptionInfo.subscriptionStatus !== 'active' || daysUnt
 assert(!app.includes("&& !subscriptionLoading && subscriptionInfo?.accountStatus === 'suspended'"), 'suspended account can temporarily unlock during refresh');
 assert(!app.includes("&& !subscriptionLoading && (!subscriptionInfo || subscriptionInfo.subscriptionStatus !== 'active'"), 'expired account can temporarily unlock during refresh');
 
+const subscriberModal = read('src/components/SubscriberModal.tsx');
+assert(subscriberModal.includes("const onboardingNoCurrentCharge = String(ensured.currentInvoice?.notes || '').includes('MOLDATK_ONBOARDING_NO_CURRENT_CHARGE');"), 'debt-aware onboarding quick-payment state missing');
+assert(subscriberModal.includes('if (onboardingNoCurrentCharge && totalOutstanding <= 0) return;'), 'zero-charge onboarding guard does not allow real debt payment');
+assert(!subscriberModal.includes("if (String(ensured.currentInvoice?.notes || '').includes('MOLDATK_ONBOARDING_NO_CURRENT_CHARGE')) return;"), 'legacy unconditional onboarding payment blocker returned');
+assert(subscriberModal.includes('applyPaymentOldestFirst('), 'quick payment no longer allocates debt oldest-first');
+assert(subscriberModal.includes('onSaveSubscriber(updated);'), 'subscriber payment does not persist updated ledger state');
+
 const gradle = read('android/app/build.gradle');
 assert(/versionCode\s+28\b/.test(gradle), 'Android versionCode is not 28');
 assert(/versionName\s+"1\.3\.24"/.test(gradle), 'Android versionName is not 1.3.24');
@@ -55,4 +62,4 @@ const main = read('src/main.tsx');
 assert(sw.includes('moldatk-shell-v4-1.3.24'), '1.3.24 service-worker cache marker missing');
 assert(main.includes('/sw.js?v=1.3.24'), '1.3.24 service-worker registration missing');
 
-console.log('Release readiness regression passed: versioning, update selection, Web Push rotation, Super Admin permissions, payout settings, cloud debt, duplicate-invoice protection, and sticky subscription locks are wired for 1.3.24.');
+console.log('Release readiness regression passed: versioning, update selection, Web Push rotation, Super Admin permissions, payout settings, cloud debt, duplicate-invoice protection, sticky subscription locks, and onboarding debt payments are wired for 1.3.24.');
