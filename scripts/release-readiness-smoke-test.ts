@@ -51,15 +51,15 @@ assert(subscriberModal.includes('applyPaymentOldestFirst('), 'quick payment no l
 assert(subscriberModal.includes('onSaveSubscriber(updated);'), 'subscriber payment does not persist updated ledger state');
 
 const gradle = read('android/app/build.gradle');
-assert(/versionCode\s+28\b/.test(gradle), 'Android versionCode is not 28');
-assert(/versionName\s+"1\.3\.24"/.test(gradle), 'Android versionName is not 1.3.24');
+assert(/versionCode\s+29\b/.test(gradle), 'Android versionCode is not 29');
+assert(/versionName\s+"1\.3\.25"/.test(gradle), 'Android versionName is not 1.3.25');
 
 const updaterFinalizer = read('scripts/apply-update-delivery-and-internal-theme-v3-fixed.mjs');
 assert(updaterFinalizer.includes('candidates.sort((a, b) => Number(b.versionCode) - Number(a.versionCode))[0]'), 'Android updater does not choose highest available version');
 
 const sw = read('public/sw.js');
 const main = read('src/main.tsx');
-assert(sw.includes('moldatk-shell-v4-1.3.24'), '1.3.24 service-worker cache marker missing');
-assert(main.includes('/sw.js?v=1.3.24'), '1.3.24 service-worker registration missing');
+assert(sw.includes('moldatk-shell-v4-1.3.25'), '1.3.25 service-worker cache marker missing');
+assert(main.includes('/sw.js?v=1.3.25'), '1.3.25 service-worker registration missing');
 
-console.log('Release readiness regression passed: versioning, update selection, Web Push rotation, Super Admin permissions, payout settings, cloud debt, duplicate-invoice protection, sticky subscription locks, and onboarding debt payments are wired for 1.3.24.');
+console.log('Release readiness regression passed: versioning, update selection, Web Push rotation, Super Admin permissions, payout settings, cloud debt, duplicate-invoice protection, sticky subscription locks, and onboarding debt payments are wired for 1.3.25.');
