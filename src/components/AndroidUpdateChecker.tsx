@@ -20,6 +20,7 @@ type AppUpdaterPlugin = {
 
 const AppUpdater = registerPlugin<AppUpdaterPlugin>('AppUpdater');
 const AUTO_UPDATE_KEY_PREFIX = 'moldatk_auto_update_started_';
+const AUTO_UPDATE_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 
 export const AndroidUpdateChecker: React.FC = () => {
   const [manifest, setManifest] = useState<VersionManifest | null>(null);
@@ -31,12 +32,40 @@ export const AndroidUpdateChecker: React.FC = () => {
   const [dismissed, setDismissed] = useState(false);
   const [showUpToDate, setShowUpToDate] = useState(false);
   const autoStartedRef = useRef<number | null>(null);
+  const checkInFlightRef = useRef(false);
 
   const isAndroidNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
 
-  const checkForUpdates = async () => {
-    if (!isAndroidNative) return;
+  const wasAutoStartedRecently = (targetCode: number) => {
+    try {
+      const raw = localStorage.getItem(`${AUTO_UPDATE_KEY_PREFIX}${targetCode}`);
+      if (!raw) return false;
+      const startedAt = Date.parse(raw);
+      return Number.isFinite(startedAt) && Date.now() - startedAt < AUTO_UPDATE_COOLDOWN_MS;
+    } catch {
+      return false;
+    }
+  };
 
+  const rememberAutoStart = (targetCode: number) => {
+    try { localStorage.setItem(`${AUTO_UPDATE_KEY_PREFIX}${targetCode}`, new Date().toISOString()); } catch {}
+  };
+
+  const clearCompletedUpdateMarkers = (installedCode: number) => {
+    try {
+      for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+        const key = localStorage.key(i) || '';
+        if (!key.startsWith(AUTO_UPDATE_KEY_PREFIX)) continue;
+        const code = Number(key.slice(AUTO_UPDATE_KEY_PREFIX.length));
+        if (Number.isFinite(code) && code <= installedCode) localStorage.removeItem(key);
+      }
+    } catch {}
+  };
+
+  const checkForUpdates = async () => {
+    if (!isAndroidNative || checkInFlightRef.current) return;
+
+    checkInFlightRef.current = true;
     setChecking(true);
     setError(null);
     try {
@@ -67,17 +96,20 @@ export const AndroidUpdateChecker: React.FC = () => {
       }
 
       const installedCode = Number(version.versionCode);
+      clearCompletedUpdateMarkers(installedCode);
       setCurrentVersionCode(installedCode);
       setCurrentVersionName(version.versionName || '');
       setManifest(latestManifest);
 
       if (!latestManifest.enabled || Number(latestManifest.versionCode) <= installedCode) {
+        autoStartedRef.current = null;
         setShowUpToDate(true);
         window.setTimeout(() => setShowUpToDate(false), 3200);
       }
     } catch (e: any) {
       setError(e?.message || 'تعذر التحقق من التحديث');
     } finally {
+      checkInFlightRef.current = false;
       setChecking(false);
     }
   };
@@ -86,13 +118,18 @@ export const AndroidUpdateChecker: React.FC = () => {
     if (!isAndroidNative) return;
     void checkForUpdates();
 
+    let resumeTimer = 0;
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
-        window.setTimeout(() => void checkForUpdates(), 700);
+        window.clearTimeout(resumeTimer);
+        resumeTimer = window.setTimeout(() => void checkForUpdates(), 1200);
       }
     };
     document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.clearTimeout(resumeTimer);
+    };
   }, [isAndroidNative]);
 
   if (!isAndroidNative) return null;
@@ -101,27 +138,32 @@ export const AndroidUpdateChecker: React.FC = () => {
   const forceUpdate = Boolean(hasUpdate && (manifest?.force || currentVersionCode! < Number(manifest?.minimumVersionCode || 0)));
 
   const install = async (automatic = false) => {
-    if (!manifest?.apkUrl) {
-      setError('رابط ملف التحديث غير مفعّل بعد');
+    if (!manifest?.apkUrl || installing) {
+      if (!manifest?.apkUrl) setError('رابط ملف التحديث غير مفعّل بعد');
       return;
     }
 
     const targetCode = Number(manifest.versionCode);
-    if (automatic && autoStartedRef.current === targetCode) return;
-    if (automatic) autoStartedRef.current = targetCode;
+    if (automatic && (autoStartedRef.current === targetCode || wasAutoStartedRecently(targetCode))) return;
+    if (automatic) {
+      autoStartedRef.current = targetCode;
+      // Persist before starting the native download so app resume/remount cannot start it again.
+      rememberAutoStart(targetCode);
+    }
 
     setInstalling(true);
     setError(null);
     try {
       const result = await AppUpdater.downloadAndInstall({ url: manifest.apkUrl });
-      if (result?.launched) {
-        try { localStorage.setItem(`${AUTO_UPDATE_KEY_PREFIX}${targetCode}`, new Date().toISOString()); } catch {}
-      }
+      if (result?.launched) rememberAutoStart(targetCode);
     } catch (e: any) {
       const message = e?.message || 'تعذر تنزيل التحديث';
       setError(message);
-      // إذا فتح Android صفحة السماح بالتثبيت، اسمح بإعادة المحاولة تلقائياً عند الرجوع للتطبيق.
-      if (message.includes('اسمح للتطبيق')) autoStartedRef.current = null;
+      // Permission flow is the only case where automatic retry after returning is useful.
+      if (message.includes('اسمح للتطبيق')) {
+        autoStartedRef.current = null;
+        try { localStorage.removeItem(`${AUTO_UPDATE_KEY_PREFIX}${targetCode}`); } catch {}
+      }
     } finally {
       setInstalling(false);
     }
@@ -130,15 +172,16 @@ export const AndroidUpdateChecker: React.FC = () => {
   useEffect(() => {
     if (!hasUpdate || !manifest?.apkUrl || installing || checking) return;
     const targetCode = Number(manifest.versionCode);
-    if (autoStartedRef.current === targetCode) return;
+    if (autoStartedRef.current === targetCode || wasAutoStartedRecently(targetCode)) return;
 
-    // يبدأ تنزيل التحديث تلقائياً بمجرد اكتشاف إصدار أحدث.
     const timer = window.setTimeout(() => void install(true), 900);
     return () => window.clearTimeout(timer);
   }, [hasUpdate, manifest?.versionCode, manifest?.apkUrl, installing, checking]);
 
   if (dismissed && !forceUpdate) return null;
   if (!checking && !installing && !error && !hasUpdate && !showUpToDate) return null;
+
+  const waitingForInstall = Boolean(hasUpdate && manifest && wasAutoStartedRecently(Number(manifest.versionCode)) && !installing && !error);
 
   return (
     <div className="fixed z-[9999] left-3 right-3 bottom-[76px] sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[430px]" dir="rtl">
@@ -150,10 +193,10 @@ export const AndroidUpdateChecker: React.FC = () => {
 
           <div className="min-w-0 flex-1">
             <div className="text-xs font-black text-slate-900 dark:text-white">
-              {checking ? 'جاري التحقق من التحديثات...' : installing ? 'جاري تنزيل التحديث تلقائياً...' : error ? 'تعذر التحديث التلقائي' : hasUpdate ? `تحديث ${manifest?.versionName || ''} متوفر` : 'أنت تستخدم أحدث إصدار'}
+              {checking ? 'جاري التحقق من التحديثات...' : installing ? 'جاري تنزيل التحديث...' : error ? 'تعذر التحديث' : waitingForInstall ? 'التحديث جاهز للتثبيت' : hasUpdate ? `تحديث ${manifest?.versionName || ''} متوفر` : 'أنت تستخدم أحدث إصدار'}
             </div>
             <div className="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400 truncate">
-              {error || (hasUpdate ? (manifest?.notes || `الإصدار الحالي ${currentVersionName || currentVersionCode}`) : `الإصدار الحالي ${currentVersionName || currentVersionCode || ''}`)}
+              {error || (waitingForInstall ? 'إذا أغلقت شاشة تثبيت أندرويد، اضغط تحديث الآن لإعادة فتحها.' : hasUpdate ? (manifest?.notes || `الإصدار الحالي ${currentVersionName || currentVersionCode}`) : `الإصدار الحالي ${currentVersionName || currentVersionCode || ''}`)}
             </div>
           </div>
 
