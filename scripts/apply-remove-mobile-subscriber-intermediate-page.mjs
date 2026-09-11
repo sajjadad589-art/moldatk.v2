@@ -47,3 +47,4 @@ await import('./apply-release-readiness-hardening.mjs');
 await import('./apply-subscription-lock-stability-fix.mjs');
 await import('./apply-minimal-branded-receipt-final.mjs');
 await import('./apply-update-sync-loop-fix.mjs');
+await import('./apply-dashboard-count-release-1-3-26.mjs');
