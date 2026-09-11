@@ -121,13 +121,21 @@ const must = (v, m) => { if (!v) throw new Error(`Collector/manager parity final
     "table: 'generator_invoices'",
     "table: 'generator_audit_logs'",
     'payment_status: s.paymentStatus',
-    'amount_due: Number(s.amountDue || 0)',
     'amount_paid: Number(s.amountPaid || 0)',
     'remaining_amount: Number(i.remainingAmount || 0)',
     'collector_name: i.collectorName || null',
     'notes: i.notes || null',
     'receipt_number: i.receiptNumber || null',
   ]) must(s.includes(needle), `sync mapping missing: ${needle}`);
+
+  // First-pass source can still use the aggregate field; the release-readiness pass then
+  // upgrades it to ledger-derived outstanding debt. Both are valid here, and the latter
+  // must remain accepted on the second build mutation pass.
+  must(
+    s.includes('amount_due: Number(s.amountDue || 0)') ||
+    s.includes("amount_due: (s.invoicesHistory || []).filter(i => i.status !== 'cancelled')"),
+    'subscriber debt mapping missing'
+  );
 
   write(p, s);
 }
