@@ -112,10 +112,10 @@ const must = (value, message) => { if (!value) throw new Error(`Release readines
 {
   const path = 'android/app/build.gradle';
   let source = read(path);
-  source = source.replace(/versionCode\s+\d+/, 'versionCode 28');
-  source = source.replace(/versionName\s+"[^"]+"/, 'versionName "1.3.24"');
-  must(source.includes('versionCode 28'), 'Android versionCode is not 28');
-  must(source.includes('versionName "1.3.24"'), 'Android versionName is not 1.3.24');
+  source = source.replace(/versionCode\s+\d+/, 'versionCode 29');
+  source = source.replace(/versionName\s+"[^"]+"/, 'versionName "1.3.25"');
+  must(source.includes('versionCode 29'), 'Android versionCode is not 29');
+  must(source.includes('versionName "1.3.25"'), 'Android versionName is not 1.3.25');
   write(path, source);
 }
 
