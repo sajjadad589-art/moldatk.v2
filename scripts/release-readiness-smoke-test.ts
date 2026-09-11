@@ -27,7 +27,21 @@ if (superAdmin.includes('WebsiteReleaseManager')) {
 const sync = read('src/lib/useGeneratorCloudSync.ts');
 assert(sync.includes("amount_due: (s.invoicesHistory || []).filter(i => i.status !== 'cancelled')"), 'cloud amount_due is not derived from invoice ledger');
 assert(sync.includes('function dedupeInvoicesForCloud('), 'cloud invoice dedupe helper missing');
-assert(sync.includes('dedupeInvoicesForCloud(subscribers.flatMap'), 'cloud invoice dedupe is not wired');
+assert(
+  sync.includes('dedupeInvoicesForCloud(writableSubscribers.flatMap') || sync.includes('dedupeInvoicesForCloud(subscribers.flatMap'),
+  'cloud invoice dedupe is not wired'
+);
+
+const app = read('src/App.tsx');
+assert(app.includes('SUBSCRIPTION_LOCK_STABILITY_V1'), 'subscription lock stability marker missing');
+assert(app.includes('const loadSubscription = async (showBlockingLoader = false) => {'), 'subscription refresh mode missing');
+assert(app.includes('void loadSubscription(true);'), 'initial subscription check must be blocking');
+assert(app.includes('window.setInterval(() => void loadSubscription(false), 30 * 1000)'), 'periodic subscription refresh must stay non-blocking');
+assert(app.includes("const subscriptionAccessControlled = userSession.role === 'generator_admin' || userSession.role === 'collector';"), 'owner/collector subscription lock missing');
+assert(app.includes("subscriptionInfo?.accountStatus === 'suspended'"), 'suspended account lock missing');
+assert(app.includes("subscriptionInfo.subscriptionStatus !== 'active' || daysUntilExpiry(subscriptionInfo.endsAt) <= 0"), 'expired account lock missing');
+assert(!app.includes("&& !subscriptionLoading && subscriptionInfo?.accountStatus === 'suspended'"), 'suspended account can temporarily unlock during refresh');
+assert(!app.includes("&& !subscriptionLoading && (!subscriptionInfo || subscriptionInfo.subscriptionStatus !== 'active'"), 'expired account can temporarily unlock during refresh');
 
 const gradle = read('android/app/build.gradle');
 assert(/versionCode\s+28\b/.test(gradle), 'Android versionCode is not 28');
@@ -41,4 +55,4 @@ const main = read('src/main.tsx');
 assert(sw.includes('moldatk-shell-v4-1.3.24'), '1.3.24 service-worker cache marker missing');
 assert(main.includes('/sw.js?v=1.3.24'), '1.3.24 service-worker registration missing');
 
-console.log('Release readiness regression passed: versioning, update selection, Web Push rotation, Super Admin permissions, payout settings, cloud debt and duplicate-invoice protection are wired for 1.3.24.');
+console.log('Release readiness regression passed: versioning, update selection, Web Push rotation, Super Admin permissions, payout settings, cloud debt, duplicate-invoice protection, and sticky subscription locks are wired for 1.3.24.');
