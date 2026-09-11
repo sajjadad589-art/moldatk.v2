@@ -129,10 +129,12 @@ export function reconciledCashbox(collected: number, logs: AuditLogEntry[] = [],
   const p = 'src/components/mobile/MobileDashboard.tsx';
   let s = read(p);
   s = addImportAfter(s, "import { getInvoiceRemaining, getMonthId } from '../../utils/monthlyAccounting';", "import { summarizeSubscribers } from '../../utils/authoritativeAccounting';");
-  const start = s.indexOf('  const totalSubscribers = subscribers.length;');
-  const end = s.indexOf('  const circleLength =', start);
-  must(start >= 0 && end > start, 'MobileDashboard accounting block missing');
-  s = s.slice(0, start) + `  // AUTHORITATIVE_FINANCE_V2\n  const dashboardSummary = summarizeSubscribers(subscribers, pricingTiers, activeMonthId);\n  const totalSubscribers = dashboardSummary.totalSubscribers;\n  const paidSubs = dashboardSummary.paidSubscribers;\n  const unpaidSubs = dashboardSummary.unpaidSubscribers;\n  const totalCollectedRevenue = dashboardSummary.collected;\n  const totalUnpaidDebt = dashboardSummary.outstanding;\n  const currentMonthTotal = dashboardSummary.monthTotal;\n\n` + s.slice(end);
+  if (!s.includes('AUTHORITATIVE_FINANCE_V2')) {
+    const start = s.indexOf('  const totalSubscribers = subscribers.length;');
+    const end = s.indexOf('  const circleLength =', start);
+    must(start >= 0 && end > start, 'MobileDashboard accounting block missing');
+    s = s.slice(0, start) + `  // AUTHORITATIVE_FINANCE_V2\n  const dashboardSummary = summarizeSubscribers(subscribers, pricingTiers, activeMonthId);\n  const totalSubscribers = dashboardSummary.totalSubscribers;\n  const paidSubs = dashboardSummary.paidSubscribers;\n  const unpaidSubs = dashboardSummary.unpaidSubscribers;\n  const totalCollectedRevenue = dashboardSummary.collected;\n  const totalUnpaidDebt = dashboardSummary.outstanding;\n  const currentMonthTotal = dashboardSummary.monthTotal;\n\n` + s.slice(end);
+  }
   // Cashbox headline must match the real collected total if older audit rows are incomplete.
   s = s.replace('{formatCurrency(cashboxAmount, generatorSpecs.currency)}', '{formatCurrency(totalCollectedRevenue, generatorSpecs.currency)}');
   write(p, s);
@@ -145,10 +147,12 @@ export function reconciledCashbox(collected: number, logs: AuditLogEntry[] = [],
   s = addImportAfter(s, "import { formatCurrency } from '../utils/formatters';", "import { reconciledCashbox, summarizeSubscribers } from '../utils/authoritativeAccounting';");
   if (!s.includes('  activeMonthId?: string;')) s = s.replace('  walletResetTimestamp?: string;', '  walletResetTimestamp?: string;\n  activeMonthId?: string;');
   if (!s.includes('  activeMonthId,\n  onOpenPricingModal')) s = s.replace('  walletResetTimestamp,\n  onOpenPricingModal', '  walletResetTimestamp,\n  activeMonthId,\n  onOpenPricingModal');
-  const start = s.indexOf('  const totalCount = subscribers.length;');
-  const ret = s.indexOf('  return (', start);
-  must(start >= 0 && ret > start, 'DashboardView accounting block missing');
-  s = s.slice(0, start) + `  // AUTHORITATIVE_FINANCE_V2\n  const dashboardSummary = summarizeSubscribers(subscribers, pricingTiers, activeMonthId);\n  const totalCount = dashboardSummary.totalSubscribers;\n  const paidSubscribers = dashboardSummary.paidSubscribers;\n  const unpaidSubscribers = dashboardSummary.unpaidSubscribers;\n  const totalUnpaidDebt = dashboardSummary.outstanding;\n  const totalCollectedRevenue = reconciledCashbox(dashboardSummary.collected, auditLogs, walletResetTimestamp, activeMonthId);\n\n` + s.slice(ret);
+  if (!s.includes('AUTHORITATIVE_FINANCE_V2')) {
+    const start = s.indexOf('  const totalCount = subscribers.length;');
+    const ret = s.indexOf('  return (', start);
+    must(start >= 0 && ret > start, 'DashboardView accounting block missing');
+    s = s.slice(0, start) + `  // AUTHORITATIVE_FINANCE_V2\n  const dashboardSummary = summarizeSubscribers(subscribers, pricingTiers, activeMonthId);\n  const totalCount = dashboardSummary.totalSubscribers;\n  const paidSubscribers = dashboardSummary.paidSubscribers;\n  const unpaidSubscribers = dashboardSummary.unpaidSubscribers;\n  const totalUnpaidDebt = dashboardSummary.outstanding;\n  const totalCollectedRevenue = reconciledCashbox(dashboardSummary.collected, auditLogs, walletResetTimestamp, activeMonthId);\n\n` + s.slice(ret);
+  }
   s = s.replace(/\{paidSubscribers\.reduce\([\s\S]*?\.toLocaleString\(\)\}/, '{dashboardSummary.collected.toLocaleString()}');
   write(p, s);
 }
