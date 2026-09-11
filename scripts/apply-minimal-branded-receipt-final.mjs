@@ -4,8 +4,8 @@ const read = (path) => fs.readFileSync(path, 'utf8');
 const write = (path, value) => fs.writeFileSync(path, value, 'utf8');
 const must = (value, message) => { if (!value) throw new Error(`Minimal branded receipt finalizer: ${message}`); };
 
-// Web/browser receipt: keep all subscriber/context fields, but show money exactly once
-// in the final boxed total. Put the Moldatk logo + system name at the very top.
+// Web/browser receipt: keep subscriber/context fields, but show money exactly once
+// in the final boxed total. Put Moldatk identity at the very top.
 {
   const path = 'src/components/InvoiceReceiptModal.tsx';
   let source = read(path);
@@ -19,9 +19,12 @@ const must = (value, message) => { if (!value) throw new Error(`Minimal branded 
     "          remainingAmount: '',"
   );
 
-  source = source.replace(/\n\s*\{pricePerAmp > 0 && <Row label="سعر الأمبير الشهري" value=\{formatCurrency\(pricePerAmp\)\} strong \/>\}/g, '');
-  source = source.replace(/\n\s*<div className="py-1\.5">\s*\n\s*<div className="text-\[10px\] font-bold text-slate-500">مبلغ التسديد<\/div>\s*\n\s*<div className="receipt-payment text-lg font-black mt-0\.5">\{isFree \? 'مجاني' : formatCurrency\(paymentAmount\)\}<\/div>\s*\n\s*<\/div>/g, '');
-  source = source.replace(/\n\s*\{remainingAmount > 0 && <Row label="المتبقي" value=\{formatCurrency\(remainingAmount\)\} \/>\}/g, '');
+  source = source.replace(/\n\s*\{pricePerAmp > 0 && <Row label="سعر الأمبير الشهري"[^\n]*\}/g, '');
+  source = source.replace(
+    /\n\s*<div className="[^"]*">\s*\n\s*<div className="[^"]*">مبلغ التسديد<\/div>\s*\n\s*<div className="receipt-payment[^"]*">[^\n]*<\/div>\s*\n\s*<\/div>/g,
+    ''
+  );
+  source = source.replace(/\n\s*\{remainingAmount > 0 && <Row label="المتبقي"[^\n]*\}/g, '');
 
   if (!source.includes('MOLDATK_RECEIPT_BRAND_HEADER_V1')) {
     const oldHeader = '            <div className="receipt-generator text-center text-xl font-black border-2 border-slate-950 rounded-lg px-2 py-2.5">{generatorName}</div>';
@@ -30,11 +33,9 @@ const must = (value, message) => { if (!value) throw new Error(`Minimal branded 
     source = source.replace(oldHeader, newHeader);
   }
 
-  // System identity is now at the top; avoid repeating it at the bottom.
   source = source.replace(/\n\s*<div className="receipt-brand text-center text-xl font-black leading-none">مولدتي<\/div>/g, '');
   source = source.replace(/\n\s*<div className="receipt-brand text-center text-xl font-black leading-none">مولدتك<\/div>/g, '');
 
-  // Ensure browser print keeps the image visible and crisp.
   if (!source.includes('.receipt-logo{width:12mm!important;height:12mm!important;object-fit:contain!important;display:block!important;margin:0 auto!important}')) {
     source = source.replace(
       '#thermal-receipt-printable .receipt-brand{font-size:20px!important;font-weight:900!important}',
@@ -46,12 +47,11 @@ const must = (value, message) => { if (!value) throw new Error(`Minimal branded 
   must(!source.includes('<Row label="سعر الأمبير الشهري"'), 'web receipt still prints ampere price');
   must(!source.includes('>مبلغ التسديد</div>'), 'web receipt still prints middle received amount');
   must(!source.includes('<Row label="المتبقي"'), 'web receipt still prints remaining amount');
-  must(source.includes('>المبلغ النهائي</div>'), 'web final boxed amount missing');
+  must(source.includes('receipt-total') && source.includes('المبلغ النهائي'), 'web final boxed amount missing');
   write(path, source);
 }
 
 // Native SUNMI receipt: same rule — exactly one monetary value, inside the final box.
-// Add the real app vector mark and "مولدتك" above the generator name.
 {
   const path = 'android/app/src/main/java/com/mwaldatk/app/SunmiPrinterPlugin.java';
   let source = read(path);
@@ -67,7 +67,6 @@ const must = (value, message) => { if (!value) throw new Error(`Minimal branded 
     );
   }
 
-  // The generator remains on the receipt, but no longer impersonates the system brand.
   source = source.replace(
     '        String generatorName = val(r, "header", "المولدة");\n        lines.add(new DrawLine(generatorName, 31f, true, Layout.Alignment.ALIGN_CENTER, 10, true));',
     '        String generatorName = val(r, "header", "المولدة");\n        lines.add(new DrawLine("مولدتك", 31f, true, Layout.Alignment.ALIGN_CENTER, 5));\n        lines.add(new DrawLine(generatorName, 24f, true, Layout.Alignment.ALIGN_CENTER, 10, true));'
@@ -79,11 +78,9 @@ const must = (value, message) => { if (!value) throw new Error(`Minimal branded 
     '\n\n        String paidAmount = raw(r, "paidAmount");\n        String totalAmount = raw(r, "totalAmount");\n        String finalAmount = !paidAmount.isEmpty() ? paidAmount : totalAmount;'
   );
 
-  // Remove old bottom duplicate brand line; the system brand is now at the top.
   source = source.replace('        lines.add(new DrawLine("مولدتي", 31f, true, Layout.Alignment.ALIGN_CENTER, 2));\n', '');
   source = source.replace('        lines.add(new DrawLine("مولدتك", 31f, true, Layout.Alignment.ALIGN_CENTER, 2));\n', '');
 
-  // Reserve vertical room for the logo exactly once.
   source = source.replace(
     /int totalHeight = PADDING \* 2(?: \+ 18)?;/,
     'int totalHeight = PADDING * 2 + 18 + RECEIPT_LOGO_SIZE + RECEIPT_LOGO_GAP;'
