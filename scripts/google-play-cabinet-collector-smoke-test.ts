@@ -45,6 +45,6 @@ expect(fs.statSync('public/icons/moldatk-apple-touch-v6.png').size > 1000, 'Gene
 
 expect(gradle.includes('androidxEspressoCoreVersion'), 'Android Gradle Espresso variable mismatch remains');
 expect(!gradle.includes('androidxTestEspressoCoreVersion'), 'Broken Android Gradle variable remains');
-expect(gradle.includes('versionCode 29') && gradle.includes('versionName "1.3.25"'), 'Android release version is not 1.3.25/29');
+expect(gradle.includes('versionCode 30') && gradle.includes('versionName "1.3.26"'), 'Android release version is not 1.3.26/30');
 
-console.log('Google Play legal pages, actual multi-cabinet collector picker/scope, cabinet deletion/order sync, iPhone/PWA v6 icon and Android build regression: OK');
+console.log('Google Play legal pages, actual multi-cabinet collector picker/scope, cabinet deletion/order sync, iPhone/PWA v6 icon and Android 1.3.26 build regression: OK');
