@@ -93,12 +93,20 @@ src = src.replace(
   "import { calculateSubscriberBill } from '../utils/formatters';\nimport { AdminAdSlidesPanel } from './AdminAdSlidesPanel';\nimport { SeasonalCampaignManager } from './SeasonalCampaignManager';\nimport { CustomerOrdersPanel } from './CustomerOrdersPanel';"
 );
 
-src = src.replace(/type Tab = 'overview' \| 'generators' \| 'finance' \| 'notifications';/g, "type Tab = 'overview' | 'generators' | 'finance' | 'orders' | 'notifications';");
+// Keep the orders tab through both the plain and owner-gated navigation variants produced
+// by the lint -> build mutation chain.
+src = src.replace(/type Tab = ([^;]+);/, (full, union) => {
+  if (union.includes("'orders'")) return full;
+  const withOrders = union.includes("'notifications'")
+    ? union.replace("'notifications'", "'orders' | 'notifications'")
+    : `${union} | 'orders'`;
+  return `type Tab = ${withOrders};`;
+});
 src = src.replace(/\n\s*\['orders', 'طلبات الموقع',[^\n]*\n/g, '\n');
-src = src.replace(
-  "    ['finance', 'الحسابات', CircleDollarSign],\n    ['notifications', 'الإشعارات', Bell],",
-  "    ['finance', 'الحسابات', CircleDollarSign],\n    ['orders', 'طلبات الموقع', WalletCards],\n    ['notifications', 'الإشعارات', Bell],"
-);
+const financeNav = "    ['finance', 'الحسابات', CircleDollarSign],";
+if (src.includes(financeNav) && !src.includes("['orders', 'طلبات الموقع', WalletCards]")) {
+  src = src.replace(financeNav, `${financeNav}\n    ['orders', 'طلبات الموقع', WalletCards],`);
+}
 
 src = src.replace(/\n\s*\{tab === 'orders' && <CustomerOrdersPanel \/>\}\s*\n/g, '\n');
 const generatorsNeedle = "          {tab === 'generators' &&";
@@ -148,4 +156,4 @@ if (!out.includes('<SeasonalCampaignManager />')) throw new Error('SeasonalCampa
 if (!out.includes("['orders', 'طلبات الموقع', WalletCards]")) throw new Error('Customer orders navigation missing after repair');
 if (!out.includes("{tab === 'orders' && <CustomerOrdersPanel />}")) throw new Error('CustomerOrdersPanel missing after repair');
 if (!landing.includes('href="/order"')) throw new Error('Customer order landing link missing after repair');
-console.log('Final admin ad, seasonal campaign and customer order repair applied.');
+console.log('Final admin ad, seasonal campaign and customer order repair applied with repeat-build-safe navigation.');
