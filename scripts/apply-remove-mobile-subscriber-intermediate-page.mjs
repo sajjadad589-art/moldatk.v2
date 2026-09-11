@@ -45,6 +45,7 @@ await import('./apply-discount-dashboard-boxes-final.mjs');
 await import('./apply-mobile-wallet-runtime-fix-final.mjs');
 await import('./apply-release-readiness-hardening.mjs');
 await import('./apply-subscription-lock-stability-fix.mjs');
+await import('./patch-minimal-receipt-finalizer-input.mjs');
 await import('./apply-minimal-branded-receipt-final.mjs');
 await import('./apply-update-sync-loop-fix.mjs');
 await import('./apply-dashboard-count-release-1-3-26.mjs');
