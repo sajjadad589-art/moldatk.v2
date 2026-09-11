@@ -16,14 +16,18 @@ source = source.replace(
   "      setSubscriptionLoading(userSession.role === 'generator_admin');",
   '      if (showBlockingLoader) setSubscriptionLoading(true);'
 );
-source = source.replace(
-  '      setSubscriptionLoading(true);',
-  '      if (showBlockingLoader) setSubscriptionLoading(true);'
-);
-source = source.replace(
-  '        setSubscriptionLoading(false);',
-  '        if (showBlockingLoader) setSubscriptionLoading(false);'
-);
+if (!source.includes('if (showBlockingLoader) setSubscriptionLoading(true);')) {
+  source = source.replace(
+    '      setSubscriptionLoading(true);',
+    '      if (showBlockingLoader) setSubscriptionLoading(true);'
+  );
+}
+if (!source.includes('if (showBlockingLoader) setSubscriptionLoading(false);')) {
+  source = source.replace(
+    '        setSubscriptionLoading(false);',
+    '        if (showBlockingLoader) setSubscriptionLoading(false);'
+  );
+}
 source = source.replace(
   '    void loadSubscription();',
   '    void loadSubscription(true);'
@@ -33,15 +37,24 @@ source = source.replace(
   '    const timer = window.setInterval(() => void loadSubscription(false), 30 * 1000);'
 );
 
-const finalLegacyGuards = `  if ((userSession.role === 'generator_admin' || userSession.role === 'collector') && !subscriptionLoading && subscriptionInfo?.accountStatus === 'suspended') {\n    return <SuspendedAccountScreen reason={subscriptionInfo.suspensionReason} onLogout={handleLogout} />;\n  }\n\n  if ((userSession.role === 'generator_admin' || userSession.role === 'collector') && !subscriptionLoading && (!subscriptionInfo || subscriptionInfo.subscriptionStatus !== 'active' || daysUntilExpiry(subscriptionInfo.endsAt) <= 0)) {\n    return <ExpiredSubscriptionScreen onLogout={handleLogout} />;\n  }`;
-
-const canonicalLegacyGuards = `  if (userSession.role === 'generator_admin' && !subscriptionLoading && subscriptionInfo?.accountStatus === 'suspended') {\n    return <SuspendedAccountScreen reason={subscriptionInfo.suspensionReason} onLogout={handleLogout} />;\n  }\n\n  if (userSession.role === 'generator_admin' && !subscriptionLoading && (!subscriptionInfo || subscriptionInfo.subscriptionStatus !== 'active' || daysUntilExpiry(subscriptionInfo.endsAt) <= 0)) {\n    return <ExpiredSubscriptionScreen onLogout={handleLogout} />;\n  }`;
-
 const stableGuards = `  const subscriptionAccessControlled = userSession.role === 'generator_admin' || userSession.role === 'collector';\n\n  // SUBSCRIPTION_LOCK_STABILITY_V1: a refresh may update data, but it can never temporarily expose the app.\n  if (subscriptionAccessControlled && subscriptionInfo?.accountStatus === 'suspended') {\n    return <SuspendedAccountScreen reason={subscriptionInfo.suspensionReason} onLogout={handleLogout} />;\n  }\n\n  if (subscriptionAccessControlled && subscriptionInfo && (subscriptionInfo.subscriptionStatus !== 'active' || daysUntilExpiry(subscriptionInfo.endsAt) <= 0)) {\n    return <ExpiredSubscriptionScreen onLogout={handleLogout} />;\n  }\n\n  if (subscriptionAccessControlled && !subscriptionInfo) {\n    if (subscriptionLoading) {\n      return (\n        <div dir=\"rtl\" className=\"min-h-screen bg-slate-100 dark:bg-[#070d1e] flex items-center justify-center p-5 font-['Cairo',sans-serif]\">\n          <div className=\"w-full max-w-md bg-white dark:bg-[#111c38] rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl p-8 text-center\">\n            <div className=\"w-10 h-10 mx-auto rounded-full border-4 border-slate-200 border-t-blue-600 animate-spin mb-4\" />\n            <div className=\"font-black text-slate-900 dark:text-white\">جاري التحقق من حالة الاشتراك...</div>\n          </div>\n        </div>\n      );\n    }\n    return <ExpiredSubscriptionScreen onLogout={handleLogout} />;\n  }`;
 
 if (!source.includes('const subscriptionAccessControlled =')) {
-  if (source.includes(finalLegacyGuards)) source = source.replace(finalLegacyGuards, stableGuards);
-  else if (source.includes(canonicalLegacyGuards)) source = source.replace(canonicalLegacyGuards, stableGuards);
+  const suspendedNeedle = "subscriptionInfo?.accountStatus === 'suspended'";
+  const expiredNeedle = 'daysUntilExpiry(subscriptionInfo.endsAt) <= 0';
+  const suspendedIndex = source.indexOf(suspendedNeedle);
+  const blockStart = suspendedIndex >= 0 ? source.lastIndexOf('  if (', suspendedIndex) : -1;
+  const expiredIndex = blockStart >= 0 ? source.indexOf(expiredNeedle, suspendedIndex) : -1;
+  const expiredReturnIndex = expiredIndex >= 0 ? source.indexOf('return <ExpiredSubscriptionScreen', expiredIndex) : -1;
+  const blockEndMarker = expiredReturnIndex >= 0 ? source.indexOf('\n  }', expiredReturnIndex) : -1;
+  const blockEnd = blockEndMarker >= 0 ? blockEndMarker + '\n  }'.length : -1;
+
+  must(blockStart >= 0, 'suspended guard start not found');
+  must(expiredIndex >= 0, 'expired guard not found');
+  must(expiredReturnIndex >= 0, 'expired guard return not found');
+  must(blockEnd > blockStart, 'subscription guard block end not found');
+
+  source = source.slice(0, blockStart) + stableGuards + source.slice(blockEnd);
 }
 
 must(source.includes('SUBSCRIPTION_LOCK_STABILITY_V1'), 'marker missing');
