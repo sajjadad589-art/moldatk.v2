@@ -19,10 +19,21 @@ const superAdmin = read('src/components/SuperAdminDashboard.tsx');
 assert(superAdmin.includes("[['notifications', 'الإشعارات', Bell]]"), 'notifications nav is not owner-gated');
 assert(!superAdmin.includes("    ['notifications', 'الإشعارات', Bell],"), 'unrestricted notifications nav remains');
 assert(superAdmin.includes("tab === 'notifications' && isOwnerSuperAdmin"), 'notifications page is not owner-gated');
+assert(superAdmin.includes('SUPER_ADMIN_SUBSCRIPTION_STATUS_V2'), 'effective subscription status UI missing');
+assert(superAdmin.includes("effectiveStatus === 'suspended' ? 'اشتراك متوقف' : 'اشتراك منتهي'"), 'expired/suspended status labels missing');
+assert(superAdmin.includes('subscriptionRemainingText(sub)'), 'remaining subscription duration is not shown');
+assert(superAdmin.includes('SUPER_ADMIN_RESPONSIVE_NOTIFICATION_CENTER_V2'), 'responsive notifications center missing');
+assert(superAdmin.includes('<SeasonalCampaignsPanel />'), 'responsive seasonal campaigns panel missing');
+assert(superAdmin.includes('<AdminAdSlidesPanel />'), 'admin advertisement panel missing');
+assert(!superAdmin.includes('<SeasonalCampaignManager />'), 'legacy duplicate seasonal manager remains');
+assert(!superAdmin.includes('min-w-[1100px]'), 'Super Admin still forces desktop-only width');
 if (superAdmin.includes('WebsiteReleaseManager')) {
   assert(superAdmin.includes("[['website', 'الموقع والتحديثات', Wrench]]"), 'release-management nav is not owner-gated');
   assert(superAdmin.includes("tab === 'website' && isOwnerSuperAdmin"), 'release-management page is not owner-gated');
 }
+
+const adPanel = read('src/components/AdminAdSlidesPanel.tsx');
+assert(!adPanel.includes('<SeasonalCampaignsPanel />'), 'duplicate seasonal editor still exists inside ads panel');
 
 const sync = read('src/lib/useGeneratorCloudSync.ts');
 assert(sync.includes("amount_due: (s.invoicesHistory || []).filter(i => i.status !== 'cancelled')"), 'cloud amount_due is not derived from invoice ledger');
@@ -51,8 +62,8 @@ assert(subscriberModal.includes('applyPaymentOldestFirst('), 'quick payment no l
 assert(subscriberModal.includes('onSaveSubscriber(updated);'), 'subscriber payment does not persist updated ledger state');
 
 const gradle = read('android/app/build.gradle');
-assert(/versionCode\s+30\b/.test(gradle), 'Android versionCode is not 30');
-assert(/versionName\s+"1\.3\.26"/.test(gradle), 'Android versionName is not 1.3.26');
+assert(/versionCode\s+31\b/.test(gradle), 'Android versionCode is not 31');
+assert(/versionName\s+"1\.3\.27"/.test(gradle), 'Android versionName is not 1.3.27');
 
 const mobileDashboard = read('src/components/mobile/MobileDashboard.tsx');
 assert(mobileDashboard.includes('const totalSubscribers = paidSubs.length + unpaidSubs.length;'), 'mobile dashboard total is not aligned with paid + unpaid classified subscribers');
@@ -62,7 +73,7 @@ assert(updaterFinalizer.includes('candidates.sort((a, b) => Number(b.versionCode
 
 const sw = read('public/sw.js');
 const main = read('src/main.tsx');
-assert(sw.includes('moldatk-shell-v4-1.3.26'), '1.3.26 service-worker cache marker missing');
-assert(main.includes('/sw.js?v=1.3.26'), '1.3.26 service-worker registration missing');
+assert(sw.includes('moldatk-shell-v4-1.3.27'), '1.3.27 service-worker cache marker missing');
+assert(main.includes('/sw.js?v=1.3.27'), '1.3.27 service-worker registration missing');
 
-console.log('Release readiness regression passed: dashboard count, versioning, update selection, Web Push rotation, Super Admin permissions, payout settings, cloud debt, duplicate-invoice protection, sticky subscription locks, and onboarding debt payments are wired for 1.3.26.');
+console.log('Release readiness regression passed: Super Admin subscription status/remaining time, responsive seasons/notifications, dashboard count, versioning, update selection, Web Push rotation, permissions, cloud debt, sticky subscription locks, and onboarding debt payments are wired for 1.3.27.');
