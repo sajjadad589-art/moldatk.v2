@@ -28,4 +28,7 @@ if (!out.includes("import { AdminAdSlidesPanel } from './AdminAdSlidesPanel';"))
 if (!out.includes('<AdminAdSlidesPanel />')) {
   throw new Error('AdminAdSlidesPanel was not inserted before notification form');
 }
+
+await import('./patch-final-ad-version-compat-1-3-27.mjs');
+
 console.log('Super admin ad panel injected as sibling before notification form.');
