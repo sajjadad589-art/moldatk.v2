@@ -49,3 +49,4 @@ await import('./patch-minimal-receipt-finalizer-input.mjs');
 await import('./apply-minimal-branded-receipt-final.mjs');
 await import('./apply-update-sync-loop-fix.mjs');
 await import('./apply-dashboard-count-release-1-3-26.mjs');
+await import('./apply-super-admin-status-responsive-final.mjs');
