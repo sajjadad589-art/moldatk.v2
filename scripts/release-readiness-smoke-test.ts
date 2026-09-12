@@ -27,6 +27,7 @@ assert(superAdmin.includes('<SeasonalCampaignsPanel />'), 'responsive seasonal c
 assert(superAdmin.includes('<AdminAdSlidesPanel />'), 'admin advertisement panel missing');
 assert(!superAdmin.includes('<SeasonalCampaignManager />'), 'legacy duplicate seasonal manager remains');
 assert(!superAdmin.includes('min-w-[1100px]'), 'Super Admin still forces desktop-only width');
+assert(superAdmin.includes("supabase.functions.invoke('purge-generator-account'"), 'generator deletion is not using permanent purge backend');
 if (superAdmin.includes('WebsiteReleaseManager')) {
   assert(superAdmin.includes("[['website', 'الموقع والتحديثات', Wrench]]"), 'release-management nav is not owner-gated');
   assert(superAdmin.includes("tab === 'website' && isOwnerSuperAdmin"), 'release-management page is not owner-gated');
@@ -42,6 +43,7 @@ assert(
   sync.includes('dedupeInvoicesForCloud(writableSubscribers.flatMap') || sync.includes('dedupeInvoicesForCloud(subscribers.flatMap'),
   'cloud invoice dedupe is not wired'
 );
+assert(sync.includes('moldatk_factory_reset_in_progress'), 'cloud sync is not frozen during factory reset');
 
 const app = read('src/App.tsx');
 assert(app.includes('SUBSCRIPTION_LOCK_STABILITY_V1'), 'subscription lock stability marker missing');
@@ -53,6 +55,8 @@ assert(app.includes("subscriptionInfo?.accountStatus === 'suspended'"), 'suspend
 assert(app.includes("subscriptionInfo.subscriptionStatus !== 'active' || daysUntilExpiry(subscriptionInfo.endsAt) <= 0"), 'expired account lock missing');
 assert(!app.includes("&& !subscriptionLoading && subscriptionInfo?.accountStatus === 'suspended'"), 'suspended account can temporarily unlock during refresh');
 assert(!app.includes("&& !subscriptionLoading && (!subscriptionInfo || subscriptionInfo.subscriptionStatus !== 'active'"), 'expired account can temporarily unlock during refresh');
+assert(app.includes("action: 'reset_generator_data'"), 'cloud-authoritative owner reset missing');
+assert(app.includes("action: 'delete_subscriber'"), 'permanent subscriber deletion missing');
 
 const subscriberModal = read('src/components/SubscriberModal.tsx');
 assert(subscriberModal.includes("const onboardingNoCurrentCharge = String(ensured.currentInvoice?.notes || '').includes('MOLDATK_ONBOARDING_NO_CURRENT_CHARGE');"), 'debt-aware onboarding quick-payment state missing');
@@ -62,8 +66,8 @@ assert(subscriberModal.includes('applyPaymentOldestFirst('), 'quick payment no l
 assert(subscriberModal.includes('onSaveSubscriber(updated);'), 'subscriber payment does not persist updated ledger state');
 
 const gradle = read('android/app/build.gradle');
-assert(/versionCode\s+31\b/.test(gradle), 'Android versionCode is not 31');
-assert(/versionName\s+"1\.3\.27"/.test(gradle), 'Android versionName is not 1.3.27');
+assert(/versionCode\s+32\b/.test(gradle), 'Android versionCode is not 32');
+assert(/versionName\s+"1\.3\.28"/.test(gradle), 'Android versionName is not 1.3.28');
 
 const mobileDashboard = read('src/components/mobile/MobileDashboard.tsx');
 assert(mobileDashboard.includes('const totalSubscribers = paidSubs.length + unpaidSubs.length;'), 'mobile dashboard total is not aligned with paid + unpaid classified subscribers');
@@ -73,7 +77,7 @@ assert(updaterFinalizer.includes('candidates.sort((a, b) => Number(b.versionCode
 
 const sw = read('public/sw.js');
 const main = read('src/main.tsx');
-assert(sw.includes('moldatk-shell-v4-1.3.27'), '1.3.27 service-worker cache marker missing');
-assert(main.includes('/sw.js?v=1.3.27'), '1.3.27 service-worker registration missing');
+assert(sw.includes('moldatk-shell-v4-1.3.28'), '1.3.28 service-worker cache marker missing');
+assert(main.includes('/sw.js?v=1.3.28'), '1.3.28 service-worker registration missing');
 
-console.log('Release readiness regression passed: Super Admin subscription status/remaining time, responsive seasons/notifications, dashboard count, versioning, update selection, Web Push rotation, permissions, cloud debt, sticky subscription locks, and onboarding debt payments are wired for 1.3.27.');
+console.log('Release readiness regression passed: Super Admin status/UI, permanent data purge, dashboard count, versioning, update selection, Web Push, permissions, cloud debt, subscription locks, and onboarding payments are wired for 1.3.28.');
