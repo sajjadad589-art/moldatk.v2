@@ -34,8 +34,8 @@ jobs:
       VITE_SUPABASE_URL: https://adluynhkikoodjljoxeu.supabase.co
       VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CObjK2Uua18kVkXCkxdRog_keQLIDiE
       VITE_ENABLE_NATIVE_PUSH: 'true'
-      CURRENT_VERSION: 1.3.27
-      CURRENT_VERSION_CODE: 31
+      CURRENT_VERSION: 1.3.28
+      CURRENT_VERSION_CODE: 32
       SHOULD_RELEASE: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release')) }}
 
     steps:
@@ -68,7 +68,7 @@ jobs:
           grep -q 'moldatk-mark.svg' src/LandingPage.tsx
           grep -q 'MOLDATK_CALM_BRAND_V2' src/index.css
           grep -q 'MOLDATK_INTERNAL_CALM_THEME_V3' src/index.css
-          grep -q 'moldatk-shell-v4-1.3.27' public/sw.js
+          grep -q 'moldatk-shell-v4-1.3.28' public/sw.js
           grep -q 'moldatk-apple-touch-v6.png' index.html
           grep -q 'moldatk-icon-192-v6.png' public/manifest.webmanifest
 
@@ -108,6 +108,9 @@ jobs:
       - name: Destructive controls safety audit
         run: npx tsx scripts/secure-destructive-controls-audit.ts
 
+      - name: Permanent data purge regression test
+        run: npx tsx scripts/permanent-data-purge-smoke-test.ts
+
       - name: Super Admin owner create regression test
         run: npx tsx scripts/super-admin-owner-create-smoke-test.ts
 
@@ -125,8 +128,8 @@ jobs:
           test -f android/app/google-services.json
           grep -q 'com.mwaldatk.app' android/app/google-services.json
           grep -q 'POST_NOTIFICATIONS' android/app/src/main/AndroidManifest.xml
-          grep -q 'versionCode 31' android/app/build.gradle
-          grep -q 'versionName "1.3.27"' android/app/build.gradle
+          grep -q 'versionCode 32' android/app/build.gradle
+          grep -q 'versionName "1.3.28"' android/app/build.gradle
 
       - name: Build debug APK
         run: |
@@ -206,7 +209,7 @@ jobs:
           else
             gh release create "$TAG" release/Moldatk-Android-Release.apk release/Moldatk-Android-Release.aab \
               --title "مولدتك ${CURRENT_VERSION}" \
-              --notes "تصحيح حالة اشتراك أصحاب المولدات حسب وقت الانتهاء الفعلي والإيقاف الإداري، إظهار المدة المتبقية، وإعادة تصميم واجهات المواسم والإشعارات لتعمل بصورة متناسقة على الهاتف والحاسوب."
+              --notes "تصفير بيانات صاحب المولدة صار سحابياً ودائماً، حذف المشترك يمسح فواتيره وديونه وتسديداته، وحذف صاحب المولدة يمسح بياناته وحساباته وملفاته المرتبطة نهائياً."
           fi
 
       - name: Activate in-app update manifest
@@ -223,7 +226,7 @@ jobs:
             minimumVersionCode: versionCode,
             force: true,
             apkUrl: `https://github.com/sajjadad589-art/moldatk.v2/releases/download/v${version}/Moldatk-Android-Release.apk`,
-            notes: 'تحديث إلزامي 1.3.27: تصحيح حالة الاشتراك والمدة المتبقية وتحسين واجهات المواسم والإشعارات على الهاتف والحاسوب.'
+            notes: 'تحديث إلزامي 1.3.28: تصفير سحابي دائم، حذف كامل للمشترك وصاحب المولدة، ومنع رجوع البيانات بعد إعادة التحميل.'
           };
           fs.writeFileSync('public/app-version.json', JSON.stringify(manifest, null, 2) + '\n');
           NODE
