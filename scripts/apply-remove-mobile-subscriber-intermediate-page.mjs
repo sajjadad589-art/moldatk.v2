@@ -52,3 +52,4 @@ await import('./apply-dashboard-count-release-1-3-26.mjs');
 await import('./patch-super-admin-status-finalizer-idempotence.mjs');
 await import('./apply-super-admin-status-responsive-final.mjs');
 await import('./preserve-super-admin-subscriber-count-after-responsive.mjs');
+await import('./apply-permanent-data-purge-final.mjs');
