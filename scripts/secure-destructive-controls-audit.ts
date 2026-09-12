@@ -7,6 +7,7 @@ const reports = read('src/components/mobile/MobileMonthlyReports.tsx');
 const pricing = read('src/components/PricingModal.tsx');
 const reset = read('src/components/SecureSystemReset.tsx');
 const sync = read('src/lib/useGeneratorCloudSync.ts');
+const superAdmin = read('src/components/SuperAdminDashboard.tsx');
 
 // Full reset protection.
 assert(reset.includes("const CONFIRM_PHRASE = 'تصفير جميع بيانات مولدتك'"), 'Exact destructive confirmation phrase is required');
@@ -19,22 +20,17 @@ assert(app.includes("a.download = 'moldatk-backup-before-reset-'"), 'Desktop dow
 assert(app.includes('const isIOSBrowser = /iPad|iPhone|iPod/i.test(navigator.userAgent)'), 'iOS reset must detect Safari/WebView');
 assert(app.includes('const shouldAutoDownloadBackup = !isIOSBrowser && !Capacitor.isNativePlatform()'), 'iOS/native reset must not auto-open the JSON backup preview');
 assert(app.includes("console.info('Reset backup kept safely inside Moldatk; automatic file preview skipped on iOS/native app.')"), 'Mobile reset must preserve backup without navigating away');
-assert(app.includes(".delete().eq('generator_id', generatorId)"), 'Cloud deletes must be generator-scoped');
 assert(sync.includes('moldatk_factory_reset_in_progress'), 'Cloud sync must pause during destructive reset');
+assert(app.includes("supabase.functions.invoke('generator-data-admin'"), 'Full reset must run through the protected generator data Edge Function');
+assert(app.includes("action: 'reset_generator_data'"), 'Cloud-authoritative reset action missing');
+assert(app.includes("action: 'delete_subscriber'"), 'Permanent subscriber delete action missing');
+assert(app.includes('handleDeleteSubscriberPermanent'), 'Subscriber delete callbacks are not centralized');
+assert(superAdmin.includes("supabase.functions.invoke('purge-generator-account'"), 'Super Admin account deletion must use the permanent purge backend');
+assert(!superAdmin.includes("action: 'delete_account'"), 'Legacy partial generator delete action is still wired in the final UI');
 
-// Full reset scope must include all core accounting/business tables, while auth/subscription are intentionally preserved.
-for (const table of [
-  'generator_invoices',
-  'generator_subscribers',
-  'generator_lines',
-  'generator_monthly_tariffs',
-  'generator_audit_logs',
-  'generator_settings',
-]) {
-  assert(app.includes(`'${table}'`), `Full reset must clear ${table}`);
-}
-assert(!app.includes("supabase.from('generator_subscriptions').delete"), 'Owner subscription must not be deleted');
-assert(!app.includes('supabase.auth.admin.deleteUser'), 'Owner login must not be deleted');
+// The account/subscription identity is intentionally preserved by an owner factory reset.
+assert(!app.includes("supabase.from('generator_subscriptions').delete"), 'Owner subscription must not be deleted by owner factory reset');
+assert(!app.includes('supabase.auth.admin.deleteUser'), 'Owner client must never delete Auth users directly');
 
 // Annual report reset is a presentation/accounting-period reset, not a debt erase.
 assert(reports.includes('reportResetMarkers'), 'Reports must support annual reset markers');
@@ -53,4 +49,4 @@ assert(app.includes("getStorageKey('moldatk_deleted_tariffs')"), 'Tariff deletio
 assert(app.includes('normalized.length === 0'), 'Empty tariff list must have an explicit live-zero path');
 assert(sync.includes('.filter(t => !deletedTariffSet.has(t.id))'), 'Deleted tariffs must not resurrect from cloud pull');
 
-console.log('Secure destructive controls audit passed: owner re-auth, iOS-safe backup, scoped reset, annual reports reset, delete-all tariffs, live-zero state, and preserved accounting history.');
+console.log('Secure destructive controls audit passed: password + 10s protection, backup, cloud-authoritative factory reset, permanent subscriber/generator purge wiring, annual report reset, and tariff history safeguards are intact.');
