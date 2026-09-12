@@ -23,6 +23,10 @@ if (src.includes('<AdminAdSlidesPanel />') && !src.includes('SUPER_ADMIN_NOTIFIC
 }
 
 // Owner-only destructive account deletion from the generator details modal.
+// On the first mutation pass this installs the legacy protected handler. The
+// absolute release finalizer upgrades it to purge-generator-account. On the
+// second lint->build pass, preserve that stronger handler instead of requiring
+// the legacy action marker to reappear.
 if (!src.includes('const deleteGeneratorAccount = async () =>')) {
   const marker = '  const openEditSubscription = () => {';
   if (!src.includes(marker)) throw new Error('Super Admin openEditSubscription marker not found');
@@ -45,7 +49,11 @@ if (seasonalManagerUsage !== 0) throw new Error('Duplicate standalone seasonal m
 if (!src.includes('SUPER_ADMIN_NOTIFICATIONS_LAYOUT_V2')) throw new Error('Notifications responsive layout marker missing');
 if (!src.includes('const deleteGeneratorAccount = async () =>')) throw new Error('Generator delete handler missing');
 if (!src.includes('onClick={() => void deleteGeneratorAccount()}')) throw new Error('Generator delete button missing');
-if (!src.includes("action: 'delete_account'")) throw new Error('Generator delete edge action missing from UI');
+const hasLegacyProtectedDelete = src.includes("action: 'delete_account'");
+const hasPermanentPurgeDelete = src.includes("supabase.functions.invoke('purge-generator-account'");
+if (!hasLegacyProtectedDelete && !hasPermanentPurgeDelete) throw new Error('Generator delete backend action missing from UI');
 
 fs.writeFileSync(path, src, 'utf8');
-console.log('Super Admin notifications deduplicated/reordered and protected generator delete action added.');
+console.log(hasPermanentPurgeDelete
+  ? 'Super Admin notifications finalized; permanent generator purge handler preserved.'
+  : 'Super Admin notifications deduplicated/reordered and protected generator delete action added.');
