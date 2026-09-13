@@ -1,0 +1,22 @@
+name: Sync and cashbox regression
+on:
+  pull_request:
+  push:
+    branches: [fix/event-sync-cashbox-reset]
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      VITE_SUPABASE_URL: https://adluynhkikoodjljoxeu.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CObjK2Uua18kVkXCkxdRog_keQLIDiE
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run test:sync-cashbox
+      - run: npm run build
+      - run: npx tsc --noEmit
