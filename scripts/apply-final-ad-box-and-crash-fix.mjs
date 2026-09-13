@@ -55,6 +55,7 @@ await import('./apply-owner-ai-help-center.mjs');
 await import('./apply-lazy-xlsx.mjs');
 await import('./apply-android-push-superadmin-data-fix.mjs');
 await import('./apply-superadmin-notifications-delete-generator-fix.mjs');
+await import('./apply-super-admin-storage-card.mjs');
 
 removeMobileSlider(reportsPath);
 
@@ -71,6 +72,7 @@ if (!finalSettings.includes('<OwnerAIAssistant') || !finalSettings.includes('<He
 if (finalSuperAdmin.includes('<SeasonalCampaignManager />')) throw new Error('Duplicate seasonal manager remains in Super Admin');
 if (!finalSuperAdmin.includes('SUPER_ADMIN_NOTIFICATIONS_LAYOUT_V2')) throw new Error('Super Admin notifications layout fix missing');
 if (!finalSuperAdmin.includes('deleteGeneratorAccount')) throw new Error('Super Admin generator delete control missing');
+if (!finalSuperAdmin.includes('<SuperAdminStorageCard />')) throw new Error('Super Admin storage monitor missing');
 
 await import('./apply-brand-identity-v2.mjs');
 await import('./apply-brand-surfaces-v2.mjs');
@@ -126,4 +128,4 @@ await import('./apply-subscriber-first-page-print-motion.mjs');
 await import('./apply-subscriber-payment-ux-final.mjs');
 await import('./apply-remove-mobile-subscriber-intermediate-page.mjs');
 
-console.log('Final release guard preserved core features, enforced the calm internal theme, Google Play legal surfaces, cabinet sync safety, collector cabinet assignments, and the corrected iOS/PWA icon set.');
+console.log('Final release guard preserved core features, enforced the calm internal theme, Google Play legal surfaces, cabinet sync safety, collector cabinet assignments, Supabase storage monitoring, and the corrected iOS/PWA icon set.');
