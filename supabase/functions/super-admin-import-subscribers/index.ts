@@ -37,14 +37,11 @@ const numberValue = (value: unknown, fallback = 0) => {
 const dateValue = (value: unknown) => {
   const raw = text(value);
   if (!raw) return null;
-  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
   const d = new Date(raw);
   if (Number.isNaN(d.getTime())) return null;
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
 const allowedTiers = new Set(["normal", "commercial", "golden", "free", "custom"]);
@@ -56,6 +53,7 @@ Deno.serve(async (req) => {
 
   const url = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
   const authHeader = req.headers.get("Authorization") || "";
   const token = authHeader.replace(/^Bearer\s+/i, "");
   if (!token) return json({ ok: false, error: "unauthorized" }, 401);
@@ -71,12 +69,20 @@ Deno.serve(async (req) => {
       admin.from("profiles").select("role,is_active").eq("id", caller.id).maybeSingle(),
       admin.from("super_admin_managers").select("is_owner,is_active").eq("id", caller.id).maybeSingle(),
     ]);
+
     const callerEmail = String(caller.email || "").toLowerCase();
-    const roleAllowed = Boolean(profile?.is_active && ["super_admin", "super_admin_manager"].includes(profile?.role));
-    const managerAllowed = Boolean(manager?.is_active);
-    if (!roleAllowed && !managerAllowed && callerEmail !== "almumizz@gmail.com") {
+    const isSuperAdmin = Boolean(profile?.is_active && profile?.role === "super_admin");
+    const isManager = Boolean(profile?.is_active && profile?.role === "super_admin_manager" && manager?.is_active);
+    if (!isSuperAdmin && !isManager && callerEmail !== "almumizz@gmail.com") {
       return json({ ok: false, error: "رفع المشتركين متاح للسوبر أدمن المخوّل فقط" }, 403);
     }
+
+    // Writes must run as the authenticated caller, not service_role.
+    // Subscriber permission triggers rely on auth.uid(); service_role has no caller uid.
+    const writer = createClient(url, anonKey, {
+      auth: { persistSession: false },
+      global: { headers: { Authorization: authHeader } },
+    });
 
     const body = await req.json().catch(() => ({}));
     const generatorId = text(body?.generator_id);
@@ -125,7 +131,8 @@ Deno.serve(async (req) => {
     };
 
     const prepared: any[] = [];
-    inputRows.forEach((raw: any, index: number) => {
+    for (let index = 0; index < inputRows.length; index += 1) {
+      const raw: any = inputRows[index] || {};
       const excelRow = Number(raw?.excel_row || index + 2);
       const fullName = text(raw?.full_name).replace(/\s+/g, " ");
       const normalizedName = nameKey(fullName);
@@ -135,17 +142,17 @@ Deno.serve(async (req) => {
       if (!fullName) {
         invalidRows += 1;
         warnings.push(`السطر ${excelRow}: لم يتم رفعه لأن الاسم فارغ.`);
-        return;
+        continue;
       }
       if (usedNames.has(normalizedName)) {
         duplicateNames += 1;
         warnings.push(`السطر ${excelRow}: الاسم مطابق لاسم موجود مسبقاً (${fullName}).`);
-        return;
+        continue;
       }
       if (normalizedPhone && usedPhones.has(normalizedPhone)) {
         duplicatePhones += 1;
         warnings.push(`السطر ${excelRow}: رقم الهاتف مكرر (${phone}).`);
-        return;
+        continue;
       }
 
       usedNames.add(normalizedName);
@@ -160,7 +167,6 @@ Deno.serve(async (req) => {
       const amperes = Math.max(0, Math.round(numberValue(raw?.amperes, 1)));
       const isExempted = Boolean(raw?.is_exempted) || tier === "free";
       const paid = isExempted ? 0 : Math.max(0, Math.round(numberValue(raw?.amount_paid, 0)));
-
       const explicitDue = raw?.amount_due === null || raw?.amount_due === undefined || raw?.amount_due === ""
         ? null
         : Math.max(0, Math.round(numberValue(raw?.amount_due, 0)));
@@ -175,7 +181,6 @@ Deno.serve(async (req) => {
         paymentStatus = isExempted ? "free" : paid >= total && total > 0 ? "paid" : paid > 0 ? "partial" : "unpaid";
       }
       if (isExempted) paymentStatus = "free";
-      const amountDue = paymentStatus === "free" ? 0 : Math.max(total - paid, 0);
 
       prepared.push({
         id: text(raw?.id) || `sub-${crypto.randomUUID()}`,
@@ -190,7 +195,7 @@ Deno.serve(async (req) => {
         box_number: text(raw?.box_number) || null,
         payment_status: paymentStatus,
         last_payment_date: dateValue(raw?.last_payment_date),
-        amount_due: amountDue,
+        amount_due: paymentStatus === "free" ? 0 : Math.max(total - paid, 0),
         amount_paid: paid,
         notes: text(raw?.notes) || null,
         is_exempted: isExempted,
@@ -199,7 +204,7 @@ Deno.serve(async (req) => {
         updated_at: new Date().toISOString(),
         excel_row: excelRow,
       });
-    });
+    }
 
     if (!prepared.length) {
       return json({
@@ -253,7 +258,7 @@ Deno.serve(async (req) => {
     }
 
     if (createdLines.length) {
-      const { error } = await admin.from("generator_lines").insert(createdLines);
+      const { error } = await writer.from("generator_lines").insert(createdLines);
       if (error) throw new Error(`generator_lines: ${error.message}`);
     }
 
@@ -268,34 +273,12 @@ Deno.serve(async (req) => {
       };
     });
 
-    const { error: insertError } = await admin.from("generator_subscribers").insert(subscriberRows);
+    const { error: insertError } = await writer.from("generator_subscribers").insert(subscriberRows);
     if (insertError) {
       if (createdLines.length) {
-        await admin.from("generator_lines").delete().eq("generator_id", generatorId).in("id", createdLines.map((line) => line.id));
+        await writer.from("generator_lines").delete().eq("generator_id", generatorId).in("id", createdLines.map((line) => line.id));
       }
       throw new Error(`generator_subscribers: ${insertError.message}`);
-    }
-
-    const { data: allSubscribers, error: statReadError } = await admin.from("generator_subscribers")
-      .select("line_id,amperes")
-      .eq("generator_id", generatorId);
-    if (!statReadError) {
-      const stats = new Map<string, { count: number; amps: number }>();
-      for (const sub of allSubscribers || []) {
-        if (!sub.line_id) continue;
-        const prev = stats.get(sub.line_id) || { count: 0, amps: 0 };
-        prev.count += 1;
-        prev.amps += numberValue(sub.amperes, 0);
-        stats.set(sub.line_id, prev);
-      }
-      const allLines = [...(existingLines || []), ...createdLines];
-      await Promise.all(allLines.map((line: any) => {
-        const stat = stats.get(line.id) || { count: 0, amps: 0 };
-        return admin.from("generator_lines")
-          .update({ subscribers_count: stat.count, current_load_amperes: Math.round(stat.amps), updated_at: new Date().toISOString() })
-          .eq("generator_id", generatorId)
-          .eq("id", line.id);
-      }));
     }
 
     await admin.from("generator_audit_logs").insert({
