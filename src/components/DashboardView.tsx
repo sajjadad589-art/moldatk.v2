@@ -47,7 +47,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       if (log.category !== 'payment') return false;
       if (resetTimeMs > 0) {
         const logTime = log.timestamp ? new Date(log.timestamp).getTime() : 0;
-        if (logTime > 0 && logTime < resetTimeMs) return false;
+        if (!Number.isFinite(logTime) || logTime <= resetTimeMs) return false;
       }
       return true;
     })
