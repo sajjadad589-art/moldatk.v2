@@ -52,11 +52,7 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
     return sub.paymentStatus === 'unpaid' || sub.paymentStatus === 'partial';
   });
 
-  const totalCollectedRevenue = subscribers.reduce((acc, sub) => {
-    const invoice = currentAccount(sub);
-    if (invoice) return acc + Number(invoice.paidAmount || 0);
-    return acc + (sub.paymentStatus === 'paid' || sub.paymentStatus === 'partial' ? Number(sub.amountPaid || 0) : 0);
-  }, 0);
+  const totalCollectedRevenue = billingCycleActive ? cashboxAmount : 0;
 
   const totalUnpaidDebt = subscribers.reduce((acc, sub) => {
     const invoice = currentAccount(sub);
