@@ -1,3 +1,4 @@
+import { useCashboxBalance } from '../lib/useCashboxBalance';
 import React from 'react';
 import {
   DollarSign,
@@ -41,7 +42,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const resetTimeMs = walletResetTimestamp ? new Date(walletResetTimestamp).getTime() : 0;
 
   // القاصة تقرأ حصراً من سجل العمليات المالية الجديدة مع حماية ضد القيم الفارغة أو غير الرقمية
-  const totalCollectedRevenue = auditLogs
+  const localCollectedRevenue = auditLogs
     .filter(log => {
       if (log.category !== 'payment') return false;
       if (resetTimeMs > 0) {
@@ -50,7 +51,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       }
       return true;
     })
-    .reduce((acc, log) => acc + (Number(log.amount) || 0), 0);
+    .reduce((acc, log) => acc + (Number(log.amount) || 0), 0);;
+  const totalCollectedRevenue = useCashboxBalance(localCollectedRevenue);
 
   // حساب الديون غير المسددة بأمان تام لمنع ظهور NaN
   const totalUnpaidDebt = unpaidSubscribers.reduce((acc, s) => {
