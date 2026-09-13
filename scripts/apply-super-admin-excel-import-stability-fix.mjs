@@ -8,8 +8,8 @@ if (!fs.existsSync(p)) {
 
 let c = fs.readFileSync(p, 'utf8');
 
-if (c.includes('SUPER_ADMIN_EXCEL_IMPORT_STABILITY_V4')) {
-  console.log('Super Admin Excel import stability/cabinet auto-link already applied.');
+if (c.includes('SUPER_ADMIN_EXCEL_IMPORT_CLOUD_V5')) {
+  console.log('Super Admin cloud Excel import already applied.');
   process.exit(0);
 }
 
@@ -21,30 +21,53 @@ if (start === -1 || end === -1) {
   process.exit(0);
 }
 
-const stableHandler = String.raw`  // SUPER_ADMIN_EXCEL_IMPORT_STABILITY_V4
+const cloudHandler = String.raw`  // SUPER_ADMIN_EXCEL_IMPORT_CLOUD_V5
   const importSubscribersFromExcel = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!excelImportForm.generator_id) return setMessage('اختر حساب صاحب المولدة قبل الرفع');
     if (!excelImportForm.file) return setMessage('اختر ملف Excel أولاً');
 
     const idle = () => new Promise<void>(resolve => setTimeout(resolve, 0));
-    const normalizePhoneKey = (value: unknown) => normalizeText(value)
-      .replace(/[٠-٩]/g, d => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
-      .replace(/[۰-۹]/g, d => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
-      .replace(/\D/g, '');
-    const normalizeLineKey = (value: unknown) => normalizeText(value)
-      .replace(/[ً-ْ]/g, '')
-      .replace(/[أإآ]/g, 'ا')
-      .replace(/ة/g, 'ه')
-      .replace(/ى/g, 'ي')
-      .replace(/[٠-٩]/g, d => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
-      .replace(/[۰-۹]/g, d => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
-      .replace(/[ـ_\-.\/\:،,()\[\]]/g, '')
-      .replace(/\s+/g, '')
-      .toLowerCase();
     const cellValue = (sheet: XLSX.WorkSheet, rowIndex: number, colIndex: number) => {
       const cell = sheet[XLSX.utils.encode_cell({ r: rowIndex, c: colIndex })];
       return cell?.w ?? cell?.v ?? '';
+    };
+    const normalizeImportPhone = (value: unknown) => {
+      const raw = normalizeText(value)
+        .replace(/[٠-٩]/g, d => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+        .replace(/[۰-۹]/g, d => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
+      const digits = raw.replace(/\D/g, '');
+      if (/^7\d{9}$/.test(digits)) return '0' + digits;
+      return raw;
+    };
+    const toNullableNumber = (value: unknown) => isEmptyCell(value) ? null : toNumber(value);
+    const toDateValue = (value: unknown) => {
+      if (value instanceof Date && !Number.isNaN(value.getTime())) {
+        const yyyy = value.getFullYear();
+        const mm = String(value.getMonth() + 1).padStart(2, '0');
+        const dd = String(value.getDate()).padStart(2, '0');
+        return yyyy + '-' + mm + '-' + dd;
+      }
+      const raw = normalizeText(value);
+      if (!raw) return null;
+      const iso = raw.match(/^(\d{4})[-\/]([01]?\d)[-\/]([0-3]?\d)/);
+      if (iso) return iso[1] + '-' + String(Number(iso[2])).padStart(2, '0') + '-' + String(Number(iso[3])).padStart(2, '0');
+      const parsed = new Date(raw);
+      if (Number.isNaN(parsed.getTime())) return null;
+      return parsed.getFullYear() + '-' + String(parsed.getMonth() + 1).padStart(2, '0') + '-' + String(parsed.getDate()).padStart(2, '0');
+    };
+    const explicitPaymentStatus = (value: unknown): PaymentStatus | null => {
+      const raw = normalizeText(value).toLowerCase();
+      if (!raw) return null;
+      if (raw.includes('مجاني') || raw.includes('معفي') || raw.includes('free')) return 'free';
+      if (raw.includes('جزئي') || raw.includes('partial')) return 'partial';
+      if (raw.includes('مسدد') || raw.includes('مدفوع') || raw.includes('paid')) return 'paid';
+      if (raw.includes('غير') || raw.includes('unpaid')) return 'unpaid';
+      return null;
+    };
+    const isTruthyExcel = (value: unknown) => {
+      const raw = normalizeText(value).toLowerCase();
+      return ['1', 'true', 'yes', 'y', 'نعم', 'معفي', 'مجاني'].includes(raw);
     };
 
     setExcelImporting(true);
@@ -54,10 +77,8 @@ const stableHandler = String.raw`  // SUPER_ADMIN_EXCEL_IMPORT_STABILITY_V4
 
     try {
       const generator = generators.find(g => g.id === excelImportForm.generator_id);
-      await idle();
       const buffer = await excelImportForm.file.arrayBuffer();
       setExcelImportProgress(10);
-      setExcelImportReport(prev => ({ ...prev, title: 'جاري قراءة المصنف بدون تجميد الصفحة...' }));
       await idle();
 
       const workbook = XLSX.read(buffer, { type: 'array', cellDates: true, cellNF: false, cellStyles: false, WTF: false });
@@ -69,198 +90,163 @@ const stableHandler = String.raw`  // SUPER_ADMIN_EXCEL_IMPORT_STABILITY_V4
       const range = XLSX.utils.decode_range(ref);
 
       const headers = Array.from({ length: range.e.c - range.s.c + 1 }, (_, index) => normalizeText(cellValue(sheet, range.s.r, range.s.c + index)));
+      const extraKnownHeaders = [
+        'الاسم الكامل', 'اسم الكابينة', 'رقم الجوزة / الصندوق', 'المبلغ المطلوب', 'المبلغ المسدد',
+        'آخر تاريخ تسديد', 'معفي؟', 'سبب الإعفاء', 'تاريخ الانضمام'
+      ].map(normalizeHeader);
+      const importKnownHeaderSet = new Set([...knownHeaderSet, ...extraKnownHeaders]);
       const visibleHeaders = headers.filter(Boolean);
       const totalColumns = visibleHeaders.length;
-      const unmappedColumns = visibleHeaders.filter(h => !knownHeaderSet.has(normalizeHeader(h)));
+      const unmappedColumns = visibleHeaders.filter(h => !importKnownHeaderSet.has(normalizeHeader(h)));
       const mappedColumns = Math.max(0, totalColumns - unmappedColumns.length);
-      const headerIndexByField: Record<string, number> = {};
-      for (const field of Object.keys(EXCEL_FIELD_ALIASES)) {
-        const wanted = EXCEL_FIELD_ALIASES[field].map(normalizeHeader);
-        const found = headers.findIndex(h => wanted.includes(normalizeHeader(h)));
-        if (found >= 0) headerIndexByField[field] = range.s.c + found;
-      }
-      const readField = (rowIndex: number, field: string) => {
-        const colIndex = headerIndexByField[field];
-        return typeof colIndex === 'number' ? cellValue(sheet, rowIndex, colIndex) : '';
-      };
       const readAny = (rowIndex: number, aliases: string[]) => {
         const wanted = aliases.map(normalizeHeader);
         const found = headers.findIndex(h => wanted.includes(normalizeHeader(h)));
         return found >= 0 ? cellValue(sheet, rowIndex, range.s.c + found) : '';
-      };
-      const readCabinetName = (rowIndex: number) => {
-        const explicitCabinet = normalizeText(readAny(rowIndex, ['الكابينة', 'كابينة', 'البورد', 'البورد/الكابينة', 'اسم الكابينة', 'cabinet', 'board']));
-        const line = normalizeText(readField(rowIndex, 'line'));
-        const box = normalizeText(readField(rowIndex, 'boxNumber'));
-        return explicitCabinet || line || box;
       };
 
       const dataStartRow = range.s.r + 1;
       const totalRows = Math.max(0, range.e.r - dataStartRow + 1);
       if (!totalRows) throw new Error('لا توجد بيانات مشتركين داخل الملف');
 
-      setExcelImportProgress(20);
-      setExcelImportReport({ ...EMPTY_EXCEL_REPORT, status: 'processing', title: 'تمت قراءة الملف، جاري إنشاء الكابينات وربط المشتركين...', generatorName: generator?.name || excelImportForm.generator_id, fileName: excelImportForm.file.name, totalRows, totalColumns, mappedColumns, unmappedColumns, cellsRead: 0 });
+      setExcelImportProgress(18);
+      setExcelImportReport({
+        ...EMPTY_EXCEL_REPORT,
+        status: 'processing',
+        title: 'تمت قراءة الملف، جاري تجهيز البيانات للرفع السحابي...',
+        generatorName: generator?.name || excelImportForm.generator_id,
+        fileName: excelImportForm.file.name,
+        totalRows,
+        totalColumns,
+        mappedColumns,
+        unmappedColumns,
+      });
       await idle();
 
-      const subscribersKey = scopedKey('moldatk_subscribers', excelImportForm.generator_id);
-      const tariffsKey = scopedKey('moldatk_monthly_tariffs', excelImportForm.generator_id);
-      const linesKey = scopedKey('moldatk_lines', excelImportForm.generator_id);
-      const auditKey = scopedKey('moldatk_audit_logs', excelImportForm.generator_id);
-      const generatorKey = scopedKey('moldatk_generator', excelImportForm.generator_id);
-      const existing = readJson<Subscriber[]>(subscribersKey, []);
-      const tariffs = readJson<MonthlyTariffRecord[]>(tariffsKey, INITIAL_MONTHLY_TARIFFS);
-      const activeTariff = tariffs.find(t => t.isCurrentActive) || tariffs[0] || INITIAL_MONTHLY_TARIFFS[0];
-      const lines = readJson<LineDistribution[]>(linesKey, []);
-      const imported: Subscriber[] = [];
-      const warnings: string[] = [];
-      const errors: string[] = [];
-      const createdCabinets: string[] = [];
-      const now = new Date().toISOString();
-      const usedPhones = new Set(existing.map(s => normalizePhoneKey(s.phone)).filter(Boolean));
-      const usedCodes = new Set(existing.map(s => s.code || s.subscriberCode).filter(Boolean));
-      const lineByKey = new Map<string, LineDistribution>();
-      const registerLine = (line: LineDistribution) => {
-        [line.id, line.name, line.zone, (line as any).lineName].filter(Boolean).forEach(value => {
-          const key = normalizeLineKey(value);
-          if (key && !lineByKey.has(key)) lineByKey.set(key, line);
-        });
-      };
-      lines.forEach(registerLine);
-      const ensureCabinet = (rawName: string): LineDistribution | null => {
-        const name = normalizeText(rawName);
-        if (!name) return null;
-        const key = normalizeLineKey(name);
-        const found = lineByKey.get(key);
-        if (found) return found;
-        const nextIndex = lines.length + 1;
-        const phaseTypes = ['phase-R', 'phase-S', 'phase-T', '3-phase'];
-        const phaseType = phaseTypes[(nextIndex - 1) % phaseTypes.length];
-        const newLine = {
-          id: 'excel-line-' + Date.now() + '-' + nextIndex + '-' + (normalizeLineKey(name).slice(0, 24) || 'cabinet' + nextIndex),
-          name,
-          zone: name,
-          phaseType,
-          phaseNameAr: phaseType === 'phase-R' ? 'فيز R (الأحمر) - 380V' : phaseType === 'phase-S' ? 'فيز S (الأصفر) - 380V' : phaseType === 'phase-T' ? 'فيز T (الأزرق) - 380V' : 'ثلاثي الفيز (3-Phase)',
-          maxCapacityAmperes: 200,
-          currentLoadAmperes: 0,
-          subscribersCount: 0,
-          technicianName: '',
-          breakerNumber: 'Q' + nextIndex + '-250A',
-        } as any as LineDistribution;
-        lines.push(newLine);
-        registerLine(newLine);
-        createdCabinets.push(name);
-        return newLine;
-      };
-
-      let skippedRows = 0;
+      const rows: any[] = [];
+      const parserWarnings: string[] = [];
+      let parserSkipped = 0;
       let cellsRead = 0;
-      let cellsImported = 0;
-      let rowsWithoutCabinet = 0;
+
       for (let rowIndex = dataStartRow; rowIndex <= range.e.r; rowIndex += 1) {
-        try {
-          const rowValues = Array.from({ length: range.e.c - range.s.c + 1 }, (_, index) => cellValue(sheet, rowIndex, range.s.c + index));
-          if (!rowValues.some(v => !isEmptyCell(v))) { skippedRows += 1; continue; }
-          cellsRead += rowValues.filter(v => !isEmptyCell(v)).length;
-          const fullName = normalizeText(readField(rowIndex, 'fullName'));
-          const phone = normalizeText(readField(rowIndex, 'phone'));
-          const phoneKey = normalizePhoneKey(phone);
-          if (!fullName && !phone) { skippedRows += 1; warnings.push('السطر ' + (rowIndex + 1) + ': لم يتم رفعه لأن اسم المشترك ورقم الهاتف فارغين.'); continue; }
-          if (phoneKey && usedPhones.has(phoneKey)) { skippedRows += 1; warnings.push('السطر ' + (rowIndex + 1) + ': لم يتم رفعه لأن رقم الهاتف مكرر (' + phone + ').'); continue; }
-          if (phoneKey) usedPhones.add(phoneKey);
-
-          const tier = parseTier(readField(rowIndex, 'tier'));
-          const amperes = Math.max(0, toNumber(readField(rowIndex, 'amperes')) || 1);
-          const calc = calculateSubscriberBill(amperes, tier, activeTariff?.tiers || []);
-          const paid = toNumber(readField(rowIndex, 'amountPaid'));
-          const explicitDue = toNumber(readField(rowIndex, 'amountDue'));
-          const total = explicitDue > 0 ? explicitDue + paid : calc.total;
-          const paymentStatus = parsePaymentStatus(readField(rowIndex, 'paymentStatus'), paid, total);
-          const cabinetName = readCabinetName(rowIndex);
-          const cabinet = ensureCabinet(cabinetName);
-          if (!cabinet) { rowsWithoutCabinet += 1; if (rowsWithoutCabinet <= 20) warnings.push('السطر ' + (rowIndex + 1) + ': لا يحتوي اسم كابينة/خط، تم رفع المشترك بدون ربط كابينة.'); }
-
-          const givenCode = normalizeText(readField(rowIndex, 'code'));
-          let code = givenCode && !usedCodes.has(givenCode) ? givenCode : generateImportCode(excelImportForm.generator_id, [...existing, ...imported]);
-          while (usedCodes.has(code)) code = generateImportCode(excelImportForm.generator_id, [...existing, ...imported]);
-          usedCodes.add(code);
-          const dueAmount = paymentStatus === 'free' || tier === 'free' ? 0 : Math.max(total - paid, 0);
-          const subscriber: Subscriber = {
-            id: (crypto as any)?.randomUUID?.() || 'sub-' + Date.now() + '-' + Math.random().toString(16).slice(2),
-            code,
-            subscriberCode: code,
-            fullName: fullName || 'مشترك ' + (existing.length + imported.length + 1),
-            phone,
-            tier,
-            amperes,
-            lineId: cabinet?.id,
-            lineName: cabinet?.name || cabinetName || '',
-            line: cabinet?.name || cabinetName || '',
-            address: normalizeText(readField(rowIndex, 'address')),
-            boxNumber: normalizeText(readField(rowIndex, 'boxNumber')),
-            paymentStatus,
-            lastPaymentDate: normalizeText(readAny(rowIndex, ['تاريخ آخر دفع', 'تاريخ التسديد', 'lastPaymentDate', 'paymentDate'])) || undefined,
-            amountDue: dueAmount,
-            amountPaid: paymentStatus === 'free' ? 0 : paid,
-            notes: normalizeText(readField(rowIndex, 'notes')),
-            isExempted: paymentStatus === 'free' || tier === 'free',
-            exemptReason: paymentStatus === 'free' || tier === 'free' ? normalizeText(readField(rowIndex, 'exemptReason')) || 'استيراد من Excel' : undefined,
-            invoicesHistory: [],
-            createdAt: now,
-            joiningDate: normalizeText(readField(rowIndex, 'joiningDate')) || now.slice(0, 10),
-          };
-          imported.push(subscriber);
-          cellsImported += 13;
-        } catch (rowErr: any) {
-          skippedRows += 1;
-          errors.push('السطر ' + (rowIndex + 1) + ': ' + (rowErr?.message || 'تعذر قراءة السطر'));
+        const rowValues = Array.from({ length: range.e.c - range.s.c + 1 }, (_, index) => cellValue(sheet, rowIndex, range.s.c + index));
+        if (!rowValues.some(v => !isEmptyCell(v))) {
+          parserSkipped += 1;
+          continue;
         }
+        cellsRead += rowValues.filter(v => !isEmptyCell(v)).length;
+
+        const fullName = normalizeText(readAny(rowIndex, ['الاسم الكامل', 'اسم المشترك', 'اسم المشترك الكامل', 'الاسم', 'اسم الزبون', 'اسم العميل', 'المشترك', 'المستهلك', 'fullName', 'name', 'subscriberName']));
+        const phone = normalizeImportPhone(readAny(rowIndex, ['رقم الهاتف', 'الهاتف', 'رقم الموبايل', 'موبايل', 'الموبايل', 'رقم العميل', 'phone', 'mobile', 'mobileNumber']));
+        if (!fullName && !phone) {
+          parserSkipped += 1;
+          parserWarnings.push('السطر ' + (rowIndex + 1) + ': الاسم ورقم الهاتف فارغان.');
+          continue;
+        }
+
+        const tier = parseTier(readAny(rowIndex, ['نوع الاشتراك', 'نوع المشترك', 'الفئة', 'التصنيف', 'tier', 'type', 'subscriptionType']));
+        const rawExempt = readAny(rowIndex, ['معفي؟', 'معفي', 'اعفاء', 'إعفاء', 'isExempted']);
+        const isExempted = tier === 'free' || isTruthyExcel(rawExempt);
+        const paidValue = readAny(rowIndex, ['المبلغ المسدد', 'المبلغ المدفوع', 'المدفوع', 'المسدد', 'الواصل', 'paid', 'amountPaid']);
+        const dueValue = readAny(rowIndex, ['المبلغ المطلوب', 'المبلغ المستحق', 'المستحق', 'الدين', 'الباقي', 'remaining', 'due', 'amountDue']);
+
+        rows.push({
+          excel_row: rowIndex + 1,
+          code: normalizeText(readAny(rowIndex, ['كود المشترك', 'الكود', 'رقم المشترك', 'رمز المشترك', 'code', 'subscriberCode'])),
+          full_name: fullName,
+          phone,
+          tier,
+          amperes: Math.max(0, toNumber(readAny(rowIndex, ['عدد الأمبيرات', 'عدد الامبيرات', 'الأمبير', 'الامبير', 'امبير', 'عدد الامبير', 'amperes', 'amps', 'amp'])) || 1),
+          line_name: normalizeText(readAny(rowIndex, ['اسم الكابينة', 'الكابينة', 'كابينة', 'البورد', 'البورد/الكابينة', 'الخط', 'اسم الخط', 'خط', 'line', 'lineName', 'zone'])),
+          address: normalizeText(readAny(rowIndex, ['العنوان', 'الموقع', 'الدار', 'عنوان السكن', 'address', 'location'])),
+          box_number: normalizeText(readAny(rowIndex, ['رقم الجوزة / الصندوق', 'رقم الجوزة/الصندوق', 'رقم الصندوق', 'رقم الجوزة', 'الجوزة', 'boxNumber', 'box'])),
+          payment_status: explicitPaymentStatus(readAny(rowIndex, ['حالة التسديد', 'حالة الدفع', 'الحالة', 'status', 'paymentStatus'])),
+          amount_due: toNullableNumber(dueValue),
+          amount_paid: toNullableNumber(paidValue) ?? 0,
+          last_payment_date: toDateValue(readAny(rowIndex, ['آخر تاريخ تسديد', 'تاريخ آخر دفع', 'تاريخ التسديد', 'lastPaymentDate', 'paymentDate'])),
+          is_exempted: isExempted,
+          exempt_reason: normalizeText(readAny(rowIndex, ['سبب الإعفاء', 'سبب الاعفاء', 'سبب المجاني', 'exemptReason'])),
+          notes: normalizeText(readAny(rowIndex, ['ملاحظات', 'ملاحظة', 'notes', 'note'])),
+          joining_date: toDateValue(readAny(rowIndex, ['تاريخ الانضمام', 'تاريخ الاشتراك', 'joiningDate', 'createdAt'])),
+        });
+
         const doneRows = rowIndex - dataStartRow + 1;
-        if (doneRows % 25 === 0 || rowIndex === range.e.r) {
-          const progress = 20 + Math.round((doneRows / Math.max(totalRows, 1)) * 65);
-          setExcelImportProgress(Math.min(progress, 88));
-          setExcelImportReport(prev => ({ ...prev, title: 'جاري تحويل البيانات وربط الكابينات... ' + Math.min(doneRows, totalRows) + ' / ' + totalRows, totalRows, importedRows: imported.length, skippedRows, cellsRead, cellsImported, warnings: warnings.slice(-30), errors: errors.slice(-30) }));
+        if (doneRows % 30 === 0 || rowIndex === range.e.r) {
+          const progress = 18 + Math.round((doneRows / Math.max(totalRows, 1)) * 47);
+          setExcelImportProgress(Math.min(progress, 65));
+          setExcelImportReport(prev => ({ ...prev, title: 'جاري قراءة وتجهيز السطور... ' + Math.min(doneRows, totalRows) + ' / ' + totalRows, cellsRead, skippedRows: parserSkipped }));
           await idle();
         }
       }
 
-      if (!imported.length) throw new Error('لم يتم رفع أي مشترك. تأكد من وجود عمود اسم المشترك أو رقم الهاتف وعدم تكرار الأرقام.');
-      const nextSubscribers = [...existing, ...imported];
-      const lineStats = new Map<string, { count: number; amps: number }>();
-      nextSubscribers.forEach(sub => {
-        if (!sub.lineId) return;
-        const prev = lineStats.get(sub.lineId) || { count: 0, amps: 0 };
-        prev.count += 1;
-        prev.amps += Number(sub.amperes || 0);
-        lineStats.set(sub.lineId, prev);
-      });
-      const nextLines = lines.map(line => {
-        const stats = lineStats.get(line.id) || { count: 0, amps: 0 };
-        return { ...line, subscribersCount: stats.count, currentLoadAmperes: stats.amps };
-      });
-      setExcelImportProgress(92);
-      setExcelImportReport(prev => ({ ...prev, title: 'جاري حفظ المشتركين والكابينات داخل حساب صاحب المولدة...' }));
+      if (!rows.length) throw new Error('لم يتم العثور على أي مشترك صالح داخل الملف');
+
+      setExcelImportProgress(72);
+      setExcelImportReport(prev => ({ ...prev, title: 'جاري رفع البيانات فعلياً إلى حساب صاحب المولدة في السحابة...', cellsRead, skippedRows: parserSkipped }));
       await idle();
-      try {
-        localStorage.setItem(subscribersKey, JSON.stringify(nextSubscribers));
-        localStorage.setItem(linesKey, JSON.stringify(nextLines));
-      } catch (storageError) {
-        throw new Error('حجم ملف Excel كبير جداً على تخزين المتصفح. قسّم الملف إلى دفعات أصغر ثم ارفعه من جديد.');
-      }
-      if (generator) {
-        const oldGenerator = readJson<any>(generatorKey, {});
-        localStorage.setItem(generatorKey, JSON.stringify({ ...oldGenerator, generatorName: generator.name, ownerName: generator.owner_name, phone: generator.phone || oldGenerator.phone || '', area: generator.area || oldGenerator.area || '' }));
-      }
-      localStorage.setItem(auditKey, JSON.stringify([{ id: 'audit-' + Date.now(), timestamp: now, category: 'subscriber', title: 'رفع مشتركين من Excel عبر السوبر أدمن', details: 'تم رفع ' + imported.length + ' مشترك، وإنشاء ' + createdCabinets.length + ' كابينة، وتخطي ' + skippedRows + ' سطر.', entityName: generator?.name || excelImportForm.generator_id, actorName: 'Super Admin' }, ...readJson<any[]>(auditKey, [])]));
+
+      const { data: result, error: invokeError } = await supabase.functions.invoke('super-admin-import-subscribers', {
+        body: { generator_id: excelImportForm.generator_id, rows },
+      });
+      if (invokeError) throw new Error((result as any)?.error || invokeError.message || 'فشل الاتصال بخدمة الرفع السحابي');
+      if (!(result as any)?.ok) throw new Error((result as any)?.error || 'فشل حفظ المشتركين في السحابة');
+
+      const importedCount = Number((result as any).imported_count || 0);
+      const backendSkipped = Number((result as any).skipped_count || 0);
+      const skippedRows = parserSkipped + backendSkipped;
+      const createdCabinets = Array.isArray((result as any).created_cabinets) ? (result as any).created_cabinets : [];
+      const backendWarnings = Array.isArray((result as any).warnings) ? (result as any).warnings : [];
+      const warnings = [
+        ...(createdCabinets.length ? ['تم إنشاء الكابينات الجديدة: ' + createdCabinets.join('، ')] : []),
+        ...parserWarnings,
+        ...backendWarnings,
+      ].slice(0, 100);
+
       setExcelImportProgress(100);
-      setExcelImportReport({ status: 'success', title: 'تم رفع ملف Excel وربط الكابينات بنجاح', generatorName: generator?.name || excelImportForm.generator_id, fileName: excelImportForm.file.name, totalRows, importedRows: imported.length, skippedRows, totalColumns, mappedColumns, unmappedColumns, cellsRead, cellsImported, warnings: createdCabinets.length ? ['تم إنشاء الكابينات الجديدة: ' + createdCabinets.join('، '), ...warnings] : warnings, errors });
-      window.dispatchEvent(new Event('moldatk-local-sync'));
-      setMessage('تم رفع ' + imported.length + ' مشترك وربطهم بالكابينات بنجاح — تم إنشاء ' + createdCabinets.length + ' كابينة وتخطي ' + skippedRows + ' سطر.');
+      if (importedCount === 0) {
+        setExcelImportReport({
+          status: 'error',
+          title: 'لم تتم إضافة أي مشترك جديد — جميع السطور مكررة أو غير صالحة',
+          generatorName: (result as any).generator_name || generator?.name || excelImportForm.generator_id,
+          fileName: excelImportForm.file.name,
+          totalRows,
+          importedRows: 0,
+          skippedRows,
+          totalColumns,
+          mappedColumns,
+          unmappedColumns,
+          cellsRead,
+          cellsImported: 0,
+          warnings,
+          errors: [],
+        });
+        setMessage('لم تتم إضافة أي مشترك جديد. تم تخطي ' + skippedRows + ' سطر، ومنها ' + Number((result as any).duplicate_names || 0) + ' اسم مطابق موجود مسبقاً.');
+      } else {
+        setExcelImportReport({
+          status: 'success',
+          title: 'تم رفع ملف Excel وحفظ المشتركين فعلياً في السحابة',
+          generatorName: (result as any).generator_name || generator?.name || excelImportForm.generator_id,
+          fileName: excelImportForm.file.name,
+          totalRows,
+          importedRows: importedCount,
+          skippedRows,
+          totalColumns,
+          mappedColumns,
+          unmappedColumns,
+          cellsRead,
+          cellsImported: importedCount * 13,
+          warnings,
+          errors: [],
+        });
+        setMessage('تم رفع ' + importedCount + ' مشترك فعلياً إلى حساب صاحب المولدة — تم تخطي ' + skippedRows + ' سطر، منها ' + Number((result as any).duplicate_names || 0) + ' اسم مطابق.');
+      }
+
+      window.dispatchEvent(new CustomEvent('moldatk-cloud-import-complete', { detail: { generatorId: excelImportForm.generator_id, importedCount } }));
+      await load();
     } catch (err: any) {
       const errorMessage = err?.message || 'خطأ غير معروف';
       setExcelImportProgress(100);
-      setExcelImportReport(prev => ({ ...prev, status: 'error', title: 'فشل رفع ملف Excel', errors: [...prev.errors, errorMessage] }));
+      setExcelImportReport(prev => ({ ...prev, status: 'error', title: 'فشل رفع ملف Excel إلى السحابة', errors: [...prev.errors, errorMessage] }));
       setMessage('تعذر رفع ملف Excel: ' + errorMessage);
     } finally {
       setExcelImporting(false);
@@ -269,6 +255,6 @@ const stableHandler = String.raw`  // SUPER_ADMIN_EXCEL_IMPORT_STABILITY_V4
 
 `;
 
-c = c.slice(0, start) + stableHandler + c.slice(end);
+c = c.slice(0, start) + cloudHandler + c.slice(end);
 fs.writeFileSync(p, c);
-console.log('Applied stable Super Admin Excel import with automatic cabinet creation/linking v4');
+console.log('Applied Super Admin cloud Excel import with exact-name duplicate protection v5');
