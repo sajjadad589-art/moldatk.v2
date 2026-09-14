@@ -110,7 +110,8 @@ const replaceBlock = (src, pattern, replacement, label) => {
   const authoritativeDashboard =
     s.includes('AUTHORITATIVE_FINANCE_V2') &&
     s.includes('reconciledCashbox(') &&
-    s.includes('summarizeSubscribers(');
+    s.includes('summarizeSubscribers(') ||
+    s.includes('useCashboxBalance(');
 
   if (!authoritativeDashboard) {
     const dashboardReplacement = `  // القاصة تقرأ من سجل العمليات بعد آخر تصفير: التسديد يزيد، والإلغاء ينقص.\n  const totalCollectedRevenue = auditLogs\n    .filter(log => {\n      if (log.category !== 'payment' && log.category !== 'cancellation') return false;\n      if (resetTimeMs > 0) {\n        const logTime = log.timestamp ? new Date(log.timestamp).getTime() : 0;\n        if (logTime > 0 && logTime < resetTimeMs) return false;\n      }\n      return true;\n    })\n    .reduce((acc, log) => {\n      const amount = Math.abs(Number(log.amount) || 0);\n      return log.category === 'cancellation' ? acc - amount : acc + amount;\n    }, 0);`;
