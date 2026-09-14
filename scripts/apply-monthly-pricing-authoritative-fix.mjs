@@ -169,7 +169,14 @@ const write = (p, c) => fs.writeFileSync(p, c);
   if (!explicitSaveDraft && !c.includes('onSaveMonthlyTariffs(updatedTariffs, monthId, true);')) {
     throw new Error('Monthly pricing authoritative fix: neither immediate activation nor explicit-save draft flow is present');
   }
-  if (explicitSaveDraft && !c.includes('onSaveMonthlyTariffs(tariffs, selectedMonthId, true);')) {
+
+  // Final pricing recovery may rename the local array before Save/Apply. Validate the
+  // behavior semantically inside handleSave instead of requiring a specific variable name.
+  const saveStart = c.indexOf('  const handleSave = () => {');
+  const saveEnd = saveStart >= 0 ? c.indexOf('\n\n  const getTierIcon', saveStart) : -1;
+  const saveBlock = saveStart >= 0 && saveEnd > saveStart ? c.slice(saveStart, saveEnd) : '';
+  const hasExplicitSaveApply = /onSaveMonthlyTariffs\([\s\S]*?selectedMonthId[\s\S]*?,\s*true\s*\);/.test(saveBlock);
+  if (explicitSaveDraft && !hasExplicitSaveApply) {
     throw new Error('Monthly pricing authoritative fix: explicit Save/Apply activation is missing');
   }
   if (!c.includes("onSaveMonthlyTariffs([], '', false);")) {
