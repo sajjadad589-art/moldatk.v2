@@ -59,8 +59,17 @@ for (const [path,relative] of [['src/components/WalletView.tsx','../lib/'],['src
                   finally { setResetting(false); }
                 }}`);
     s=s.replace("{countdown > 0 ? `يرجى القراءة (${countdown}ث)` : 'تأكيد التصفير'}", "{resetting ? 'جاري حفظ التصفير...' : countdown > 0 ? `يرجى القراءة (${countdown}ث)` : 'تأكيد التصفير'}");
-    s=s.replace('const authoritativeCashbox = reconciledCashbox(walletSummary.collected, auditLogs, walletResetTimestamp, activeMonthId);',
-      'const authoritativeCashbox = useCashboxBalance(reconciledCashbox(walletSummary.collected, auditLogs, walletResetTimestamp, activeMonthId));');
+    // Earlier release generators can place this block inside the countdown effect.
+    // Remove every generated copy and insert hooks at component scope.
+    s=s.replace(/\n\s*\/\/ AUTHORITATIVE_WALLET_V2\s*\n\s*const walletSummary = summarizeSubscribers\([^;]+;\s*\n\s*const authoritativeCashbox = (?:useCashboxBalance\()?reconciledCashbox\([^;]+;\s*/g, '\n');
+    const walletHookBlock = `  // AUTHORITATIVE_WALLET_V2
+  const walletSummary = summarizeSubscribers(subscribers, pricingTiers, activeMonthId);
+  const authoritativeCashbox = useCashboxBalance(reconciledCashbox(walletSummary.collected, auditLogs, walletResetTimestamp, activeMonthId));
+
+`;
+    const firstEffect = s.indexOf('  useEffect(() => {');
+    must(firstEffect >= 0, 'wallet component effect anchor missing');
+    s = s.slice(0, firstEffect) + walletHookBlock + s.slice(firstEffect);
     s=s.replace('if (logTime < resetTimeMs) return false;', 'if (!Number.isFinite(logTime) || logTime <= resetTimeMs) return false;');
   } else if (path.endsWith('DashboardView.tsx')) {
     s=s.replace(/const totalCollectedRevenue = billingCycleActive\n\s*\? reconciledCashbox\(dashboardSummary.collected, auditLogs, walletResetTimestamp, activeMonthId\)\n\s*: 0;/,
