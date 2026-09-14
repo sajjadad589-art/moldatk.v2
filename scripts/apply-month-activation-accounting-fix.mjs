@@ -101,11 +101,18 @@ await import('./apply-collector-account-save-login-fix.mjs');
 await import('./apply-monthly-ledger-finalization.mjs');
 await import('./apply-monthly-ledger-typecheck-fixes.mjs');
 await import('./apply-dashboard-current-month-status-fix.mjs');
-// The modern draft flow is installed later in this chain. On a second lint -> build
-// pass, do not let the legacy editor patch demand immediate month activation again.
-const pricingSourceBeforeDesktopPatch = fs.readFileSync('src/components/PricingModal.tsx', 'utf8');
-if (!pricingSourceBeforeDesktopPatch.includes('MONTHLY_TARIFF_PRICE_DRAFT_V1')
-    && !pricingSourceBeforeDesktopPatch.includes('مسودة محلية فقط: لا تُرسل للسحابة')) {
+
+const hasModernPricingDraft = () => {
+  const source = fs.readFileSync('src/components/PricingModal.tsx', 'utf8');
+  return source.includes('MONTHLY_TARIFF_PRICE_DRAFT_V1')
+    || source.includes('مسودة محلية فقط: لا تُرسل للسحابة');
+};
+
+// Legacy pricing scripts used to force a newly-created month to activate before
+// its per-tier prices were entered. The modern workflow deliberately keeps it as
+// a local draft until Save/Apply. On a second lint -> build pass, skip those legacy
+// assertions rather than undoing the restored pricing workflow.
+if (!hasModernPricingDraft()) {
   await import('./apply-desktop-reports-pricing-editor-fix.mjs');
 } else {
   console.log('Skipped legacy immediate-activation pricing editor on repeat build; draft pricing flow already active.');
@@ -114,7 +121,11 @@ await import('./apply-secure-reset-and-report-controls.mjs');
 await import('./apply-secure-reset-layout-fix.mjs');
 await import('./apply-secure-reset-safety-finalization.mjs');
 await import('./apply-monthly-cycle-tier-source-prep.mjs');
-await import('./apply-monthly-cycle-empty-tariffs-fix.mjs');
+if (!hasModernPricingDraft()) {
+  await import('./apply-monthly-cycle-empty-tariffs-fix.mjs');
+} else {
+  console.log('Skipped legacy immediate-activation empty-tariff guard on repeat build; modern draft flow already active.');
+}
 await import('./apply-collector-account-save-login-fix.mjs?monthly-cycle-final=1');
 await import('./apply-monthly-pricing-authoritative-fix.mjs');
 await import('./apply-collector-account-save-login-fix.mjs?after-authoritative=1');
