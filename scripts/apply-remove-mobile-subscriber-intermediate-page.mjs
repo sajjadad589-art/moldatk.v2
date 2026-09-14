@@ -55,3 +55,4 @@ await import('./preserve-super-admin-subscriber-count-after-responsive.mjs');
 await import('./patch-permanent-data-purge-final-v2.mjs');
 await import('./apply-authoritative-month-cycle-reconciliation.mjs');
 await import('./apply-monthly-tariff-price-draft-restoration.mjs');
+await import('./apply-pricing-tier-field-recovery.mjs');
