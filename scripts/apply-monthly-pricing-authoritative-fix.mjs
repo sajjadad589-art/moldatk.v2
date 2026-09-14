@@ -152,7 +152,9 @@ const write = (p, c) => fs.writeFileSync(p, c);
   write(p, c);
 }
 
-// Pricing editor: make duplicate-month behavior explicit and keep the new-month action atomic.
+// Pricing editor: make duplicate-month behavior explicit. Both supported flows are valid:
+// legacy immediate activation on the FIRST compatibility pass, and the modern explicit-save
+// draft flow on later/final passes. Never force an empty/zero-price draft into billing.
 {
   const p = 'src/components/PricingModal.tsx';
   let c = read(p);
@@ -162,8 +164,13 @@ const write = (p, c) => fs.writeFileSync(p, c);
     `    if (exists) {\n      setSelectedMonthId(monthId);\n      setIsAddingNewMonth(false);\n      window.alert('تسعيرة هذا الشهر موجودة مسبقاً. تم فتحها فقط ولم يتم إنشاء دورة شهرية ثانية.');\n      return;\n    }`
   );
 
-  if (!c.includes('onSaveMonthlyTariffs(updatedTariffs, monthId, true);')) {
-    throw new Error('Monthly pricing authoritative fix: new month is not activated immediately');
+  const explicitSaveDraft = c.includes('MONTHLY_TARIFF_PRICE_DRAFT_V1')
+    || c.includes('مسودة محلية فقط: لا تُرسل للسحابة');
+  if (!explicitSaveDraft && !c.includes('onSaveMonthlyTariffs(updatedTariffs, monthId, true);')) {
+    throw new Error('Monthly pricing authoritative fix: neither immediate activation nor explicit-save draft flow is present');
+  }
+  if (explicitSaveDraft && !c.includes('onSaveMonthlyTariffs(tariffs, selectedMonthId, true);')) {
+    throw new Error('Monthly pricing authoritative fix: explicit Save/Apply activation is missing');
   }
   if (!c.includes("onSaveMonthlyTariffs([], '', false);")) {
     throw new Error('Monthly pricing authoritative fix: delete-all tariffs support missing');
