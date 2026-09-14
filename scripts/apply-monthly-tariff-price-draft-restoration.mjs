@@ -45,7 +45,10 @@ if (!pricing.includes('const handlePriceChange =')) {
 if (!pricing.includes('disabled={!isEditable || isFree}')) {
   throw new Error('Tariff draft restoration: active-month price input is not editable');
 }
-if (!pricing.includes('onSaveMonthlyTariffs(tariffs, selectedMonthId, true);')) {
+const saveStart = pricing.indexOf('  const handleSave = () => {');
+const saveEnd = saveStart >= 0 ? pricing.indexOf('\n\n  const getTierIcon', saveStart) : -1;
+const saveBlock = saveStart >= 0 && saveEnd > saveStart ? pricing.slice(saveStart, saveEnd) : '';
+if (!/onSaveMonthlyTariffs\([\s\S]*?selectedMonthId[\s\S]*?,\s*true\s*\);/.test(saveBlock)) {
   throw new Error('Tariff draft restoration: explicit save/apply activation is missing');
 }
 const verifyCreateStart = pricing.indexOf('  const handleCreateNewMonthTariff = () => {');
