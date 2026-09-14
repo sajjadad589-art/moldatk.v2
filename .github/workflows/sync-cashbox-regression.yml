@@ -2,7 +2,7 @@ name: Sync and cashbox regression
 on:
   pull_request:
   push:
-    branches: [fix/event-sync-cashbox-reset]
+    branches: [main, fix/event-sync-cashbox-reset, fix/no-tariff-subscriber-state]
 jobs:
   regression:
     runs-on: ubuntu-latest

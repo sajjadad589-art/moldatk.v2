@@ -166,98 +166,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       )}
 
-      <section data-ampere-discount-dashboard-desktop-v1 className="max-w-4xl mx-auto">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <button type="button" onClick={() => setShowPreviousDebtList(true)} className="rounded-3xl bg-white dark:bg-[#131E38] border border-rose-200 dark:border-rose-900/50 p-4 text-right shadow-sm hover:border-rose-400 transition-all">
-            <span className="text-[11px] font-black text-slate-500 dark:text-slate-400">ديون الشهر السابق</span>
-            <div className="mt-2 flex items-end justify-between gap-2"><strong className="text-3xl font-black text-rose-600 dark:text-rose-400">{ampereDiscountSummary.previousDebtSubscribers}</strong><span className="text-xs font-black text-rose-600" dir="ltr">{formatCurrency(ampereDiscountSummary.previousDebtAmount, generatorSpecs.currency)}</span></div>
-          </button>
-          <div className="rounded-3xl bg-white dark:bg-[#131E38] border border-blue-200 dark:border-blue-900/50 p-4 shadow-sm">
-            <span className="text-[11px] font-black text-slate-500 dark:text-slate-400">الأمبيرات المحتسبة للجباية</span>
-            <div className="mt-2"><strong className="text-3xl font-black text-blue-600 dark:text-blue-400">{ampereDiscountSummary.billedAmperes.toLocaleString('en-US')}A</strong><p className="text-[10px] font-bold text-slate-400 mt-1">خصم {ampereDiscountSummary.discountedAmperes.toLocaleString('en-US')}A من {ampereDiscountSummary.originalBillableAmperes.toLocaleString('en-US')}A</p></div>
-          </div>
-          <div className="rounded-3xl bg-white dark:bg-[#131E38] border border-amber-200 dark:border-amber-900/50 p-4 shadow-sm">
-            <span className="text-[11px] font-black text-slate-500 dark:text-slate-400">مبالغ الخصومات الشهرية</span>
-            <div className="mt-2"><strong className="text-2xl font-black text-amber-600 dark:text-amber-400" dir="ltr">{formatCurrency(ampereDiscountSummary.monthlyDiscountAmount, generatorSpecs.currency)}</strong><p className="text-[10px] font-bold text-slate-400 mt-1">خصومات أمبيرات معتمدة من الإدارة</p></div>
-          </div>
-        </div>
-      </section>
+      
 
-      {showPreviousDebtList && (
-        <div className="fixed inset-0 z-[80] bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4" dir="rtl">
-          <div className="w-full max-w-xl max-h-[80vh] overflow-y-auto rounded-3xl bg-white dark:bg-[#101a33] border border-slate-200 dark:border-slate-800 shadow-2xl p-5">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <div><h3 className="text-base font-black text-slate-950 dark:text-white">مدينو الشهر السابق</h3><p className="text-xs text-slate-500 mt-1">الشهر {ampereDiscountSummary.previousMonthId} — {formatCurrency(ampereDiscountSummary.previousDebtAmount, generatorSpecs.currency)}</p></div>
-              <button type="button" onClick={() => setShowPreviousDebtList(false)} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-black text-slate-700 dark:text-slate-200">إغلاق</button>
-            </div>
-            {ampereDiscountSummary.previousMonthDebtors.length === 0 ? <div className="py-12 text-center text-sm font-black text-emerald-600">لا توجد ديون متبقية من الشهر السابق.</div> : (
-              <div className="space-y-2">{ampereDiscountSummary.previousMonthDebtors.map(row => <div key={row.subscriber.id} className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 px-4 py-3 flex items-center justify-between gap-3"><div><div className="text-sm font-black text-slate-900 dark:text-white">{row.subscriber.fullName}</div><div className="text-[10px] text-slate-400 mt-1">{row.subscriber.code || row.subscriber.subscriberCode}</div></div><strong className="text-sm font-black text-rose-600" dir="ltr">{formatCurrency(row.amount, generatorSpecs.currency)}</strong></div>)}</div>
-            )}
-          </div>
-        </div>
-      )}
+      
 
-      <section data-ampere-discount-dashboard-desktop-v1 className="max-w-4xl mx-auto">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <button type="button" onClick={() => setShowPreviousDebtList(true)} className="rounded-3xl bg-white dark:bg-[#131E38] border border-rose-200 dark:border-rose-900/50 p-4 text-right shadow-sm hover:border-rose-400 transition-all">
-            <span className="text-[11px] font-black text-slate-500 dark:text-slate-400">ديون الشهر السابق</span>
-            <div className="mt-2 flex items-end justify-between gap-2"><strong className="text-3xl font-black text-rose-600 dark:text-rose-400">{ampereDiscountSummary.previousDebtSubscribers}</strong><span className="text-xs font-black text-rose-600" dir="ltr">{formatCurrency(ampereDiscountSummary.previousDebtAmount, generatorSpecs.currency)}</span></div>
-          </button>
-          <div className="rounded-3xl bg-white dark:bg-[#131E38] border border-blue-200 dark:border-blue-900/50 p-4 shadow-sm">
-            <span className="text-[11px] font-black text-slate-500 dark:text-slate-400">الأمبيرات المحتسبة للجباية</span>
-            <div className="mt-2"><strong className="text-3xl font-black text-blue-600 dark:text-blue-400">{ampereDiscountSummary.billedAmperes.toLocaleString('en-US')}A</strong><p className="text-[10px] font-bold text-slate-400 mt-1">خصم {ampereDiscountSummary.discountedAmperes.toLocaleString('en-US')}A من {ampereDiscountSummary.originalBillableAmperes.toLocaleString('en-US')}A</p></div>
-          </div>
-          <div className="rounded-3xl bg-white dark:bg-[#131E38] border border-amber-200 dark:border-amber-900/50 p-4 shadow-sm">
-            <span className="text-[11px] font-black text-slate-500 dark:text-slate-400">مبالغ الخصومات الشهرية</span>
-            <div className="mt-2"><strong className="text-2xl font-black text-amber-600 dark:text-amber-400" dir="ltr">{formatCurrency(ampereDiscountSummary.monthlyDiscountAmount, generatorSpecs.currency)}</strong><p className="text-[10px] font-bold text-slate-400 mt-1">خصومات أمبيرات معتمدة من الإدارة</p></div>
-          </div>
-        </div>
-      </section>
+      
 
-      {showPreviousDebtList && (
-        <div className="fixed inset-0 z-[80] bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4" dir="rtl">
-          <div className="w-full max-w-xl max-h-[80vh] overflow-y-auto rounded-3xl bg-white dark:bg-[#101a33] border border-slate-200 dark:border-slate-800 shadow-2xl p-5">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <div><h3 className="text-base font-black text-slate-950 dark:text-white">مدينو الشهر السابق</h3><p className="text-xs text-slate-500 mt-1">الشهر {ampereDiscountSummary.previousMonthId} — {formatCurrency(ampereDiscountSummary.previousDebtAmount, generatorSpecs.currency)}</p></div>
-              <button type="button" onClick={() => setShowPreviousDebtList(false)} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-black text-slate-700 dark:text-slate-200">إغلاق</button>
-            </div>
-            {ampereDiscountSummary.previousMonthDebtors.length === 0 ? <div className="py-12 text-center text-sm font-black text-emerald-600">لا توجد ديون متبقية من الشهر السابق.</div> : (
-              <div className="space-y-2">{ampereDiscountSummary.previousMonthDebtors.map(row => <div key={row.subscriber.id} className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 px-4 py-3 flex items-center justify-between gap-3"><div><div className="text-sm font-black text-slate-900 dark:text-white">{row.subscriber.fullName}</div><div className="text-[10px] text-slate-400 mt-1">{row.subscriber.code || row.subscriber.subscriberCode}</div></div><strong className="text-sm font-black text-rose-600" dir="ltr">{formatCurrency(row.amount, generatorSpecs.currency)}</strong></div>)}</div>
-            )}
-          </div>
-        </div>
-      )}
+      
 
-      <section data-ampere-discount-dashboard-desktop-v1 className="max-w-4xl mx-auto">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <button type="button" onClick={() => setShowPreviousDebtList(true)} className="rounded-3xl bg-white dark:bg-[#131E38] border border-rose-200 dark:border-rose-900/50 p-4 text-right shadow-sm hover:border-rose-400 transition-all">
-            <span className="text-[11px] font-black text-slate-500 dark:text-slate-400">ديون الشهر السابق</span>
-            <div className="mt-2 flex items-end justify-between gap-2"><strong className="text-3xl font-black text-rose-600 dark:text-rose-400">{ampereDiscountSummary.previousDebtSubscribers}</strong><span className="text-xs font-black text-rose-600" dir="ltr">{formatCurrency(ampereDiscountSummary.previousDebtAmount, generatorSpecs.currency)}</span></div>
-          </button>
-          <div className="rounded-3xl bg-white dark:bg-[#131E38] border border-blue-200 dark:border-blue-900/50 p-4 shadow-sm">
-            <span className="text-[11px] font-black text-slate-500 dark:text-slate-400">الأمبيرات المحتسبة للجباية</span>
-            <div className="mt-2"><strong className="text-3xl font-black text-blue-600 dark:text-blue-400">{ampereDiscountSummary.billedAmperes.toLocaleString('en-US')}A</strong><p className="text-[10px] font-bold text-slate-400 mt-1">خصم {ampereDiscountSummary.discountedAmperes.toLocaleString('en-US')}A من {ampereDiscountSummary.originalBillableAmperes.toLocaleString('en-US')}A</p></div>
-          </div>
-          <div className="rounded-3xl bg-white dark:bg-[#131E38] border border-amber-200 dark:border-amber-900/50 p-4 shadow-sm">
-            <span className="text-[11px] font-black text-slate-500 dark:text-slate-400">مبالغ الخصومات الشهرية</span>
-            <div className="mt-2"><strong className="text-2xl font-black text-amber-600 dark:text-amber-400" dir="ltr">{formatCurrency(ampereDiscountSummary.monthlyDiscountAmount, generatorSpecs.currency)}</strong><p className="text-[10px] font-bold text-slate-400 mt-1">خصومات أمبيرات معتمدة من الإدارة</p></div>
-          </div>
-        </div>
-      </section>
+      
 
-      {showPreviousDebtList && (
-        <div className="fixed inset-0 z-[80] bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4" dir="rtl">
-          <div className="w-full max-w-xl max-h-[80vh] overflow-y-auto rounded-3xl bg-white dark:bg-[#101a33] border border-slate-200 dark:border-slate-800 shadow-2xl p-5">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <div><h3 className="text-base font-black text-slate-950 dark:text-white">مدينو الشهر السابق</h3><p className="text-xs text-slate-500 mt-1">الشهر {ampereDiscountSummary.previousMonthId} — {formatCurrency(ampereDiscountSummary.previousDebtAmount, generatorSpecs.currency)}</p></div>
-              <button type="button" onClick={() => setShowPreviousDebtList(false)} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-black text-slate-700 dark:text-slate-200">إغلاق</button>
-            </div>
-            {ampereDiscountSummary.previousMonthDebtors.length === 0 ? <div className="py-12 text-center text-sm font-black text-emerald-600">لا توجد ديون متبقية من الشهر السابق.</div> : (
-              <div className="space-y-2">{ampereDiscountSummary.previousMonthDebtors.map(row => <div key={row.subscriber.id} className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 px-4 py-3 flex items-center justify-between gap-3"><div><div className="text-sm font-black text-slate-900 dark:text-white">{row.subscriber.fullName}</div><div className="text-[10px] text-slate-400 mt-1">{row.subscriber.code || row.subscriber.subscriberCode}</div></div><strong className="text-sm font-black text-rose-600" dir="ltr">{formatCurrency(row.amount, generatorSpecs.currency)}</strong></div>)}</div>
-            )}
-          </div>
-        </div>
-      )}
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
 
       {/* 2. بطاقة القاصة (المحفظة) */}
       <section className="max-w-4xl mx-auto">

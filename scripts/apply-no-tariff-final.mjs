@@ -1,4 +1,29 @@
 import fs from 'node:fs';
+import ts from 'typescript';
+
+// Legacy generators reinsert these sections after rebuilding the summary block.
+// Keep one copy of each rendered section, using TSX node boundaries.
+for (const path of ['src/components/DashboardView.tsx', 'src/components/mobile/MobileDashboard.tsx', 'src/components/SuperAdminDashboard.tsx']) {
+  let source = fs.readFileSync(path, 'utf8').replaceAll('\r\n', '\n');
+  const ast = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const seen = new Set();
+  const removals = [];
+  function visit(node) {
+    let key;
+    if (ts.isJsxElement(node)) {
+      key = node.openingElement.attributes.properties.find(p => ts.isJsxAttribute(p) && p.name.getText(ast).startsWith('data-ampere-discount-dashboard-'))?.name.getText(ast);
+    } else if (ts.isJsxExpression(node)) {
+      const text = node.getText(ast);
+      if (text.startsWith('{showPreviousDebtList &&') || /^\{tab === 'website' && isOwnerSuperAdmin && <WebsiteReleaseManager/.test(text)) key = text;
+    }
+    if (key && seen.has(key)) { removals.push([node.getStart(ast), node.end]); return; }
+    if (key) seen.add(key);
+    ts.forEachChild(node, visit);
+  }
+  visit(ast);
+  for (const [start, end] of removals.sort((a,b) => b[0]-a[0])) source = source.slice(0,start) + source.slice(end);
+  fs.writeFileSync(path, source);
+}
 
 // Run after every legacy generator. Known already-normalized shapes are skipped
 // so lint and build can safely run more than once on the same checkout.
@@ -6,7 +31,7 @@ const patch = (path, transform) => {
   let source = fs.readFileSync(path, 'utf8').replaceAll('\r\n', '\n');
   const replace = (before, after) => {
     if (source.includes(after)) return;
-    if (!source.includes(before)) { console.warn(`skip no-tariff anchor: ${path}: ${before.slice(0, 90)}`); return; }
+    if (!source.includes(before)) throw new Error(`Missing no-tariff anchor: ${path}: ${before.slice(0, 90)}`);
     source = source.replace(before, after);
   };
   const addImport = (relative, names = 'hasMonthlyPricing, NO_TARIFF_LABEL') => {
@@ -44,6 +69,12 @@ patch('src/utils/authoritativeAccounting.ts', (replace, addImport) => {
   replace('  const isFree = sub.tier', `  // Historical invoices never reopen a deleted monthly billing cycle.
   if (!hasMonthlyPricing(tiers)) return { sub, isFree: false, bill: 0, paid: 0, outstanding: 0, status: 'no_tariff' as const };
   const isFree = sub.tier`);
+});
+
+patch('src/utils/discountAccounting.ts', (replace, addImport) => {
+  addImport('../', 'hasMonthlyPricing');
+  replace('  const financialRows = subscribers', '  const billingSubscribers = hasMonthlyPricing(tiers) ? subscribers : [];\n  const financialRows = billingSubscribers');
+  replace('const previousMonthDebtors = subscribers.flatMap', 'const previousMonthDebtors = billingSubscribers.flatMap');
 });
 
 patch('src/utils/monthlyAccounting.ts', (replace, addImport) => {

@@ -244,6 +244,9 @@ export const SuperAdminDashboard: React.FC<Props> = ({ onLogout }) => {
   // SUPERADMIN_AD_UPLOAD_UI_FINAL_V2
   // SUPERADMIN_AD_UPLOAD_UI_FINAL_V2
   // SUPERADMIN_AD_UPLOAD_UI_FINAL_V2
+  // SUPERADMIN_AD_UPLOAD_UI_FINAL_V2
+  // SUPERADMIN_AD_UPLOAD_UI_FINAL_V2
+  // SUPERADMIN_AD_UPLOAD_UI_FINAL_V2
   const [subscriberCounts, setSubscriberCounts] = useState<Record<string, number>>({});
   const [totalSubscribers, setTotalSubscribers] = useState(0);
   const [managers, setManagers] = useState<SuperAdminManager[]>([]);
@@ -1054,11 +1057,17 @@ export const SuperAdminDashboard: React.FC<Props> = ({ onLogout }) => {
           {tab === 'website' && isOwnerSuperAdmin && <WebsiteReleaseManager />}
 
           {/* super-admin-balanced-stats-v4 */}
-          {tab === 'website' && isOwnerSuperAdmin && <WebsiteReleaseManager />}
+          
 
-          {tab === 'website' && isOwnerSuperAdmin && <WebsiteReleaseManager />}
+          
 
-          {tab === 'website' && isOwnerSuperAdmin && <WebsiteReleaseManager />}
+          
+
+          
+
+          
+
+          
 
           {tab === 'overview' && <>
             <SuperAdminStorageCard />
@@ -1082,6 +1091,9 @@ export const SuperAdminDashboard: React.FC<Props> = ({ onLogout }) => {
               <div className="min-h-[108px] bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-center"><p className="text-slate-500 font-bold">إشعارات منشورة</p><p className="text-2xl sm:text-3xl font-black mt-3 whitespace-nowrap">{notifications.length}</p></div>
             </div>
           </>}
+          {/* SUPER_ADMIN_SUBSCRIPTION_STATUS_V2 */}
+          {/* SUPER_ADMIN_SUBSCRIPTION_STATUS_V2 */}
+          {/* SUPER_ADMIN_SUBSCRIPTION_STATUS_V2 */}
           {/* SUPER_ADMIN_SUBSCRIPTION_STATUS_V2 */}
           {/* SUPER_ADMIN_SUBSCRIPTION_STATUS_V2 */}
           {/* SUPER_ADMIN_SUBSCRIPTION_STATUS_V2 */}
@@ -1149,6 +1161,9 @@ export const SuperAdminDashboard: React.FC<Props> = ({ onLogout }) => {
             <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead className="bg-slate-50 text-slate-500"><tr><th className="p-4 text-right">المدير</th><th className="p-4 text-right">الإيميل</th><th className="p-4 text-center">تفعيل</th><th className="p-4 text-center">تعديل</th><th className="p-4 text-center">إنشاء حساب</th><th className="p-4 text-center">الحالة</th></tr></thead><tbody>{managers.map(m => <tr key={m.id} className="border-t"><td className="p-4 font-black">{m.full_name}{m.is_owner ? ' — المدير الرئيسي' : ''}</td><td className="p-4">{m.email}</td>{(['can_activate','can_edit','can_create_generator'] as const).map(k => <td key={k} className="p-4 text-center"><input type="checkbox" disabled={m.is_owner || savingManager} checked={Boolean(m[k])} onChange={e=>void updateManagerPermissions(m,{[k]:e.target.checked} as any)} /></td>)}<td className="p-4 text-center"><button disabled={m.is_owner || savingManager} onClick={()=>void updateManagerPermissions(m,{is_active:!m.is_active})} className={`px-3 py-1.5 rounded-lg text-xs font-black ${m.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{m.is_active ? 'فعال' : 'موقوف'}</button></td></tr>)}</tbody></table></div>
           </section>}
 
+          {/* SUPER_ADMIN_RESPONSIVE_NOTIFICATION_CENTER_V2 */}
+          {/* SUPER_ADMIN_RESPONSIVE_NOTIFICATION_CENTER_V2 */}
+          {/* SUPER_ADMIN_RESPONSIVE_NOTIFICATION_CENTER_V2 */}
           {/* SUPER_ADMIN_RESPONSIVE_NOTIFICATION_CENTER_V2 */}
           {/* SUPER_ADMIN_RESPONSIVE_NOTIFICATION_CENTER_V2 */}
           {/* SUPER_ADMIN_RESPONSIVE_NOTIFICATION_CENTER_V2 */}

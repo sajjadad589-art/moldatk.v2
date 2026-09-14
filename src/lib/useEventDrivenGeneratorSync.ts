@@ -103,7 +103,7 @@ export function createGeneratorSync(session: ActiveUserSession, client = supabas
       if (active && tariffs.some(t => t.id === active.id)) {
         const { error } = await client.rpc('reconcile_generator_monthly_cycle', { p_generator_id: id, p_tariff_id: active.id });
         if (error) throw error;
-      } else if (sent.tariffs.length === 0) {
+      } else if (sent.tariffs.length === 0 && (sent.deletedTariffs.length > 0 || ack.tariffs.length > 0)) {
         const { error } = await client.rpc('reconcile_generator_no_tariff_state', { p_generator_id: id });
         if (error) throw error;
       }
@@ -147,10 +147,6 @@ export function createGeneratorSync(session: ActiveUserSession, client = supabas
     const inv = settings.data?.invoice_settings || {};
     const remoteTariffs = tariffs.map(rowToTariff).sort((a, b) => b.year - a.year || b.month - a.month);
     const noCurrentTariff = remoteTariffs.length === 0;
-    if (noCurrentTariff && session.role === 'generator_admin') {
-      const { error } = await client.rpc('reconcile_generator_no_tariff_state', { p_generator_id: id });
-      if (error) throw error;
-    }
     const next: Snapshot = {
       ...empty,
       subscribers: subs.map(row => {

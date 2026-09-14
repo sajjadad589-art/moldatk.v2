@@ -443,31 +443,7 @@ const must = (v, m) => { if (!v) throw new Error(`Onboarding/lump finalizer: ${m
   const onboardingUi = `{!subscriberToEdit && currentTierObj?.type !== 'free' && (\n              <div className="bg-white dark:bg-[#101a33] border border-slate-200 dark:border-slate-800 rounded-3xl p-4 space-y-3">\n                <div><h3 className="text-xs font-black text-slate-900 dark:text-white">حالة المديونية عند التسجيل</h3><p className="text-[10px] text-slate-500 mt-1">حدد هل يبدأ المشترك بدين سابق أم يبدأ بدون أي استحقاق لهذا الشهر.</p></div>\n                <div className="grid grid-cols-2 gap-2">\n                  <button type="button" onClick={() => { setNewDebtMode('none'); setPriorDebtMonthId(''); setNewDebtError(''); }} className={\`py-3 px-2 rounded-2xl border text-xs font-black transition-all \${newDebtMode === 'none' ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200'}\`}>بدون دين سابق</button>\n                  <button type="button" onClick={() => { setNewDebtMode('prior'); setNewDebtError(''); }} className={\`py-3 px-2 rounded-2xl border text-xs font-black transition-all \${newDebtMode === 'prior' ? 'bg-amber-500 border-amber-500 text-white' : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200'}\`}>عليه دين سابق</button>\n                </div>\n                {newDebtMode === 'none' && <div className="rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 p-3 text-[11px] font-bold text-emerald-700 dark:text-emerald-300">سيتم إضافة المشترك الآن بدين 0 د.ع، وتبدأ جبايته من دورة الشهر القادمة.</div>}\n                {newDebtMode === 'prior' && (\n                  <div className="space-y-2">\n                    {availableDebtTariffs.length === 0 ? (\n                      <div className="rounded-2xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 p-3 text-[11px] font-black text-rose-600 dark:text-rose-300">لا توجد تسعيرة شهرية محفوظة. يجب إضافة تسعيرة الشهر أولاً، ولا يمكن تسجيل دين بدون تسعيرة.</div>\n                    ) : (<>\n                      <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300">اختر الشهر الذي يعود له الدين</label>\n                      <select value={priorDebtMonthId} onChange={e => { setPriorDebtMonthId(e.target.value); setNewDebtError(''); }} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 text-xs font-black text-slate-900 dark:text-white outline-none">\n                        <option value="">اختر تسعيرة الشهر</option>\n                        {availableDebtTariffs.map(m => <option key={m.id} value={m.id}>{m.monthNameAr}</option>)}\n                      </select>\n                      {selectedPriorTariff && <div className="rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 p-3 flex items-center justify-between gap-2"><span className="text-[10px] font-bold text-amber-800 dark:text-amber-300">الدين حسب {selectedPriorTariff.monthNameAr}</span><strong className="text-sm text-amber-700 dark:text-amber-300">{formatCurrency(selectedPriorDebtAmount)}</strong></div>}\n                    </>)}\n                  </div>\n                )}\n                {newDebtError && <p className="text-[11px] font-black text-rose-500">{newDebtError}</p>}\n              </div>\n            )}\n            `;
   const newSubmit = '<button type="submit" disabled={!subscriberToEdit && currentTierObj?.type !== \'free\' && (!newDebtMode || (newDebtMode === \'prior\' && !priorDebtMonthId))} className="w-full py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed text-white text-xs font-black shadow-md">{subscriberToEdit ? \'حفظ التعديلات\' : \'إضافة المشترك\'}</button>';
   if (s.includes(oldSubmit)) {
-    if (s.includes(oldSubmit)) {
-    if (s.includes(oldSubmit)) {
-    if (s.includes(oldSubmit)) {
-    if (s.includes(oldSubmit)) {
-    if (s.includes(oldSubmit)) {
-    if (s.includes(oldSubmit)) {
     s = s.replace(oldSubmit, onboardingUi + newSubmit);
-  } else {
-    must(s.includes(newSubmit) && onboardingSubmitAlreadyApplied, 'subscriber onboarding submit state inconsistent');
-  }
-  } else {
-    must(s.includes(newSubmit) && onboardingSubmitAlreadyApplied, 'subscriber onboarding submit state inconsistent');
-  }
-  } else {
-    must(s.includes(newSubmit) && onboardingSubmitAlreadyApplied, 'subscriber onboarding submit state inconsistent');
-  }
-  } else {
-    must(s.includes(newSubmit) && onboardingSubmitAlreadyApplied, 'subscriber onboarding submit state inconsistent');
-  }
-  } else {
-    must(s.includes(newSubmit) && onboardingSubmitAlreadyApplied, 'subscriber onboarding submit state inconsistent');
-  }
-  } else {
-    must(s.includes(newSubmit) && onboardingSubmitAlreadyApplied, 'subscriber onboarding submit state inconsistent');
-  }
   } else {
     must(s.includes(newSubmit) && onboardingSubmitAlreadyApplied, 'subscriber onboarding submit state inconsistent');
   }

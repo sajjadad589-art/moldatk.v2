@@ -24,7 +24,7 @@ const id = 'test-generator';
 const session = { generatorId: id, role: 'generator_admin' };
 const sub = { id: 's1', code: '1', fullName: 'Test', tier: 'normal', amperes: 5, paymentStatus: 'unpaid', invoicesHistory: [] };
 const tables = ['generator_subscribers','generator_invoices','generator_lines','generator_monthly_tariffs','generator_audit_logs'];
-function fixture() {
+function fixture(role = 'generator_admin') {
   localStorage.clear();
   const db = Object.fromEntries(tables.map(t=>[t,[]]));
   db.generator_settings = [{ generator_id:id, specs:{}, invoice_settings:{} }];
@@ -32,7 +32,7 @@ function fixture() {
   let fail=false, pause, onWrite, cashbox={ reset_id:null,reset_at:null,balance:null };
   const client = {
     auth: { async getSession() { active++; maxActive=Math.max(maxActive,active); await sleep(1); active--; return {data:{session:{}}}; } },
-    async rpc(name) { if (name==='reconcile_generator_monthly_cycle') { reconciles++; onWrite?.(); return {data:{ok:true}}; } return {data:cashbox}; },
+    async rpc(name) { if (name.startsWith('reconcile_generator_')) { reconciles++; onWrite?.(); return {data:{ok:true}}; } assert.equal(name, 'get_generator_cashbox'); return {data:cashbox}; },
     from(table) {
       let kind='select', rows, lo=0,hi=499,ids;
       const q={ select(){return q;}, eq(){return q;}, order(){return q;}, range(a,b){lo=a;hi=b;return q;}, maybeSingle(){kind='single';return q;},
@@ -52,7 +52,7 @@ function fixture() {
       }; return q;
     },
   };
-  const sync=createGeneratorSync(session,client,localStorage);
+  const sync=createGeneratorSync({...session, role},client,localStorage);
   const listener=e=>sync.local(e); window.addEventListener('moldatk-local-sync',listener);
   return {sync,db,set cashbox(v){cashbox=v;},set fail(v){fail=v;},set pause(v){pause=v;},set onWrite(v){onWrite=v;},
     get writes(){return writes;},get reads(){return reads;},get reconciles(){return reconciles;},get maxActive(){return maxActive;},
@@ -123,5 +123,30 @@ await test('cloud reset survives refresh and old local timestamp without an uplo
   localStorage.setItem(`moldatk_wallet_reset_timestamp_${id}`,'2000-01-01');await f.sync.flush();
   assert.equal(JSON.parse(localStorage.getItem(`moldatk_cashbox_server_${id}`)).balance,0);await f.sync.flush();assert.equal(f.writes,0);f.close();
 });
+await test('deleting last tariff reconciles once and remote pulls remain read-only', async () => {
+  const f = fixture();
+  f.db.generator_monthly_tariffs = [{ id:'t1', month:9, year:2026, tiers:[], is_current_active:true }];
+  await f.sync.flush();
+  local('deleted_tariffs', ['t1']);
+  local('monthly_tariffs', []);
+  f.onWrite = () => f.sync.remote();
+  await f.sync.flush();
+  assert.equal(f.reconciles, 1);
+  await f.sync.flush();
+  assert.equal(f.reconciles, 1);
+  assert.equal(f.db.generator_monthly_tariffs.length, 0);
+  f.close();
+});
+await test('collector pull masks stale debt without rewriting historical invoices or pushing it back', async () => {
+  const f = fixture('collector');
+  f.db.generator_subscribers = [{id:'s1',full_name:'Server',tier:'normal',amperes:4,payment_status:'partial',amount_due:196000,amount_paid:92000}];
+  f.db.generator_invoices = [{id:'old',subscriber_id:'s1',month_id:'2026-08',paid_amount:92000,total_amount:196000,status:'partial'}];
+  await f.sync.flush();
+  const pulled = JSON.parse(localStorage.getItem(`moldatk_subscribers_${id}`))[0];
+  assert.deepEqual([pulled.amountDue,pulled.amountPaid],[0,0]);
+  assert.equal(pulled.invoicesHistory[0].paidAmount,92000);
+  await f.sync.flush();
+  assert.equal(f.writes,0); assert.equal(f.reconciles,0);
+  f.close();
+});
 console.log(`Event sync regression: ${passed} PASS, 0 FAIL`);
-
