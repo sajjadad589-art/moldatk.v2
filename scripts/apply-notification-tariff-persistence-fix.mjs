@@ -3,18 +3,26 @@ import fs from 'node:fs';
 const read = p => fs.readFileSync(p, 'utf8');
 const write = (p, c) => fs.writeFileSync(p, c);
 
-// 1) A newly-created month must be persisted immediately, but subscriber balances
-// are recalculated only after the user presses Save with the final prices.
+// 1) Legacy compatibility: an older build flow persisted a newly-created month
+// immediately. Newer builds intentionally keep a new month as a LOCAL DRAFT until
+// the owner enters per-tier prices and presses Save/Apply. Never undo that newer
+// behavior on a second lint -> build pass.
 {
   const p = 'src/components/PricingModal.tsx';
   let c = read(p);
-  const old = `    setTariffs(updatedTariffs);\n    setSelectedMonthId(monthId);\n    setIsAddingNewMonth(false);\n  };`;
-  const next = `    setTariffs(updatedTariffs);\n    setSelectedMonthId(monthId);\n    // ثبّت الشهر الجديد فوراً حتى لا يختفي مع أي Pull، لكن لا تحسب المشتركين قبل حفظ الأسعار النهائية.\n    onSaveMonthlyTariffs(updatedTariffs, monthId, false);\n    setIsAddingNewMonth(false);\n  };`;
-  if (c.includes(old)) c = c.replace(old, next);
-  else if (c.includes('onSaveMonthlyTariffs(updatedTariffs, monthId, true);')) {
-    c = c.replace('onSaveMonthlyTariffs(updatedTariffs, monthId, true);', 'onSaveMonthlyTariffs(updatedTariffs, monthId, false);');
-  } else if (!c.includes('onSaveMonthlyTariffs(updatedTariffs, monthId, false);')) {
-    throw new Error('PricingModal create-month block not found');
+  const hasFinalDraftFlow = c.includes('MONTHLY_TARIFF_PRICE_DRAFT_V1')
+    || c.includes('مسودة محلية فقط: لا تُرسل للسحابة')
+    || c.includes('PRICING_TIER_FIELD_RECOVERY');
+
+  if (!hasFinalDraftFlow) {
+    const old = `    setTariffs(updatedTariffs);\n    setSelectedMonthId(monthId);\n    setIsAddingNewMonth(false);\n  };`;
+    const next = `    setTariffs(updatedTariffs);\n    setSelectedMonthId(monthId);\n    // ثبّت الشهر الجديد فوراً حتى لا يختفي مع أي Pull، لكن لا تحسب المشتركين قبل حفظ الأسعار النهائية.\n    onSaveMonthlyTariffs(updatedTariffs, monthId, false);\n    setIsAddingNewMonth(false);\n  };`;
+    if (c.includes(old)) c = c.replace(old, next);
+    else if (c.includes('onSaveMonthlyTariffs(updatedTariffs, monthId, true);')) {
+      c = c.replace('onSaveMonthlyTariffs(updatedTariffs, monthId, true);', 'onSaveMonthlyTariffs(updatedTariffs, monthId, false);');
+    } else if (!c.includes('onSaveMonthlyTariffs(updatedTariffs, monthId, false);')) {
+      throw new Error('PricingModal create-month block not found');
+    }
   }
   write(p, c);
 }
@@ -46,4 +54,4 @@ const write = (p, c) => fs.writeFileSync(p, c);
   write(p, c);
 }
 
-console.log('Applied tariff persistence: durable month creation + non-destructive history sync');
+console.log('Applied tariff persistence: durable month history + repeat-build-safe draft compatibility');
