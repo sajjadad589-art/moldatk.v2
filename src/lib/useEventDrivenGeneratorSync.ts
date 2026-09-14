@@ -103,6 +103,9 @@ export function createGeneratorSync(session: ActiveUserSession, client = supabas
       if (active && tariffs.some(t => t.id === active.id)) {
         const { error } = await client.rpc('reconcile_generator_monthly_cycle', { p_generator_id: id, p_tariff_id: active.id });
         if (error) throw error;
+      } else if (sent.tariffs.length === 0 && (sent.deletedTariffs.length > 0 || ack.tariffs.length > 0)) {
+        const { error } = await client.rpc('reconcile_generator_no_tariff_state', { p_generator_id: id });
+        if (error) throw error;
       }
     }
     await upsert('generator_audit_logs', changedRows(sent.audit, ack.audit).map(a => ({
@@ -142,10 +145,17 @@ export function createGeneratorSync(session: ActiveUserSession, client = supabas
       history.set(inv.subscriberId, [...(history.get(inv.subscriberId) || []), inv]);
     }
     const inv = settings.data?.invoice_settings || {};
+    const remoteTariffs = tariffs.map(rowToTariff).sort((a, b) => b.year - a.year || b.month - a.month);
+    const noCurrentTariff = remoteTariffs.length === 0;
     const next: Snapshot = {
       ...empty,
-      subscribers: subs.map(row => ({ ...rowToSubscriber(row), invoicesHistory: history.get(row.id) || [] })),
-      lines: lines.map(rowToLine), tariffs: tariffs.map(rowToTariff).sort((a, b) => b.year - a.year || b.month - a.month),
+      subscribers: subs.map(row => {
+        const subscriber = { ...rowToSubscriber(row), invoicesHistory: history.get(row.id) || [] };
+        return noCurrentTariff
+          ? { ...subscriber, amountDue: 0, amountPaid: 0, paymentStatus: subscriber.tier === 'free' || subscriber.isExempted ? 'free' : 'unpaid' }
+          : subscriber;
+      }),
+      lines: lines.map(rowToLine), tariffs: remoteTariffs,
       audit: logs.map(r => ({ id: r.id, timestamp: r.timestamp, category: r.category, title: r.title,
         details: r.details, entityId: r.entity_id || undefined, entityName: r.entity_name || undefined,
         actorName: r.actor_name, previousValue: r.previous_value || undefined, newValue: r.new_value || undefined,
@@ -244,4 +254,3 @@ export function useEventDrivenGeneratorSync(session: ActiveUserSession | null) {
     };
   }, [session?.generatorId, session?.role]);
 }
-

@@ -22,7 +22,9 @@ const must = (v, m) => { if (!v) throw new Error(`Final financial parity: ${m}`)
   must(s.includes('  const collectibleSubscribers ='), 'collector billable scope missing');
   must(s.includes('activeMonthId'), 'collector active accounting month missing');
 
-  const start = s.indexOf('  // COLLECTOR_DASHBOARD_ACCOUNTING_SINGLE_SOURCE_V1');
+  const legacyAccountingStart = s.indexOf('  // COLLECTOR_DASHBOARD_ACCOUNTING_SINGLE_SOURCE_V1');
+  const parityAccountingStart = s.indexOf('  // COLLECTOR_OWNER_ACCOUNTING_PARITY_V2');
+  const start = legacyAccountingStart >= 0 ? legacyAccountingStart : parityAccountingStart;
   const end = start >= 0 ? s.indexOf('\n\n  return (', start) : -1;
   must(start >= 0 && end > start, 'collector accounting block bounds missing');
 

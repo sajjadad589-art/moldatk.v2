@@ -46,6 +46,7 @@ import {
   AuditLogEntry,
 } from '../types';
 import { formatCurrency, formatNumberArabic } from '../utils/formatters';
+import { syncCloudCollectorRoster } from '../lib/collectorCloud';
 
 interface FolderDetailModalProps {
   isOpen: boolean;
@@ -59,7 +60,7 @@ interface FolderDetailModalProps {
   auditLogs?: AuditLogEntry[];
   onUpdateGeneratorSpecs: (specs: GeneratorSpecs) => void;
   onUpdateLines: (lines: LineDistribution[]) => void;
-  onUpdateCollectors: (collectors: Collector[]) => void;
+  onUpdateCollectors: (collectors: Collector[]) => void | Promise<void>;
   onUpdateInvoiceTemplate: (template: InvoiceTemplateSettings) => void;
   onClearAuditLogs?: () => void;
   onExportBackup: () => void;
@@ -109,50 +110,55 @@ export const FolderDetailModal: React.FC<FolderDetailModalProps> = ({
       setAuditFilter('all');
       setAuditSearch('');
     }
-  }, [isOpen, generatorSpecs, lines, collectors, invoiceTemplate]);
+  }, [isOpen, folderKey]);
 
   if (!isOpen || !folderKey) return null;
 
   const currentFolder = folders.find(f => f.folderKey === folderKey);
 
+  // MOLDATK_CABINET_INSTANT_PERSIST_V2
+  const persistLinesImmediately = (nextLines: LineDistribution[]) => {
+    const fixedLines = nextLines.map(line => ({
+      ...line,
+      name: line.name || 'كابينة بدون اسم',
+      lineName: (line as any).lineName || line.name || 'كابينة بدون اسم',
+      updatedAt: new Date().toISOString(),
+    } as any));
+    setCurrentLines(fixedLines);
+    onUpdateLines(fixedLines);
+    setSaved(true);
+    try { window.dispatchEvent(new Event('moldatk-local-sync')); } catch (e) {}
+    window.setTimeout(() => setSaved(false), 700);
+  };
+
   // --- Line Handlers ---
   const handleAddLine = () => {
-    const newLineId = `line-${Date.now()}`;
-    const phaseTypes: PhaseType[] = ['phase-R', 'phase-S', 'phase-T', '3-phase'];
-    const assignedPhase = phaseTypes[currentLines.length % phaseTypes.length];
-    const phaseNames: Record<PhaseType, string> = {
-      'phase-R': 'فيز R (الأحمر) - 380V',
-      'phase-S': 'فيز S (الأصفر) - 380V',
-      'phase-T': 'فيز T (الأزرق) - 380V',
-      '3-phase': 'ثلاثي الفيز (3-Phase)',
-      'single-phase': 'فيز أحادي (220V)',
-    };
-
+    const index = currentLines.length + 1;
     const newLine: LineDistribution = {
-      id: newLineId,
-      name: `خط تغذية جديد (${currentLines.length + 1})`,
-      zone: 'المنطقة / الشارع',
-      phaseType: assignedPhase,
-      phaseNameAr: phaseNames[assignedPhase],
-      maxCapacityAmperes: 200,
+      id: `line-${Date.now()}`,
+      name: `كابينة ${index}`,
+      zone: '',
+      phaseType: 'single-phase',
+      phaseNameAr: 'فيز أحادي (220V)',
+      maxCapacityAmperes: 0,
       currentLoadAmperes: 0,
       subscribersCount: 0,
-      technicianName: 'فني الصيانة المناوب',
-      breakerNumber: `Q${currentLines.length + 1}-250A`,
+      technicianName: '',
+      breakerNumber: '',
     };
-
-    setCurrentLines([...currentLines, newLine]);
+    const next = [...currentLines, newLine];
+    setCurrentLines(next);
+    onUpdateLines(next);
   };
 
   const handleDeleteLine = (id: string) => {
-    if (currentLines.length <= 1) return;
-    setCurrentLines(currentLines.filter(l => l.id !== id));
+    const nextLines = currentLines.filter(l => l.id !== id);
+    persistLinesImmediately(nextLines);
   };
 
   const handleUpdateLine = (id: string, updates: Partial<LineDistribution>) => {
-    setCurrentLines(prev =>
-      prev.map(l => (l.id === id ? { ...l, ...updates } : l))
-    );
+    const nextLines = currentLines.map(l => (l.id === id ? { ...l, ...updates, updatedAt: new Date().toISOString() } as any : l));
+    persistLinesImmediately(nextLines);
   };
 
   // --- Collector Handlers ---
@@ -161,12 +167,12 @@ export const FolderDetailModal: React.FC<FolderDetailModalProps> = ({
     const newCollector: Collector = {
       id: `col-${Date.now()}`,
       name: 'محصل ميداني جديد',
-      phone: '07700000000',
+      phone: '',
       passcode: randomPin,
       permissions: {
         canCollectPayments: true,
         canCancelPayments: false,
-        canAddSubscribers: false,
+        canAddSubscribers: true,
         canEditSubscribers: false,
         canDeleteSubscribers: false,
         canApplyFreeExemption: false,
@@ -174,8 +180,10 @@ export const FolderDetailModal: React.FC<FolderDetailModalProps> = ({
         canViewFinancialReports: false,
         canAccessSystemSettings: false,
       },
-      assignedLineId: currentLines[0]?.id || 'line-1',
-      assignedLineName: currentLines[0]?.name || 'الخط الرئيسي',
+      assignedLineId: currentLines[0]?.id || undefined,
+      assignedLineName: currentLines[0]?.name || undefined,
+      assignedLineIds: currentLines[0]?.id ? [currentLines[0].id] : [],
+      assignedAllLines: currentLines.length === 0,
       nationalId: '',
       notes: 'جابي معتمد',
       isActive: true,
@@ -296,13 +304,45 @@ export const FolderDetailModal: React.FC<FolderDetailModalProps> = ({
     reader.readAsText(file);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (folderKey === 'collectors') {
+      const normalizedPhones = currentCollectors.map(c => String(c.phone || '').replace(/\D/g, ''));
+      if (normalizedPhones.some(phone => phone.length < 10)) {
+        alert('أدخل رقم هاتف صحيح لكل جابي قبل الحفظ');
+        return;
+      }
+      if (new Set(normalizedPhones).size !== normalizedPhones.length) {
+        alert('لا يمكن استخدام نفس رقم الهاتف لأكثر من جابي');
+        return;
+      }
+      const invalidNewPin = currentCollectors.some(c => String(c.id || '').startsWith('col-') && !/^\d{4,8}$/.test(String(c.passcode || '').trim()));
+      if (invalidNewPin) {
+        alert('الرمز السري للجابي الجديد يجب أن يكون من 4 إلى 8 أرقام');
+        return;
+      }
+    }
+
     if (folderKey === 'generator_specs') {
       onUpdateGeneratorSpecs(specs);
     } else if (folderKey === 'lines_zones') {
       onUpdateLines(currentLines);
     } else if (folderKey === 'collectors') {
-      onUpdateCollectors(currentCollectors);
+      // FOLDER_COLLECTOR_SERVER_SAVE_V6
+      const invalidCollector = currentCollectors.find(item => item.assignedAllLines === false && !(item.assignedLineIds?.length || item.assignedLineId));
+      if (invalidCollector) {
+        alert('حدد كابينة واحدة على الأقل للجابي أو اختر الكل');
+        return;
+      }
+      try {
+        const savedCollectors = await syncCloudCollectorRoster(currentCollectors);
+        const finalCollectors = savedCollectors.length ? savedCollectors : currentCollectors;
+        setCurrentCollectors(finalCollectors);
+        onUpdateCollectors(finalCollectors);
+      } catch (error) {
+        console.error('Folder collector server save failed:', error);
+        alert('تعذر حفظ تخصيص الكابينات على السيرفر. لم يتم إغلاق النافذة.');
+        return;
+      }
     } else if (folderKey === 'invoices_templates') {
       onUpdateInvoiceTemplate(currentTemplate);
     }
@@ -486,7 +526,7 @@ export const FolderDetailModal: React.FC<FolderDetailModalProps> = ({
                             <div className="flex items-center gap-3 text-[10px] text-slate-400 dark:text-slate-500 pt-1">
                               {log.entityName && <span>الطرف: {log.entityName}</span>}
                               {log.actorName && <span>• المنفّذ: {log.actorName}</span>}
-                              <span>• التوقيت: {new Date(log.timestamp).toLocaleString('ar-IQ')}</span>
+                              <span>• التوقيت: {new Date(log.timestamp).toLocaleString('ar-IQ-u-nu-latn')}</span>
                             </div>
                           </div>
                         </div>
@@ -625,11 +665,12 @@ export const FolderDetailModal: React.FC<FolderDetailModalProps> = ({
                   قواطع التوزيع وخطوط الأحمال ({currentLines.length} خطوط مسجلة):
                 </span>
                 <button
+                  type="button"
                   onClick={handleAddLine}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition-all shadow-xs cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>إضافة خط وقاطع جديد</span>
+                  <span>إضافة كابينة</span>
                 </button>
               </div>
 
@@ -747,7 +788,6 @@ export const FolderDetailModal: React.FC<FolderDetailModalProps> = ({
               <div className="space-y-3.5">
                 {currentCollectors.map((c, idx) => {
                   const isPassVisible = showPasscodes[c.id] || false;
-                  const isPermsOpen = expandedPermissions[c.id] ?? true;
                   const perms = c.permissions || {
                     canCollectPayments: true,
                     canCancelPayments: false,
@@ -796,18 +836,6 @@ export const FolderDetailModal: React.FC<FolderDetailModalProps> = ({
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <button
-                            onClick={() =>
-                              setExpandedPermissions(prev => ({
-                                ...prev,
-                                [c.id]: !isPermsOpen,
-                              }))
-                            }
-                            className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-750 transition-colors"
-                          >
-                            <Shield className="w-3.5 h-3.5 text-blue-500" />
-                            <span>{isPermsOpen ? 'إخفاء الصلاحيات' : 'تعديل الصلاحيات'}</span>
-                          </button>
 
                           <button
                             onClick={() => handleDeleteCollector(c.id)}
@@ -845,27 +873,84 @@ export const FolderDetailModal: React.FC<FolderDetailModalProps> = ({
                           />
                         </div>
 
-                        <div>
+                        <div data-multi-cabinet-picker-v6="true" className="min-w-0">
                           <label className="text-[11px] text-slate-500 dark:text-slate-400 block mb-1 font-bold">
-                            الخط المخصص
+                            الكابينات المسموحة
                           </label>
-                          <select
-                            value={c.assignedLineId}
-                            onChange={e => {
-                              const line = currentLines.find(l => l.id === e.target.value);
-                              handleUpdateCollector(c.id, {
-                                assignedLineId: e.target.value,
-                                assignedLineName: line?.name || 'الخط المخصص',
-                              });
-                            }}
-                            className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
-                          >
-                            {currentLines.map(l => (
-                              <option key={l.id} value={l.id}>
-                                {l.name}
-                              </option>
-                            ))}
-                          </select>
+                          {(() => {
+                            const selectedIds = Array.isArray(c.assignedLineIds) && c.assignedLineIds.length
+                              ? c.assignedLineIds
+                              : (c.assignedLineId ? [c.assignedLineId] : []);
+                            const allSelected = c.assignedAllLines === true || (c.assignedAllLines !== false && selectedIds.length === 0);
+                            const selectedNames = currentLines.filter(line => selectedIds.includes(line.id)).map(line => line.name);
+                            const summaryText = allSelected ? 'الكل' : (selectedNames.length ? selectedNames.join('، ') : 'حدد الكابينات');
+
+                            return (
+                              <details className="group relative">
+                                <summary className="list-none cursor-pointer w-full min-h-[38px] px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white flex items-center justify-between gap-2">
+                                  <span className="truncate">{summaryText}</span>
+                                  <span className="text-slate-400 text-[11px] group-open:rotate-180 transition-transform">⌄</span>
+                                </summary>
+                                <div className="mt-2 p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 space-y-1.5 shadow-sm">
+                                  <label className={`flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-pointer border text-xs font-black ${allSelected ? 'bg-[#FFF7E3] border-[#D89A21] text-[#0B1F3B]' : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200'}`}>
+                                    <input
+                                      type="checkbox"
+                                      checked={allSelected}
+                                      onChange={e => {
+                                        if (e.target.checked) {
+                                          handleUpdateCollector(c.id, {
+                                            assignedAllLines: true,
+                                            assignedLineIds: [],
+                                            assignedLineId: undefined,
+                                            assignedLineName: 'كل الكابينات',
+                                          });
+                                        } else {
+                                          const first = currentLines[0];
+                                          handleUpdateCollector(c.id, {
+                                            assignedAllLines: false,
+                                            assignedLineIds: first ? [first.id] : [],
+                                            assignedLineId: first?.id,
+                                            assignedLineName: first?.name,
+                                          });
+                                        }
+                                      }}
+                                      className="w-4 h-4 accent-[#0B1F3B] shrink-0"
+                                    />
+                                    <span>الكل</span>
+                                  </label>
+
+                                  <div className="max-h-44 overflow-y-auto space-y-1">
+                                    {currentLines.map(line => {
+                                      const checked = !allSelected && selectedIds.includes(line.id);
+                                      return (
+                                        <label key={line.id} className={`flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-pointer border text-xs font-bold ${checked ? 'bg-[#FFF7E3] border-[#D89A21] text-[#0B1F3B]' : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200'}`}>
+                                          <input
+                                            type="checkbox"
+                                            checked={checked}
+                                            onChange={() => {
+                                              const next = checked
+                                                ? selectedIds.filter(id => id !== line.id)
+                                                : [...selectedIds, line.id];
+                                              if (checked && next.length === 0) return;
+                                              const first = currentLines.find(item => item.id === next[0]);
+                                              handleUpdateCollector(c.id, {
+                                                assignedAllLines: false,
+                                                assignedLineIds: next,
+                                                assignedLineId: next[0],
+                                                assignedLineName: first?.name,
+                                              });
+                                            }}
+                                            className="w-4 h-4 accent-[#0B1F3B] shrink-0"
+                                          />
+                                          <span className="truncate">{line.name}</span>
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              </details>
+                            );
+                          })()}
                         </div>
 
                         {/* Passcode Field for Future Login */}
@@ -888,9 +973,9 @@ export const FolderDetailModal: React.FC<FolderDetailModalProps> = ({
                           <div className="relative">
                             <input
                               type={isPassVisible ? 'text' : 'password'}
-                              value={c.passcode || '1234'}
+                              value={c.passcode || ''}
                               onChange={e => handleUpdateCollector(c.id, { passcode: e.target.value })}
-                              placeholder="مثال: 1234"
+                              placeholder="اكتب رمزاً جديداً أو اتركه بدون تغيير"
                               className="w-full pl-8 pr-2.5 py-1.5 bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700/60 rounded-xl text-xs font-black text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500 font-mono"
                             />
                             <button
@@ -913,210 +998,7 @@ export const FolderDetailModal: React.FC<FolderDetailModalProps> = ({
                         </div>
                       </div>
 
-                      {/* Permissions Panel */}
-                      {isPermsOpen && (
-                        <div className="mt-2 p-3.5 rounded-xl bg-white dark:bg-[#0c1527] border border-slate-200 dark:border-slate-800 space-y-3">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100 dark:border-slate-800">
-                            <div className="flex items-center gap-1.5 text-xs font-black text-slate-800 dark:text-slate-200">
-                              <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                              <span>صلاحيات الجابي (ما يمكنه رؤيته وتعديله):</span>
-                            </div>
 
-                            {/* Quick Presets */}
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[10px] text-slate-400 font-bold">قوالب جاهزة:</span>
-                              <button
-                                type="button"
-                                onClick={() => handleApplyPermissionPreset(c.id, 'standard')}
-                                className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100"
-                              >
-                                تسديد فقط (قياسي)
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleApplyPermissionPreset(c.id, 'supervisor')}
-                                className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 hover:bg-purple-100"
-                              >
-                                مشرف ميداني
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Granular Permission Toggles Grid */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                            {/* 1. canCollectPayments */}
-                            <label className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 cursor-pointer hover:bg-blue-50/50 dark:hover:bg-slate-800 transition-colors">
-                              <input
-                                type="checkbox"
-                                checked={perms.canCollectPayments}
-                                onChange={e =>
-                                  handleUpdateCollectorPermission(
-                                    c.id,
-                                    'canCollectPayments',
-                                    e.target.checked
-                                  )
-                                }
-                                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600"
-                              />
-                              <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
-                                تسديد وقبض الاشتراكات
-                              </div>
-                            </label>
-
-                            {/* 2. canPrintReceipts */}
-                            <label className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 cursor-pointer hover:bg-blue-50/50 dark:hover:bg-slate-800 transition-colors">
-                              <input
-                                type="checkbox"
-                                checked={perms.canPrintReceipts}
-                                onChange={e =>
-                                  handleUpdateCollectorPermission(
-                                    c.id,
-                                    'canPrintReceipts',
-                                    e.target.checked
-                                  )
-                                }
-                                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600"
-                              />
-                              <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
-                                طباعة ومشاركة وصولات القبض
-                              </div>
-                            </label>
-
-                            {/* 3. canCancelPayments */}
-                            <label className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 cursor-pointer hover:bg-blue-50/50 dark:hover:bg-slate-800 transition-colors">
-                              <input
-                                type="checkbox"
-                                checked={perms.canCancelPayments}
-                                onChange={e =>
-                                  handleUpdateCollectorPermission(
-                                    c.id,
-                                    'canCancelPayments',
-                                    e.target.checked
-                                  )
-                                }
-                                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600"
-                              />
-                              <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
-                                إلغاء التسديد وتوثيق السبب
-                              </div>
-                            </label>
-
-                            {/* 4. canApplyFreeExemption */}
-                            <label className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 cursor-pointer hover:bg-blue-50/50 dark:hover:bg-slate-800 transition-colors">
-                              <input
-                                type="checkbox"
-                                checked={perms.canApplyFreeExemption}
-                                onChange={e =>
-                                  handleUpdateCollectorPermission(
-                                    c.id,
-                                    'canApplyFreeExemption',
-                                    e.target.checked
-                                  )
-                                }
-                                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600"
-                              />
-                              <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
-                                منح إعفاء تسديد مجاني
-                              </div>
-                            </label>
-
-                            {/* 5. canAddSubscribers */}
-                            <label className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 cursor-pointer hover:bg-blue-50/50 dark:hover:bg-slate-800 transition-colors">
-                              <input
-                                type="checkbox"
-                                checked={perms.canAddSubscribers}
-                                onChange={e =>
-                                  handleUpdateCollectorPermission(
-                                    c.id,
-                                    'canAddSubscribers',
-                                    e.target.checked
-                                  )
-                                }
-                                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600"
-                              />
-                              <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
-                                إضافة مشتركين جدد
-                              </div>
-                            </label>
-
-                            {/* 6. canEditSubscribers */}
-                            <label className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 cursor-pointer hover:bg-blue-50/50 dark:hover:bg-slate-800 transition-colors">
-                              <input
-                                type="checkbox"
-                                checked={perms.canEditSubscribers}
-                                onChange={e =>
-                                  handleUpdateCollectorPermission(
-                                    c.id,
-                                    'canEditSubscribers',
-                                    e.target.checked
-                                  )
-                                }
-                                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600"
-                              />
-                              <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
-                                تعديل بيانات المشتركين
-                              </div>
-                            </label>
-
-                            {/* 7. canDeleteSubscribers */}
-                            <label className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 cursor-pointer hover:bg-blue-50/50 dark:hover:bg-slate-800 transition-colors">
-                              <input
-                                type="checkbox"
-                                checked={perms.canDeleteSubscribers}
-                                onChange={e =>
-                                  handleUpdateCollectorPermission(
-                                    c.id,
-                                    'canDeleteSubscribers',
-                                    e.target.checked
-                                  )
-                                }
-                                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600"
-                              />
-                              <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
-                                حذف المشتركين
-                              </div>
-                            </label>
-
-                            {/* 8. canViewFinancialReports */}
-                            <label className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 cursor-pointer hover:bg-blue-50/50 dark:hover:bg-slate-800 transition-colors">
-                              <input
-                                type="checkbox"
-                                checked={perms.canViewFinancialReports}
-                                onChange={e =>
-                                  handleUpdateCollectorPermission(
-                                    c.id,
-                                    'canViewFinancialReports',
-                                    e.target.checked
-                                  )
-                                }
-                                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600"
-                              />
-                              <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
-                                عرض التقارير المالية والإيرادات
-                              </div>
-                            </label>
-
-                            {/* 9. canAccessSystemSettings */}
-                            <label className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 cursor-pointer hover:bg-blue-50/50 dark:hover:bg-slate-800 transition-colors">
-                              <input
-                                type="checkbox"
-                                checked={perms.canAccessSystemSettings}
-                                onChange={e =>
-                                  handleUpdateCollectorPermission(
-                                    c.id,
-                                    'canAccessSystemSettings',
-                                    e.target.checked
-                                  )
-                                }
-                                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600"
-                              />
-                              <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
-                                الوصول لإعدادات المنظومة والمولد
-                              </div>
-                            </label>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   );
                 })}

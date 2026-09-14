@@ -101,7 +101,7 @@ const themeOptions: Array<{ value: ThemeKey; label: string }> = [
 
 const formatDate = (value: string) => {
   try {
-    return new Intl.DateTimeFormat('ar-IQ', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+    return new Intl.DateTimeFormat('ar-IQ-u-nu-latn', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
   } catch {
     return value;
   }

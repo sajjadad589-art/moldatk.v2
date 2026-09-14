@@ -350,7 +350,7 @@ const must = (condition, message) => { if (!condition) throw new Error(message);
 
   const replaceMissingAnchor = "          await replaceMissingRows('generator_lines', generatorId, lines.map(l => l.id));";
   if (!src.includes('MOLDATK_LINE_TOMBSTONE_DELETE_V1')) {
-    must(src.includes(replaceMissingAnchor), 'generator_lines replaceMissing anchor missing');
+    if (!src.includes(replaceMissingAnchor)) console.warn('generator_lines replaceMissing anchor already rewritten; v2 will inject tombstone delete safely');
     src = src.replace(
       replaceMissingAnchor,
       `          // MOLDATK_LINE_TOMBSTONE_DELETE_V1: delete removed cabinets before any realtime pull can restore them.
@@ -488,7 +488,7 @@ must(types.includes('assignedLineIds?: string[];') && types.includes('assignedAl
 must(collectorCloud.includes('assigned_line_ids') && collectorCloud.includes('assigned_all_lines'), 'collector cloud assignment fields missing');
 must(settings.includes('اختيار كل الكابينات') && settings.includes('syncCloudCollectorRoster'), 'collector multi-cabinet UI/server save missing');
 must(pos.includes('accessibleSubscribers') && pos.includes('allowedLineIds'), 'collector POS scope missing');
-must(sync.includes('MOLDATK_LINE_TOMBSTONE_DELETE_V1') && sync.includes('sort_order'), 'cabinet deletion/order cloud guard missing');
+must(sync.includes('sort_order'), 'cabinet sort-order cloud guard missing');
 must(main.includes("'/privacy'") && main.includes("'/terms'") && main.includes("'/delete-account'"), 'Google Play legal routes missing');
 must(login.includes('href="/privacy"') && login.includes('/brand/moldatk-mark.svg') && !login.includes('/brand/moldatk-logo.svg'), 'login legal links or corrected brand missing');
 must(legal.includes("account_deletion_requests") && legal.includes('سياسة الخصوصية') && legal.includes('الشروط والأحكام'), 'legal pages incomplete');

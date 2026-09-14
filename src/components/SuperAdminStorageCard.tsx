@@ -119,7 +119,7 @@ export const SuperAdminStorageCard: React.FC = () => {
                 {stats.level === 'healthy' ? <CheckCircle2 className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
                 <span>{levelText[stats.level]}</span>
               </div>
-              <span className="text-[11px] font-bold opacity-80">آخر قراءة: {new Intl.DateTimeFormat('ar-IQ', { timeStyle: 'medium' }).format(new Date(stats.sampled_at))}</span>
+              <span className="text-[11px] font-bold opacity-80">آخر قراءة: {new Intl.DateTimeFormat('ar-IQ-u-nu-latn', { timeStyle: 'medium' }).format(new Date(stats.sampled_at))}</span>
             </div>
           )}
         </div>

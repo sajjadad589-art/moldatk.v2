@@ -78,7 +78,7 @@ export const MobileAdSlider: React.FC<{ className?: string }> = ({ className = '
 
   return (
     <section className={`w-full ${className}`} aria-label="إعلانات الإدارة">
-      <div className="relative overflow-hidden rounded-[28px] bg-[#101b35] border border-slate-800/60 shadow-xl shadow-black/10" dir="ltr">
+      <div className="relative overflow-hidden rounded-[22px] bg-[#101b35] border border-slate-800/60 shadow-xl shadow-black/10" dir="ltr">
         <div
           className="flex transition-transform duration-700 ease-out will-change-transform"
           style={{ transform: `translateX(-${activeIndex * 100}%)` }}

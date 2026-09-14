@@ -1,3 +1,4 @@
+import { hasMonthlyPricing } from '../utils/pricingAvailability';
 import type {
   MonthlyTariffRecord,
   PaymentAllocationEntry,
@@ -23,21 +24,65 @@ export function monthIdToDate(monthId: string): Date {
   return new Date(year, month - 1, 1, 12, 0, 0, 0);
 }
 
+// AMPERE_DISCOUNT_MONTHLY_ACCOUNTING_V1
+export interface MonthlyChargeBreakdown {
+  total: number;
+  pricePerAmpere: number;
+  fixedFee: number;
+  originalAmperes: number;
+  discountedAmperes: number;
+  billedAmperes: number;
+  grossTotal: number;
+  discountAmount: number;
+}
+
+export function getSubscriberAmpereDiscount(subscriber: Subscriber): number {
+  const original = Math.max(0, Number(subscriber.amperes || 0));
+  const requested = Math.max(0, Number(subscriber.ampereDiscount || 0));
+  return Math.min(original, requested);
+}
+
+export function getSubscriberBillableAmperes(subscriber: Subscriber): number {
+  return Math.max(0, Math.max(0, Number(subscriber.amperes || 0)) - getSubscriberAmpereDiscount(subscriber));
+}
+
 export function calculateMonthlyCharge(
   subscriber: Subscriber,
   pricingTiers: SubscriptionTierPricing[],
-): { total: number; pricePerAmpere: number; fixedFee: number } {
+): MonthlyChargeBreakdown {
+  const originalAmperes = Math.max(0, Number(subscriber.amperes || 0));
+
   if (subscriber.tier === 'free' || subscriber.isExempted) {
-    return { total: 0, pricePerAmpere: 0, fixedFee: 0 };
+    return {
+      total: 0,
+      pricePerAmpere: 0,
+      fixedFee: 0,
+      originalAmperes,
+      discountedAmperes: 0,
+      billedAmperes: 0,
+      grossTotal: 0,
+      discountAmount: 0,
+    };
   }
 
   const tier = pricingTiers.find(t => t.type === subscriber.tier || t.id === subscriber.tier);
-  const pricePerAmpere = Number(tier?.pricePerAmpere || 0);
-  const fixedFee = Number(tier?.fixedFee || 0);
+  const pricePerAmpere = Math.max(0, Number(tier?.pricePerAmpere || 0));
+  const fixedFee = Math.max(0, Number(tier?.fixedFee || 0));
+  const discountedAmperes = getSubscriberAmpereDiscount(subscriber);
+  const billedAmperes = Math.max(0, originalAmperes - discountedAmperes);
+  const grossTotal = Math.max(0, originalAmperes * pricePerAmpere + fixedFee);
+  const discountAmount = Math.max(0, discountedAmperes * pricePerAmpere);
+  const total = Math.max(0, billedAmperes * pricePerAmpere + fixedFee);
+
   return {
-    total: Math.max(0, Number(subscriber.amperes || 0) * pricePerAmpere + fixedFee),
+    total,
     pricePerAmpere,
     fixedFee,
+    originalAmperes,
+    discountedAmperes,
+    billedAmperes,
+    grossTotal,
+    discountAmount,
   };
 }
 
@@ -83,6 +128,20 @@ export function activateMonthlyTariffForSubscribers(
     const isFree = sub.tier === 'free' || sub.isExempted;
     const history = [...(sub.invoicesHistory || [])].map(inv => ({ ...inv }));
 
+    // FREE_INVOICE_INTEGRITY_V1
+    if (isFree) {
+      for (const inv of history) {
+        if (inv.status === 'cancelled') continue;
+        inv.tier = 'free';
+        inv.pricePerAmpere = 0;
+        inv.fixedFee = 0;
+        inv.totalAmount = 0;
+        inv.paidAmount = 0;
+        inv.remainingAmount = 0;
+        inv.status = 'free';
+      }
+    }
+
     // Backfill the closing month only when the account still comes from the legacy summary fields.
     if (
       previousActiveRecord &&
@@ -109,6 +168,11 @@ export function activateMonthlyTariffForSubscribers(
         issueDate: previousActiveRecord.createdAt || now.toISOString().slice(0, 10),
         paymentDate: previousPaid > 0 ? sub.lastPaymentDate : undefined,
         amperes: sub.amperes,
+        originalAmperes: previousCharge.originalAmperes,
+        discountedAmperes: previousCharge.discountedAmperes,
+        billedAmperes: previousCharge.billedAmperes,
+        grossAmountBeforeDiscount: previousCharge.grossTotal,
+        discountAmount: previousCharge.discountAmount,
         tier: sub.tier,
         pricePerAmpere: previousCharge.pricePerAmpere,
         fixedFee: previousCharge.fixedFee,
@@ -136,13 +200,18 @@ export function activateMonthlyTariffForSubscribers(
         monthNameAr: activeRecord.monthNameAr || getMonthNameAr(monthIdToDate(activeRecord.id)),
         issueDate: now.toISOString().slice(0, 10),
         amperes: sub.amperes,
+        originalAmperes: charge.originalAmperes,
+        discountedAmperes: isFree ? 0 : charge.discountedAmperes,
+        billedAmperes: isFree ? 0 : charge.billedAmperes,
+        grossAmountBeforeDiscount: isFree ? 0 : charge.grossTotal,
+        discountAmount: isFree ? 0 : charge.discountAmount,
         tier: sub.tier,
         pricePerAmpere: isFree ? 0 : charge.pricePerAmpere,
         fixedFee: isFree ? 0 : charge.fixedFee,
         totalAmount: isFree ? 0 : charge.total,
         paidAmount: 0,
         remainingAmount: isFree ? 0 : charge.total,
-        status: isFree ? 'free' : 'unpaid',
+        status: isFree ? 'free' : charge.total <= 0 ? 'paid' : 'unpaid',
         notes: previousDebt > 0 ? `دين مرحل من أشهر سابقة: ${previousDebt}` : undefined,
       };
       history.push(currentInvoice);
@@ -151,6 +220,11 @@ export function activateMonthlyTariffForSubscribers(
       // Historical/fully-paid months are frozen and never recomputed.
       const alreadyPaid = Math.max(0, Number(currentInvoice.paidAmount || 0));
       currentInvoice.amperes = sub.amperes;
+      currentInvoice.originalAmperes = charge.originalAmperes;
+      currentInvoice.discountedAmperes = isFree ? 0 : charge.discountedAmperes;
+      currentInvoice.billedAmperes = isFree ? 0 : charge.billedAmperes;
+      currentInvoice.grossAmountBeforeDiscount = isFree ? 0 : charge.grossTotal;
+      currentInvoice.discountAmount = isFree ? 0 : charge.discountAmount;
       currentInvoice.tier = sub.tier;
       currentInvoice.monthNameAr = activeRecord.monthNameAr || currentInvoice.monthNameAr;
       currentInvoice.pricePerAmpere = isFree ? 0 : charge.pricePerAmpere;
@@ -200,6 +274,19 @@ export function ensureMonthInvoice(
 ): { invoices: SubscriberInvoice[]; currentInvoice: SubscriberInvoice; carriedDebt: number } {
   const charge = calculateMonthlyCharge(subscriber, pricingTiers);
   const existing = [...(subscriber.invoicesHistory || [])].map(inv => ({ ...inv }));
+  const freeSubscriber = subscriber.tier === 'free' || subscriber.isExempted === true || subscriber.paymentStatus === 'free';
+  if (freeSubscriber) {
+    for (const inv of existing) {
+      if (inv.status === 'cancelled') continue;
+      inv.tier = 'free';
+      inv.pricePerAmpere = 0;
+      inv.fixedFee = 0;
+      inv.totalAmount = 0;
+      inv.paidAmount = 0;
+      inv.remainingAmount = 0;
+      inv.status = 'free';
+    }
+  }
   let currentInvoice = canonicalInvoiceForMonth(existing.filter(inv => inv.monthId === monthId && inv.status !== 'cancelled'));
   const carriedDebt = existing
     .filter(inv => inv.monthId < monthId)
@@ -216,13 +303,18 @@ export function ensureMonthInvoice(
       monthNameAr: monthNameAr || getMonthNameAr(dateForName),
       issueDate: issueDate || new Date().toISOString().slice(0, 10),
       amperes: subscriber.amperes,
+      originalAmperes: charge.originalAmperes,
+      discountedAmperes: isFree ? 0 : charge.discountedAmperes,
+      billedAmperes: isFree ? 0 : charge.billedAmperes,
+      grossAmountBeforeDiscount: isFree ? 0 : charge.grossTotal,
+      discountAmount: isFree ? 0 : charge.discountAmount,
       tier: subscriber.tier,
       pricePerAmpere: isFree ? 0 : charge.pricePerAmpere,
       fixedFee: isFree ? 0 : charge.fixedFee,
       totalAmount: isFree ? 0 : charge.total,
       paidAmount: 0,
       remainingAmount: isFree ? 0 : charge.total,
-      status: isFree ? 'free' : 'unpaid',
+      status: isFree ? 'free' : charge.total <= 0 ? 'paid' : 'unpaid',
       notes: carriedDebt > 0 ? `دين مرحل من أشهر سابقة: ${carriedDebt}` : undefined,
     };
     existing.push(currentInvoice);
@@ -259,6 +351,7 @@ export function applyPaymentOldestFirst(
   activeMonthId = getMonthId(date),
   activeMonthNameAr = getMonthNameAr(monthIdToDate(activeMonthId)),
 ): OldestFirstPaymentResult {
+  if (!hasMonthlyPricing(pricingTiers)) throw new Error('NO_MONTHLY_TARIFF');
   const ensured = ensureMonthInvoice(
     subscriber,
     pricingTiers,

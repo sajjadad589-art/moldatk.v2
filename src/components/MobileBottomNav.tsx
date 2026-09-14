@@ -31,7 +31,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       badge: totalSubscribersCount > 0 ? formatNumberArabic(totalSubscribersCount) : null,
     },
     { id: 'reports', label: 'التقارير', icon: CalendarRange },
-    { id: 'settings', label: 'الإعدادات', icon: FolderKanban },
+    { id: 'settings', label: 'المزيد', icon: FolderKanban },
     { id: 'monitor', label: 'المولد', icon: Fuel },
   ];
 
@@ -45,14 +45,14 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         onClick={() => onTabChange(tab.id)}
         className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 rounded-xl transition-all cursor-pointer ${
           isActive
-            ? 'text-[#1E3A8A] dark:text-blue-400 font-bold scale-105'
+            ? 'text-[#0B1F3B] dark:text-[#F2B544] font-bold scale-105'
             : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
         }`}
       >
         <div className="relative">
           <Icon className="w-5 h-5" />
           {'badge' in tab && tab.badge && (
-            <span className="absolute -top-1.5 -left-2 px-1 py-0.2 bg-blue-600 text-white text-[9px] font-black rounded-full min-w-[14px] text-center">
+            <span className="absolute -top-1.5 -left-2 px-1 py-0.2 bg-[#D89A21] text-white text-[9px] font-black rounded-full min-w-[14px] text-center">
               {tab.badge}
             </span>
           )}
@@ -71,10 +71,10 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           <button
             id="mobile-quick-add-btn"
             onClick={onOpenNewSubscriberModal}
-            className="w-12 h-12 rounded-full bg-[#1E3A8A] hover:bg-blue-900 text-white shadow-lg shadow-blue-900/30 flex items-center justify-center border-4 border-white dark:border-[#0c1427] active:scale-95 transition-all cursor-pointer"
+            className="w-12 h-12 rounded-full bg-[#0B1F3B] hover:bg-[#142A45] text-white shadow-lg shadow-[#0B1F3B]/25 flex items-center justify-center border-4 border-white dark:border-[#0c1427] active:scale-95 transition-all cursor-pointer"
             title="إضافة مشترك سريع"
           >
-            <Plus className="w-6 h-6 text-yellow-400" />
+            <Plus className="w-6 h-6 text-[#F2B544]" />
           </button>
         </div>
 

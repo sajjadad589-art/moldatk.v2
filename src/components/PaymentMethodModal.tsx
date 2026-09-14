@@ -1,3 +1,4 @@
+import { hasMonthlyPricing, NO_TARIFF_LABEL } from '../utils/pricingAvailability';
 import React, { useEffect, useState } from 'react';
 import {
   X,
@@ -13,7 +14,7 @@ import {
 import { Subscriber, SubscriptionTierPricing, Collector } from '../types';
 import { formatCurrency, formatNumberArabic, calculateSubscriberBill } from '../utils/formatters';
 
-export type PaymentExecutionMethod = 'full' | 'partial' | 'free' | 'unpaid';
+export type PaymentExecutionMethod = 'full' | 'partial' | 'lump' | 'free' | 'unpaid';
 
 export interface PaymentExecutionData {
   subscriberId: string;
@@ -37,7 +38,7 @@ interface PaymentMethodModalProps {
   currency?: string;
 }
 
-type CustomPaymentMethod = '' | 'partial' | 'free';
+type CustomPaymentMethod = '' | 'partial' | 'lump';
 
 export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
   isOpen,
@@ -74,7 +75,7 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
     setAutoPrint(true);
   }, [subscriber, isOpen, pricingTiers, collectors]);
 
-  if (!isOpen || !subscriber) return null;
+  if (!isOpen || !subscriber || !hasMonthlyPricing(pricingTiers)) return null;
 
   const calc = calculateSubscriberBill(subscriber.amperes, subscriber.tier, pricingTiers);
   const totalAmountDue = subscriber.amountDue > 0 ? subscriber.amountDue : calc.total;
@@ -89,6 +90,9 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
   } else if (selectedMethod === 'partial') {
     computedAmountPaid = Math.min(totalAmountDue, Math.max(0, Number(partialAmount) || 0));
     computedRemaining = Math.max(0, totalAmountDue - computedAmountPaid);
+  } else if (selectedMethod === 'lump') {
+    computedAmountPaid = Math.min(totalAmountDue, Math.max(0, Number(partialAmount) || 0));
+    computedRemaining = 0;
   } else if (selectedMethod === 'free') {
     computedAmountPaid = 0;
     computedRemaining = 0;
@@ -121,9 +125,9 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
       setSelectedMethod('partial');
       const defaultPartial = Math.max(1000, Math.min(totalAmountDue, Math.round(totalAmountDue / 2 / 1000) * 1000));
       setPartialAmount(defaultPartial);
-    } else if (value === 'free') {
-      setSelectedMethod('free');
-      setPartialAmount(0);
+    } else if (value === 'lump') {
+      setSelectedMethod('lump');
+      setPartialAmount(totalAmountDue);
     } else {
       setSelectedMethod('full');
       setPartialAmount(totalAmountDue);
@@ -132,16 +136,15 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
 
   const handleApplyPayment = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!hasMonthlyPricing(pricingTiers)) return;
 
-    if (selectedMethod === 'free' && !reason.trim()) return;
-    if (selectedMethod === 'partial' && computedAmountPaid <= 0) return;
+    if ((selectedMethod === 'partial' || selectedMethod === 'lump') && computedAmountPaid <= 0) return;
 
     onConfirmPayment({
       subscriberId: subscriber.id,
       method: selectedMethod,
       amountPaid: computedAmountPaid,
       remainingAmount: computedRemaining,
-      freeReason: selectedMethod === 'free' ? reason.trim() : undefined,
       collectorName: collectorName || collectors[0]?.name || 'مدير النظام',
       notes: notes.trim() || undefined,
       autoPrintReceipt: autoPrint,
@@ -158,8 +161,10 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
   const actionLabel = selectedMethod === 'full'
     ? `تأكيد التسديد النقدي ${formatCurrency(totalAmountDue, currency)}`
     : selectedMethod === 'partial'
-      ? `تأكيد التسديد المقطوع ${formatCurrency(computedAmountPaid, currency)}`
-      : 'تأكيد التسديد المجاني';
+      ? `تأكيد التسديد المخصص ${formatCurrency(computedAmountPaid, currency)}`
+      : selectedMethod === 'lump'
+        ? `تأكيد التسديد المقطوع ${formatCurrency(computedAmountPaid, currency)}`
+        : 'تأكيد التسديد';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-150">
@@ -259,7 +264,7 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
                 </div>
                 <div>
                   <div className="text-sm font-black text-slate-900 dark:text-white">تسديد مخصص</div>
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400">تسديد مقطوع أو تسديد مجاني</div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400">مخصص: يبقى المتبقي ديناً • مقطوع: يغلق الشهر بالمبلغ المتفق عليه</div>
                 </div>
               </div>
               <ChevronDown className={`w-5 h-5 text-slate-500 transition-transform ${customPaymentOpen ? 'rotate-180' : ''}`} />
@@ -275,19 +280,19 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
                   required={customPaymentOpen}
                 >
                   <option value="">اختر طريقة التسديد</option>
-                  <option value="partial">تسديد مقطوع</option>
-                  <option value="free">تسديد مجاني</option>
+                  <option value="partial">تسديد مخصص — دفعة جزئية</option>
+                  <option value="lump">تسديد مقطوع — إغلاق الاشتراك بالمبلغ المتفق عليه</option>
                 </select>
               </div>
             )}
           </div>
 
-          {selectedMethod === 'partial' && customPaymentOpen && (
+          {(selectedMethod === 'partial' || selectedMethod === 'lump') && customPaymentOpen && (
             <div className="p-4 rounded-2xl bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 space-y-3 animate-in fade-in">
               <div className="flex items-center justify-between gap-3">
                 <label className="text-xs font-bold text-amber-950 dark:text-amber-200 flex items-center gap-1.5">
                   <Coins className="w-4 h-4 text-amber-600" />
-                  <span>مبلغ التسديد المقطوع:</span>
+                  <span>{selectedMethod === 'lump' ? 'المبلغ المتفق عليه:' : 'مبلغ التسديد المخصص:'}</span>
                 </label>
                 <span className="text-[11px] font-bold text-slate-500">المستحق {formatCurrency(totalAmountDue, currency)}</span>
               </div>
@@ -331,28 +336,10 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
                   <span className="text-xs font-black text-emerald-800 dark:text-emerald-200 tabular-nums">{formatCurrency(computedAmountPaid, currency)}</span>
                 </div>
                 <div className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40">
-                  <span className="text-[10px] text-rose-700 dark:text-rose-300 block font-bold">المتبقي</span>
+                  <span className="text-[10px] text-rose-700 dark:text-rose-300 block font-bold">{selectedMethod === 'lump' ? 'المتبقي بعد التسوية' : 'المتبقي'}</span>
                   <span className="text-xs font-black text-rose-800 dark:text-rose-200 tabular-nums">{formatCurrency(computedRemaining, currency)}</span>
                 </div>
               </div>
-            </div>
-          )}
-
-          {selectedMethod === 'free' && customPaymentOpen && (
-            <div className="p-4 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 space-y-2 animate-in fade-in">
-              <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                <HeartHandshake className="w-4 h-4 text-purple-500" />
-                <span>سبب التسديد المجاني <span className="text-rose-500">*</span></span>
-              </label>
-              <input
-                type="text"
-                value={reason}
-                onChange={e => setReason(e.target.value)}
-                placeholder="مثال: جامع، عائلة شهيد، نقطة حراسة، خدمة..."
-                className="w-full px-3 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs outline-none focus:ring-2 focus:ring-purple-500"
-                required
-              />
-              <p className="text-[10px] text-slate-500 dark:text-slate-400">لا يمكن اعتماد التسديد المجاني بدون ذكر السبب.</p>
             </div>
           )}
 

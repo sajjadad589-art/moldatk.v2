@@ -1,3 +1,4 @@
+import { useCashboxBalance } from '../lib/useCashboxBalance';
 import React, { useState, useEffect } from 'react';
 import {
   Wallet,
@@ -16,23 +17,28 @@ import {
   Trash2,
   AlertTriangle,
 } from 'lucide-react';
-import { Subscriber, Collector, AuditLogEntry } from '../types';
+import { Subscriber, Collector, AuditLogEntry, SubscriptionTierPricing } from '../types';
+import { reconciledCashbox, summarizeSubscribers } from '../utils/authoritativeAccounting';
 
 interface WalletViewProps {
   subscribers: Subscriber[];
+  pricingTiers: SubscriptionTierPricing[];
   collectors: Collector[];
   auditLogs?: AuditLogEntry[];
   walletResetTimestamp?: string;
+  activeMonthId?: string;
   currency?: string;
   onBack: () => void;
-  onClearWalletLogs?: () => void;
+  onClearWalletLogs?: () => void | Promise<void>;
 }
 
 export const WalletView: React.FC<WalletViewProps> = ({
   subscribers,
+  pricingTiers,
   collectors,
   auditLogs = [],
   walletResetTimestamp,
+  activeMonthId,
   currency = 'د.ع',
   onBack,
   onClearWalletLogs,
@@ -51,9 +57,13 @@ export const WalletView: React.FC<WalletViewProps> = ({
   const [isConfirmResetOpen, setIsConfirmResetOpen] = useState<boolean>(false);
 
   // تم تقليل وقت العداد التحذيري إلى 3 ثواني
+  const [resetting, setResetting] = useState(false);
   const [countdown, setCountdown] = useState<number>(3);
+  // AUTHORITATIVE_WALLET_V2
+  const walletSummary = summarizeSubscribers(subscribers, pricingTiers, activeMonthId);
+  const authoritativeCashbox = useCashboxBalance(reconciledCashbox(walletSummary.collected, auditLogs, walletResetTimestamp, activeMonthId));
 
-  useEffect(() => {
+useEffect(() => {
     let timer: any;
     if (isConfirmResetOpen) {
       setCountdown(3);
@@ -67,7 +77,7 @@ export const WalletView: React.FC<WalletViewProps> = ({
         });
       }, 1000);
     }
-    return () => clearInterval(timer);
+return () => clearInterval(timer);
   }, [isConfirmResetOpen]);
 
   const [currentMonth, setCurrentMonth] = useState<number>(7);
@@ -104,6 +114,15 @@ export const WalletView: React.FC<WalletViewProps> = ({
     }
   };
 
+  const toLocalDateKey = (value: Date | string) => {
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const resetTimeMs = walletResetTimestamp ? new Date(walletResetTimestamp).getTime() : 0;
 
   const financialLogs = auditLogs.filter(log => {
@@ -111,7 +130,7 @@ export const WalletView: React.FC<WalletViewProps> = ({
     
     if (resetTimeMs > 0 && log.timestamp) {
       const logTime = new Date(log.timestamp).getTime();
-      if (logTime < resetTimeMs) return false;
+      if (!Number.isFinite(logTime) || logTime <= resetTimeMs) return false;
     }
     return true;
   });
@@ -121,15 +140,73 @@ export const WalletView: React.FC<WalletViewProps> = ({
     if (filterType === 'cancellation' && log.category !== 'cancellation') return false;
     if (selectedCollector !== 'all' && log.actorName !== selectedCollector) return false;
     
-    if (startDate && log.timestamp && log.timestamp.split('T')[0] < startDate) return false;
-    if (endDate && log.timestamp && log.timestamp.split('T')[0] > endDate) return false;
+    if (startDate && log.timestamp && toLocalDateKey(log.timestamp) < startDate) return false;
+    if (endDate && log.timestamp && toLocalDateKey(log.timestamp) > endDate) return false;
 
     return true;
   });
 
-  const totalCollected = financialLogs
-    .filter(log => log.category === 'payment')
-    .reduce((acc, log) => acc + (Number(log.amount) || 0), 0);
+  const walletResolvedAmounts = (() => {
+    const ordered = [...financialLogs].sort((a, b) =>
+      new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime()
+    );
+    const unmatchedPayments = new Map<string, Array<{ key: string; amount: number }>>();
+    const amounts = new Map<string, number>();
+
+    const logKey = (log: AuditLogEntry, index: number) =>
+      String((log as any).id || `${log.timestamp || ''}-${log.category}-${log.entityId || ''}-${index}`);
+
+    ordered.forEach((log, index) => {
+      const key = logKey(log, index);
+      const entityKey = String(log.entityId || 'unknown');
+
+      if (log.category === 'payment') {
+        const amount = Math.max(0, Number(log.amount) || 0);
+        amounts.set(key, amount);
+        if (amount > 0) {
+          const stack = unmatchedPayments.get(entityKey) || [];
+          stack.push({ key, amount });
+          unmatchedPayments.set(entityKey, stack);
+        }
+        return;
+      }
+
+      if (log.category === 'cancellation') {
+        let amount = Math.max(0, Number(log.amount) || 0);
+        const stack = unmatchedPayments.get(entityKey) || [];
+        if (!amount && stack.length) amount = stack.pop()?.amount || 0;
+        else if (amount && stack.length) stack.pop();
+        unmatchedPayments.set(entityKey, stack);
+        amounts.set(key, amount);
+        return;
+      }
+
+      amounts.set(key, 0);
+    });
+
+    return { ordered, amounts, logKey };
+  })();
+
+  const isWalletFilterActive =
+    filterType !== 'all' || selectedCollector !== 'all' || !!startDate || !!endDate;
+
+  const totalCollected = (() => {
+    const sourceLogs = isWalletFilterActive ? filteredLogs : financialLogs;
+    let payments = 0;
+    let cancellations = 0;
+
+    sourceLogs.forEach(log => {
+      const originalIndex = walletResolvedAmounts.ordered.indexOf(log);
+      const key = walletResolvedAmounts.logKey(log, originalIndex >= 0 ? originalIndex : 0);
+      const amount = Math.max(0, walletResolvedAmounts.amounts.get(key) || Number(log.amount) || 0);
+      if (log.category === 'payment') payments += amount;
+      if (log.category === 'cancellation') cancellations += amount;
+    });
+
+    if (filterType === 'payment') return payments;
+    if (filterType === 'cancellation') return cancellations;
+    return Math.max(0, payments - cancellations);
+  })();
 
   return (
     <div className="space-y-6 font-['Cairo'] max-w-5xl mx-auto pb-10 text-slate-900 dark:text-white" dir="rtl">
@@ -160,9 +237,9 @@ export const WalletView: React.FC<WalletViewProps> = ({
             <Wallet className="w-8 h-8" />
           </div>
           <div>
-            <span className="text-xs font-bold text-emerald-400 block mb-1">الرصيد الحالي في القاصة</span>
+            <span className="text-xs font-bold text-emerald-400 block mb-1">{isWalletFilterActive ? 'قيمة النتائج حسب الفلتر' : 'الرصيد الحالي في القاصة'}</span>
             <span className="text-3xl font-black tabular-nums text-white">
-              {totalCollected.toLocaleString()} {currency}
+              {totalCollected.toLocaleString('en-US')} {currency}
             </span>
           </div>
         </div>
@@ -205,12 +282,12 @@ export const WalletView: React.FC<WalletViewProps> = ({
               </button>
               
               <button
-                disabled={countdown > 0}
-                onClick={() => {
-                  if (onClearWalletLogs) {
-                    onClearWalletLogs();
-                  }
-                  setIsConfirmResetOpen(false);
+                disabled={countdown > 0 || resetting}
+                onClick={async () => {
+                  if (resetting) return;
+                  setResetting(true);
+                  try { await onClearWalletLogs?.(); setIsConfirmResetOpen(false); }
+                  finally { setResetting(false); }
                 }}
                 className={`flex-1 py-3 rounded-2xl text-xs font-bold transition-all ${
                   countdown > 0 
@@ -218,7 +295,7 @@ export const WalletView: React.FC<WalletViewProps> = ({
                     : 'bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-600/25 cursor-pointer'
                 }`}
               >
-                {countdown > 0 ? `يرجى القراءة (${countdown}ث)` : 'تأكيد التصفير'}
+                {resetting ? 'جاري حفظ التصفير...' : countdown > 0 ? `يرجى القراءة (${countdown}ث)` : 'تأكيد التصفير'}
               </button>
             </div>
           </div>
@@ -289,7 +366,7 @@ export const WalletView: React.FC<WalletViewProps> = ({
                         <div key={`empty-${i}`} />
                       ))}
                       {daysArray.map(d => {
-                        const dateString = d.toISOString().split('T')[0];
+                        const dateString = toLocalDateKey(d);
                         const isStart = tempStartDate === dateString;
                         const isEnd = tempEndDate === dateString;
                         const isInRange = tempStartDate && tempEndDate && dateString > tempStartDate && dateString < tempEndDate;
@@ -435,14 +512,14 @@ export const WalletView: React.FC<WalletViewProps> = ({
                         {log.details}
                       </span>
                       <span className="text-[11px] text-slate-400 block mt-1 font-mono">
-                        المحاسب: {log.actorName || 'الإدارة'} • {new Date(log.timestamp).toLocaleString('ar-IQ')}
+                        المحاسب: {log.actorName || 'الإدارة'} • {new Date(log.timestamp).toLocaleString('ar-IQ-u-nu-latn')}
                       </span>
                     </div>
                   </div>
 
-                  {log.amount !== undefined && log.amount > 0 && (
+                  {log.amount !== undefined && Math.abs(Number(log.amount) || 0) > 0 && (
                     <span className={`text-sm font-black tabular-nums ${isPayment ? 'text-emerald-500' : 'text-rose-500'}`} dir="ltr">
-                      {isPayment ? '+' : '-'}{log.amount.toLocaleString()} {currency}
+                      {isPayment ? '+' : '-'}{Math.abs(Number(log.amount) || 0).toLocaleString('en-US')} {currency}
                     </span>
                   )}
                 </div>

@@ -70,12 +70,12 @@ export const AndroidUpdateChecker: React.FC = () => {
     setError(null);
     try {
       const version = await AppUpdater.getVersionInfo();
-      let latestManifest: VersionManifest | null = null;
+      const candidates: VersionManifest[] = [];
 
       try {
         const release = await loadActiveRelease();
         if (release) {
-          latestManifest = {
+          const fromDb: VersionManifest = {
             enabled: true,
             versionCode: Number(release.version_code),
             versionName: release.version_name,
@@ -84,16 +84,23 @@ export const AndroidUpdateChecker: React.FC = () => {
             apkUrl: release.apk_url,
             notes: release.release_notes,
           };
+          if (Number.isFinite(Number(fromDb.versionCode)) && Number(fromDb.versionCode) > 0) candidates.push(fromDb);
         }
-      } catch {
-        // Supabase unavailable: use the static manifest as a safe fallback.
-      }
+      } catch {}
 
-      if (!latestManifest) {
-        const response = await fetch('/app-version.json?ts=' + Date.now(), { cache: 'no-store' });
-        if (!response.ok) throw new Error('تعذر التحقق من آخر إصدار');
-        latestManifest = await response.json() as VersionManifest;
-      }
+      try {
+        const response = await fetch('/app-version.json?ts=' + Date.now(), {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' },
+        });
+        if (response.ok) {
+          const staticManifest = await response.json() as VersionManifest;
+          if (staticManifest?.enabled && Number.isFinite(Number(staticManifest.versionCode)) && Number(staticManifest.versionCode) > 0) candidates.push(staticManifest);
+        }
+      } catch {}
+
+      if (!candidates.length) throw new Error('تعذر التحقق من آخر إصدار');
+      const latestManifest = candidates.sort((a, b) => Number(b.versionCode) - Number(a.versionCode))[0];
 
       const installedCode = Number(version.versionCode);
       clearCompletedUpdateMarkers(installedCode);
@@ -174,7 +181,7 @@ export const AndroidUpdateChecker: React.FC = () => {
     const targetCode = Number(manifest.versionCode);
     if (autoStartedRef.current === targetCode || wasAutoStartedRecently(targetCode)) return;
 
-    const timer = window.setTimeout(() => void install(true), 900);
+    const timer = window.setTimeout(() => void install(true), 700);
     return () => window.clearTimeout(timer);
   }, [hasUpdate, manifest?.versionCode, manifest?.apkUrl, installing, checking]);
 

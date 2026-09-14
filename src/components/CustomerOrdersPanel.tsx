@@ -40,8 +40,8 @@ type Settings = {
   instructions: string | null;
 };
 
-const iqd = (value: number) => `${new Intl.NumberFormat('ar-IQ').format(value)} د.ع`;
-const fmt = (value: string | null) => value ? new Intl.DateTimeFormat('ar-IQ', { dateStyle:'medium', timeStyle:'short' }).format(new Date(value)) : '—';
+const iqd = (value: number) => `${new Intl.NumberFormat('ar-IQ-u-nu-latn').format(value)} د.ع`;
+const fmt = (value: string | null) => value ? new Intl.DateTimeFormat('ar-IQ-u-nu-latn', { dateStyle:'medium', timeStyle:'short' }).format(new Date(value)) : '—';
 
 const statusMeta: Record<CustomerOrder['status'], { label: string; cls: string }> = {
   awaiting_payment: { label:'بانتظار الوصل', cls:'bg-slate-100 text-slate-700' },
@@ -61,10 +61,18 @@ export const CustomerOrdersPanel: React.FC = () => {
   const [message, setMessage] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | CustomerOrder['status']>('awaiting_review');
   const [receiptUrls, setReceiptUrls] = useState<Record<string,string>>({});
+  const [canManagePaymentSettings, setCanManagePaymentSettings] = useState(false);
 
   const load = async () => {
     setLoading(true);
     setMessage(null);
+    const { data: authData } = await supabase.auth.getUser();
+    if (authData.user?.id) {
+      const { data: profile } = await supabase.from('profiles').select('role,is_active').eq('id', authData.user.id).maybeSingle();
+      setCanManagePaymentSettings(Boolean(profile?.is_active && profile?.role === 'super_admin'));
+    } else {
+      setCanManagePaymentSettings(false);
+    }
     const [o, s] = await Promise.all([
       supabase.from('customer_orders').select('*').order('created_at', { ascending:false }).limit(300),
       supabase.from('customer_order_payment_settings').select('*').eq('id', 1).single(),
@@ -90,6 +98,7 @@ export const CustomerOrdersPanel: React.FC = () => {
 
   const saveSettings = async () => {
     if (!settings) return;
+    if (!canManagePaymentSettings) return setMessage('تعديل معلومات التحويل متاح للمدير الرئيسي فقط');
     if (settings.qi_card_enabled && !String(settings.qi_card_number || '').trim()) return setMessage('أدخل رقم حساب كي كارد أو عطّل الطريقة');
     if (settings.zain_cash_enabled && !String(settings.zain_cash_phone || '').trim()) return setMessage('أدخل رقم هاتف زين كاش أو عطّل الطريقة');
     setSaving(true); setMessage(null);
@@ -166,7 +175,7 @@ export const CustomerOrdersPanel: React.FC = () => {
 
       {message && <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-800">{message}</div>}
 
-      {settings && <section className="bg-white border border-slate-200 rounded-3xl shadow-sm p-5">
+      {settings && canManagePaymentSettings && <section className="bg-white border border-slate-200 rounded-3xl shadow-sm p-5">
         <div className="flex items-center justify-between mb-4"><div><h3 className="font-black flex items-center gap-2"><Settings2 className="w-5 h-5" /> معلومات التحويل التي تظهر للزبون</h3><p className="text-xs text-slate-500 mt-1">التغيير يؤثر على الطلبات الجديدة فقط؛ كل طلب يحفظ رقم التحويل المستخدم وقت إنشائه.</p></div><button disabled={saving} onClick={() => void saveSettings()} className="px-4 py-2.5 rounded-xl bg-slate-950 text-white font-black text-sm flex items-center gap-2 disabled:opacity-60">{saving?<Loader2 className="w-4 h-4 animate-spin"/>:<Save className="w-4 h-4"/>} حفظ</button></div>
         <div className="grid grid-cols-2 gap-4">
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">

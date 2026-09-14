@@ -1,16 +1,25 @@
+import { hasMonthlyPricing, NO_TARIFF_LABEL } from '../utils/pricingAvailability';
 import React, { useState, useRef, useEffect } from 'react';
 import { Search, LogOut, UserPlus, Zap, MapPin, Wifi, WifiOff, Smartphone, Monitor, CheckCircle2, CreditCard } from 'lucide-react';
 import { PaymentMethodModal, PaymentExecutionData } from './PaymentMethodModal';
-import { Subscriber, SubscriptionTierPricing, GeneratorSpecs, Collector, SubscriberInvoice } from '../types';
+import { Subscriber, SubscriptionTierPricing, GeneratorSpecs, Collector, CollectorPermissions, SubscriberInvoice } from '../types';
 import { calculateSubscriberBill } from '../utils/formatters';
+import { getSubscriberFinancialRow } from '../utils/authoritativeAccounting';
+import { applyPaymentOldestFirst, ensureMonthInvoice, getInvoiceRemaining, getMonthId, getMonthNameAr, monthIdToDate } from '../utils/monthlyAccounting';
 
 interface POSQuickViewProps {
   subscribers: Subscriber[];
   pricingTiers: SubscriptionTierPricing[];
   generatorSpecs: GeneratorSpecs;
   collectorName: string;
+  activeMonthId?: string;
+  activeMonthNameAr?: string;
+  collectorPermissions?: CollectorPermissions;
+  assignedLineId?: string;
   collectors?: Collector[];
   lines: { id: string; name: string }[];
+  allowedLineIds?: string[];
+  assignedAllLines?: boolean;
   onSaveSubscriber: (sub: Subscriber) => void;
   onAddAuditLog: (entry: any) => void;
   onLogout: () => void;
@@ -25,8 +34,14 @@ export const POSQuickView: React.FC<POSQuickViewProps> = ({
   pricingTiers,
   generatorSpecs,
   collectorName,
+  activeMonthId = getMonthId(),
+  activeMonthNameAr,
+  collectorPermissions,
+  assignedLineId,
   collectors = [],
   lines,
+  allowedLineIds = [],
+  assignedAllLines = false,
   onSaveSubscriber,
   onAddAuditLog,
   onLogout,
@@ -42,6 +57,19 @@ export const POSQuickView: React.FC<POSQuickViewProps> = ({
   const [paymentSubscriber, setPaymentSubscriber] = useState<Subscriber | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState<{ name: string; amount: number; method: string } | null>(null);
 
+  const permissions: CollectorPermissions = {
+    canCollectPayments: true,
+    canCancelPayments: false,
+    canAddSubscribers: false,
+    canEditSubscribers: false,
+    canDeleteSubscribers: false,
+    canApplyFreeExemption: false,
+    canPrintReceipts: true,
+    canViewFinancialReports: false,
+    canAccessSystemSettings: false,
+    ...(collectorPermissions || {}),
+  };
+
   const effectiveCollectors: Collector[] = collectors.length > 0
     ? collectors
     : [{
@@ -55,26 +83,35 @@ export const POSQuickView: React.FC<POSQuickViewProps> = ({
       }];
 
   const handleConfirmPayment = (data: PaymentExecutionData) => {
+    if (!hasMonthlyPricing(pricingTiers)) return;
     const sub = subscribers.find(s => s.id === data.subscriberId);
     if (!sub) return;
 
-    const calc = calculateSubscriberBill(sub.amperes, sub.tier, pricingTiers);
-    const totalAmount = sub.amountDue > 0 ? sub.amountDue : calc.total;
+    const now = new Date();
+    const monthId = activeMonthId || getMonthId(now);
+    const monthName = activeMonthNameAr || getMonthNameAr(monthIdToDate(monthId));
+    const ensured = ensureMonthInvoice(sub, pricingTiers, monthId, monthName, now.toISOString().slice(0, 10));
 
     if (data.method === 'unpaid') {
+      const invoices = ensured.invoices.map(inv => inv.monthId === monthId && inv.status !== 'cancelled' && inv.status !== 'free'
+        ? { ...inv, paidAmount: 0, remainingAmount: Number(inv.totalAmount || 0), status: 'unpaid' as const, paymentDate: undefined }
+        : inv);
+      const totalDebtAfter = invoices.reduce((sum, inv) => sum + getInvoiceRemaining(inv), 0);
+      const current = invoices.find(inv => inv.monthId === monthId && inv.status !== 'cancelled');
       const updated: Subscriber = {
         ...sub,
-        paymentStatus: 'unpaid',
-        amountPaid: 0,
-        amountDue: totalAmount,
+        invoicesHistory: invoices.sort((a, b) => b.monthId.localeCompare(a.monthId)),
+        paymentStatus: totalDebtAfter === 0 ? 'paid' : 'unpaid',
+        amountDue: totalDebtAfter,
+        amountPaid: Number(current?.paidAmount || 0),
       };
       onSaveSubscriber(updated);
       onAddAuditLog({
         category: 'cancellation',
-        title: 'إلغاء تسديد',
-        details: `إرجاع المشترك "${sub.fullName}" (${sub.code || sub.subscriberCode}) إلى غير مسدد`,
+        title: 'إلغاء تسديد الشهر الحالي',
+        details: 'تم إرجاع حساب الشهر الحالي للمشترك "' + sub.fullName + '" إلى غير مسدد مع إبقاء سجل الديون التاريخي',
         entityId: sub.id,
-        entityName: `${sub.fullName} (${sub.code || sub.subscriberCode})`,
+        entityName: sub.fullName + ' (' + (sub.code || sub.subscriberCode) + ')',
         actorName: data.collectorName || collectorName || 'المحاسب',
         cancellationReason: data.cancellationReason,
       });
@@ -82,67 +119,130 @@ export const POSQuickView: React.FC<POSQuickViewProps> = ({
       return;
     }
 
-    const status: Subscriber['paymentStatus'] = data.method === 'full'
-      ? 'paid'
-      : data.method === 'partial'
-      ? 'partial'
-      : 'free';
+    if (data.method === 'free') {
+      const invoices = ensured.invoices.map(inv => inv.monthId === monthId && inv.status !== 'cancelled'
+        ? {
+            ...inv,
+            totalAmount: 0,
+            paidAmount: 0,
+            remainingAmount: 0,
+            status: 'free' as const,
+            paymentDate: undefined,
+            notes: data.freeReason ? ('إعفاء الشهر الحالي: ' + data.freeReason) : 'إعفاء الشهر الحالي',
+          }
+        : inv);
+      const totalDebtAfter = invoices.reduce((sum, inv) => sum + getInvoiceRemaining(inv), 0);
+      const updated: Subscriber = {
+        ...sub,
+        invoicesHistory: invoices.sort((a, b) => b.monthId.localeCompare(a.monthId)),
+        paymentStatus: totalDebtAfter === 0 ? 'free' : 'unpaid',
+        amountDue: totalDebtAfter,
+        amountPaid: 0,
+        exemptReason: data.freeReason || sub.exemptReason,
+      };
+      onSaveSubscriber(updated);
+      onAddAuditLog({
+        category: 'payment',
+        title: 'إعفاء مجاني للشهر الحالي',
+        details: 'تم إعفاء شهر ' + monthId + ' للمشترك "' + sub.fullName + '" بدون حذف أي دين سابق',
+        entityId: sub.id,
+        entityName: sub.fullName + ' (' + (sub.code || sub.subscriberCode) + ')',
+        actorName: data.collectorName || collectorName || 'المحاسب',
+        amount: 0,
+      });
+      setPaymentSubscriber(null);
+      setPaymentSuccess({ name: sub.fullName, amount: 0, method: data.method });
+      window.setTimeout(() => setPaymentSuccess(null), 1500);
+      return;
+    }
 
-    const now = new Date();
-    const invoice: SubscriberInvoice = {
-      id: `inv-${Date.now()}`,
-      subscriberId: sub.id,
-      receiptNumber: `REC-${sub.code || sub.subscriberCode || 'MW'}-${Date.now().toString().slice(-4)}`,
-      monthId: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
-      monthNameAr: `شهر ${now.getMonth() + 1} (${now.toLocaleDateString('ar-IQ', { month: 'long', year: 'numeric' })})`,
-      issueDate: now.toISOString().split('T')[0],
+    // COLLECTOR_LUMP_SETTLEMENT_V1
+    if (data.method === 'lump') {
+      const current = ensured.invoices.find(inv => inv.monthId === monthId && inv.status !== 'cancelled' && inv.status !== 'free');
+      if (!current || String(current.notes || '').includes('MOLDATK_ONBOARDING_NO_CURRENT_CHARGE')) return;
+      const originalTotal = Math.max(0, Number(current.totalAmount || 0));
+      const alreadyPaid = Math.max(0, Number(current.paidAmount || 0));
+      const remainingBefore = getInvoiceRemaining(current);
+      const received = Math.min(remainingBefore, Math.max(0, Number(data.amountPaid || 0)));
+      if (remainingBefore <= 0 || received <= 0) return;
+      const effectiveTotal = alreadyPaid + received;
+      const discount = Math.max(0, originalTotal - effectiveTotal);
+      const marker = 'MOLDATK_LUMP_SETTLEMENT|original=' + originalTotal + '|settled=' + effectiveTotal + '|discount=' + discount + '|received=' + received;
+      const settledCurrent: SubscriberInvoice = { ...current, totalAmount: effectiveTotal, paidAmount: effectiveTotal, remainingAmount: 0, status: 'paid', paymentDate: now.toISOString(), notes: marker };
+      const invoices = ensured.invoices.map(inv => inv.id === current.id ? settledCurrent : inv);
+      const totalDebtAfter = invoices.reduce((sum, inv) => sum + getInvoiceRemaining(inv), 0);
+      const updated: Subscriber = { ...sub, invoicesHistory: invoices.sort((a, b) => b.monthId.localeCompare(a.monthId)), paymentStatus: totalDebtAfter === 0 ? 'paid' : 'partial', amountDue: totalDebtAfter, amountPaid: effectiveTotal, lastPaymentDate: now.toISOString() };
+      const receiptInvoice: SubscriberInvoice = { ...settledCurrent, id: 'receipt-lump-' + sub.id + '-' + Date.now(), receiptNumber: 'REC-' + (sub.code || sub.subscriberCode || 'MW') + '-' + Date.now().toString().slice(-6), totalAmount: received, paidAmount: received, remainingAmount: totalDebtAfter, status: totalDebtAfter === 0 ? 'paid' : 'partial', collectorName: data.collectorName || collectorName || 'المحاسب', previousDebtBefore: Math.max(0, Number(sub.amountDue || 0) - remainingBefore), currentCharge: effectiveTotal, totalBeforePayment: originalTotal, appliedToPreviousDebt: 0, appliedToCurrentMonth: received, totalOutstandingAfter: totalDebtAfter, paymentDate: now.toISOString(), notes: marker };
+      onSaveSubscriber(updated);
+      onAddAuditLog({ category: 'payment', title: 'تسديد مقطوع', details: 'الاستحقاق الأصلي ' + originalTotal.toLocaleString('en-US') + ' | المستلم ' + received.toLocaleString('en-US') + ' | فرق التسوية ' + discount.toLocaleString('en-US'), entityId: sub.id, entityName: sub.fullName + ' (' + (sub.code || sub.subscriberCode) + ')', actorName: data.collectorName || collectorName || 'المحاسب', amount: received });
+      setPaymentSubscriber(null);
+      setPaymentSuccess({ name: sub.fullName, amount: received, method: data.method });
+      if (data.autoPrintReceipt) window.setTimeout(() => onOpenReceiptModal(updated, receiptInvoice, true), 650);
+      window.setTimeout(() => setPaymentSuccess(null), 1800);
+      return;
+    }
+
+    // COLLECTOR_FULL_PAYMENT_EXACT_OUTSTANDING_V2
+    // A full/cash payment always settles the real ledger balance, not a stale UI value.
+    const outstandingBefore = ensured.invoices.reduce((sum, inv) => sum + getInvoiceRemaining(inv), 0);
+    const requestedPayment = Math.max(0, Number(data.amountPaid || 0));
+    const paymentAmount = data.method === 'full'
+      ? outstandingBefore
+      : Math.min(outstandingBefore, requestedPayment);
+    if (paymentAmount <= 0) return;
+
+    const allocation = applyPaymentOldestFirst(sub, pricingTiers, paymentAmount, now, monthId, monthName);
+    const currentInvoice = allocation.invoices.find(inv => inv.monthId === monthId && inv.status !== 'cancelled');
+    const anyPartial = allocation.invoices.some(inv => Number(inv.paidAmount || 0) > 0 && getInvoiceRemaining(inv) > 0);
+    const updated: Subscriber = {
+      ...sub,
+      invoicesHistory: allocation.invoices.sort((a, b) => b.monthId.localeCompare(a.monthId)),
+      paymentStatus: allocation.totalDebtAfter === 0 ? 'paid' : (anyPartial || paymentAmount > 0 ? 'partial' : 'unpaid'),
+      amountDue: allocation.totalDebtAfter,
+      amountPaid: Number(currentInvoice?.paidAmount || 0),
+      lastPaymentDate: now.toISOString(),
+    };
+
+    const receiptInvoice: SubscriberInvoice = {
+      ...(currentInvoice || ensured.currentInvoice),
+      id: 'receipt-' + sub.id + '-' + Date.now(),
+      receiptNumber: 'REC-' + (sub.code || sub.subscriberCode || 'MW') + '-' + Date.now().toString().slice(-6),
       paymentDate: now.toISOString(),
-      amperes: sub.amperes,
-      tier: sub.tier,
-      pricePerAmpere: calc.pricePerAmpere,
-      fixedFee: calc.fixedFee,
-      totalAmount,
-      paidAmount: data.amountPaid,
-      remainingAmount: data.remainingAmount,
-      status,
+      paidAmount: paymentAmount,
+      remainingAmount: allocation.totalDebtAfter,
+      status: allocation.totalDebtAfter === 0 ? 'paid' : 'partial',
       collectorName: data.collectorName || collectorName || 'المحاسب',
+      previousDebtBefore: allocation.carriedDebtBefore,
+      currentCharge: allocation.currentMonthCharge,
+      totalBeforePayment: allocation.totalDebtBefore,
+      appliedToPreviousDebt: allocation.appliedToPreviousDebt,
+      appliedToCurrentMonth: allocation.appliedToCurrentMonth,
+      totalOutstandingAfter: allocation.totalDebtAfter,
+      paymentAllocations: allocation.allocations,
       notes: data.notes,
     };
 
-    const updated: Subscriber = {
-      ...sub,
-      paymentStatus: status,
-      amountDue: totalAmount,
-      amountPaid: data.amountPaid,
-      lastPaymentDate: now.toISOString(),
-      isExempted: status === 'free',
-      exemptReason: status === 'free' ? data.freeReason : sub.exemptReason,
-      invoicesHistory: [invoice, ...(sub.invoicesHistory || [])],
-    };
-
-    // الحفظ أولاً، والطباعة تأتي بعد نجاح التسديد فقط.
+    // Save first; receipt is a snapshot only and is NOT inserted as another monthly charge.
     onSaveSubscriber(updated);
     onAddAuditLog({
       category: 'payment',
-      title: status === 'paid' ? 'تسديد كامل' : status === 'partial' ? 'تسديد جزئي' : 'إعفاء مجاني',
-      details: status === 'free'
-        ? `تم إعفاء المشترك "${sub.fullName}" (${sub.code || sub.subscriberCode}) مجاناً`
-        : `تم تسديد المشترك "${sub.fullName}" (${sub.code || sub.subscriberCode}) بمبلغ ${data.amountPaid.toLocaleString('en-US')} ${generatorSpecs.currency || 'د.ع'}`,
+      title: allocation.totalDebtAfter === 0 ? 'تسديد كامل' : 'تسديد جزئي',
+      details: 'استلام ' + paymentAmount.toLocaleString('en-US') + ' ' + (generatorSpecs.currency || 'د.ع')
+        + ' من "' + sub.fullName + '" | دين سابق: ' + allocation.appliedToPreviousDebt.toLocaleString('en-US')
+        + ' | الشهر الحالي: ' + allocation.appliedToCurrentMonth.toLocaleString('en-US')
+        + ' | المتبقي: ' + allocation.totalDebtAfter.toLocaleString('en-US'),
       entityId: sub.id,
-      entityName: `${sub.fullName} (${sub.code || sub.subscriberCode})`,
+      entityName: sub.fullName + ' (' + (sub.code || sub.subscriberCode) + ')',
       actorName: data.collectorName || collectorName || 'المحاسب',
-      amount: data.amountPaid,
+      amount: paymentAmount,
     });
 
     setPaymentSubscriber(null);
-    setPaymentSuccess({ name: sub.fullName, amount: data.amountPaid, method: data.method });
+    setPaymentSuccess({ name: sub.fullName, amount: paymentAmount, method: data.method });
 
     if (data.autoPrintReceipt) {
-      window.setTimeout(() => {
-        onOpenReceiptModal(updated, invoice, true);
-      }, 900);
+      window.setTimeout(() => onOpenReceiptModal(updated, receiptInvoice, true), 650);
     }
-
     window.setTimeout(() => setPaymentSuccess(null), 1800);
   };
 
@@ -184,7 +284,33 @@ export const POSQuickView: React.FC<POSQuickViewProps> = ({
     setIsDragging(false);
   };
 
-  const filteredSubs = subscribers.filter(sub => {
+  const hasExplicitAssignment = assignedAllLines || allowedLineIds.length > 0;
+  const accessibleLines = assignedAllLines || !hasExplicitAssignment
+    ? lines
+    : lines.filter(line => allowedLineIds.includes(line.id));
+  const accessibleLineIds = new Set(accessibleLines.map(line => line.id));
+  const accessibleSubscribers = assignedAllLines || !hasExplicitAssignment
+    ? subscribers
+    : subscribers.filter(sub => {
+        const resolvedLineId = sub.lineId || lines.find(line => line.name === (sub.lineName || sub.line || ''))?.id;
+        return Boolean(resolvedLineId && accessibleLineIds.has(resolvedLineId));
+      });
+
+  // COLLECTOR_HIDE_FREE_SUBSCRIBERS_V2
+  // Free/exempt subscribers require no collection and never appear for collectors.
+  const collectibleSubscribers = accessibleSubscribers.filter(sub =>
+    sub.paymentStatus !== 'free' && sub.isExempted !== true && sub.tier !== 'free'
+  );
+
+  const filteredSubs = collectibleSubscribers.filter(sub => {
+    if (assignedLineId && sub.lineId !== assignedLineId) return false;
+    if (assignedLineId && sub.lineId !== assignedLineId) return false;
+    if (assignedLineId && sub.lineId !== assignedLineId) return false;
+    if (assignedLineId && sub.lineId !== assignedLineId) return false;
+    if (assignedLineId && sub.lineId !== assignedLineId) return false;
+    if (assignedLineId && sub.lineId !== assignedLineId) return false;
+    if (assignedLineId && sub.lineId !== assignedLineId) return false;
+    if (assignedLineId && sub.lineId !== assignedLineId) return false;
     if (selectedLineFilter !== 'all' && sub.lineId !== selectedLineFilter) return false;
     if (searchTerm.trim()) {
       const query = searchTerm.toLowerCase();
@@ -196,20 +322,51 @@ export const POSQuickView: React.FC<POSQuickViewProps> = ({
     return true;
   });
 
-  const totalCollected = subscribers.reduce((acc, sub) => {
-    const paidInvoices = (sub.invoicesHistory || []).filter(inv => inv.status === 'paid');
-    return acc + paidInvoices.reduce((s, inv) => s + (inv.paidAmount || 0), 0);
-  }, 0);
+  // COLLECTOR_OWNER_ACCOUNTING_PARITY_V2
+  // Same classifier used by MobileDashboard/DashboardView/WalletView. The collector
+  // only narrows the population by assigned cabinets; payment status semantics stay identical.
+  const billingCycleActive = pricingTiers.some(t =>
+    t.type !== 'free' && (Number(t.pricePerAmpere || 0) > 0 || Number(t.fixedFee || 0) > 0)
+  );
+  const collectorAccountingRows = collectibleSubscribers.map(sub => {
+    const row = getSubscriberFinancialRow(sub, pricingTiers, activeMonthId);
+    return {
+      sub,
+      billed: row.bill,
+      collected: row.paid,
+      outstanding: row.outstanding,
+      status: row.status,
+      isFree: row.isFree,
+    };
+  });
+  type CollectorAccountingRow = (typeof collectorAccountingRows)[number];
+  const collectorAccountingById = new Map<string, CollectorAccountingRow>(
+    collectorAccountingRows.map(row => [row.sub.id, row] as const)
+  );
 
-  const totalUnpaid = subscribers.reduce((acc, sub) => {
-    const unpaidInvoices = (sub.invoicesHistory || []).filter(inv => inv.status === 'unpaid' || inv.status === 'partial');
-    return acc + unpaidInvoices.reduce((s, inv) => s + Math.max(0, inv.amount - (inv.paidAmount || 0)), 0);
-  }, 0);
+  const cabinetAccountingRows = selectedLineFilter === 'all'
+    ? collectorAccountingRows
+    : collectorAccountingRows.filter(row => row.sub.lineId === selectedLineFilter);
+  const dashboardAccountingRows = billingCycleActive ? cabinetAccountingRows : [];
 
-  const paidSubscribersList = filteredSubs.filter(sub => sub.paymentStatus === 'paid');
-  const unpaidSubscribersList = filteredSubs.filter(sub => sub.paymentStatus !== 'paid');
+  const totalCollected = dashboardAccountingRows.reduce((sum, row) => sum + row.collected, 0);
+  const totalUnpaid = dashboardAccountingRows.reduce((sum, row) => sum + row.outstanding, 0);
+  const dashboardPaidSubscribers = dashboardAccountingRows.filter(row =>
+    row.status === 'paid' && row.outstanding === 0 && row.billed > 0
+  );
 
-  const activeTierPrice = pricingTiers[0]?.pricePerAmpere || 0;
+  const paidSubscribersList = billingCycleActive ? filteredSubs.filter(sub => {
+    const row = collectorAccountingById.get(sub.id);
+    return Boolean(row && row.status === 'paid' && row.outstanding === 0 && row.billed > 0);
+  }) : [];
+  const unpaidSubscribersList = billingCycleActive ? filteredSubs.filter(sub => {
+    const row = collectorAccountingById.get(sub.id);
+    return Boolean(row && (row.outstanding > 0 || row.status === 'unpaid' || row.status === 'partial'));
+  }) : [];
+
+  const activeTier = pricingTiers.find(t => t.type === 'normal')
+    || pricingTiers.find(t => t.type !== 'free');
+  const activeTierPrice = Math.max(0, Number(activeTier?.pricePerAmpere || 0));
 
   return (
     <div className="min-h-screen bg-[#070d1e] text-white p-4 sm:p-6 font-['Cairo'] select-none flex justify-center" dir="rtl">
@@ -226,12 +383,16 @@ export const POSQuickView: React.FC<POSQuickViewProps> = ({
             <span>خروج</span>
           </button>
 
-          <div className="text-center truncate px-1">
-            <h1 className="text-base sm:text-xl font-black text-amber-400 truncate">{generatorSpecs.generatorName || 'مولدتك'}</h1>
+          <div className="flex items-center justify-center gap-1.5 min-w-0 px-1">
+            <h1 className="text-base sm:text-xl font-black text-[#F2B544] truncate">{generatorSpecs.generatorName || 'مولدتك'}</h1>
+            <span className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[8px] font-bold whitespace-nowrap ${isOnline ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25' : 'bg-rose-500/10 text-rose-400 border-rose-500/25'}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+              <span>{isOnline ? 'متصل' : 'غير متصل'}</span>
+            </span>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <div className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-bold ${
+            <div className={`hidden items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-bold ${
               isOnline 
                 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' 
                 : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
@@ -274,7 +435,7 @@ export const POSQuickView: React.FC<POSQuickViewProps> = ({
             </div>
           </div>
 
-          <div className={`sm:hidden flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-bold ${
+          <div className={`hidden items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-bold ${
             isOnline ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
           }`}>
             {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
@@ -285,10 +446,10 @@ export const POSQuickView: React.FC<POSQuickViewProps> = ({
         <div className="space-y-4 pt-1">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-black text-slate-300">لوحة التحكم الميدانية</h2>
-            {onOpenNewSubscriberModal && (
+            {onOpenNewSubscriberModal && permissions.canAddSubscribers && (
               <button
                 onClick={onOpenNewSubscriberModal}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black shadow-lg shadow-blue-600/30 transition-all cursor-pointer"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-blue-600 hover:bg-[#0B1F3B] text-white text-xs font-black shadow-lg shadow-blue-600/30 transition-all cursor-pointer"
               >
                 <UserPlus className="w-4 h-4" />
                 <span>إضافة مشترك جديد</span>
@@ -300,21 +461,21 @@ export const POSQuickView: React.FC<POSQuickViewProps> = ({
             <div className="bg-[#101b35] border border-blue-900/40 p-3.5 rounded-3xl text-center space-y-1 shadow-md">
               <span className="text-[11px] text-slate-400 block">تم تحصيله</span>
               <span className="text-sm sm:text-base font-black text-emerald-400" dir="ltr">
-                {totalCollected.toLocaleString()} {generatorSpecs.currency || 'د.ع'}
+                {totalCollected.toLocaleString('en-US')} {generatorSpecs.currency || 'د.ع'}
               </span>
             </div>
 
             <div className="bg-[#101b35] border border-blue-900/40 p-3.5 rounded-3xl text-center space-y-1 shadow-md">
               <span className="text-[11px] text-slate-400 block">مبالغ غير مسددة</span>
               <span className="text-sm sm:text-base font-black text-rose-400" dir="ltr">
-                {totalUnpaid.toLocaleString()} {generatorSpecs.currency || 'د.ع'}
+                {totalUnpaid.toLocaleString('en-US')} {generatorSpecs.currency || 'د.ع'}
               </span>
             </div>
 
             <div className="bg-[#101b35] border border-blue-900/40 p-3.5 rounded-3xl text-center space-y-1 shadow-md">
               <span className="text-[11px] text-slate-400 block">سعر الأمبير</span>
-              <span className="text-sm sm:text-base font-black text-amber-400" dir="ltr">
-                {activeTierPrice.toLocaleString()} {generatorSpecs.currency || 'د.ع'}
+              <span className="text-sm sm:text-base font-black text-[#F2B544]" dir="ltr">
+                {activeTierPrice.toLocaleString('en-US')} {generatorSpecs.currency || 'د.ع'}
               </span>
             </div>
 
@@ -327,7 +488,7 @@ export const POSQuickView: React.FC<POSQuickViewProps> = ({
                 <span>المسددين</span>
               </div>
               <span className="text-base sm:text-lg font-black text-emerald-300">
-                {paidSubscribersList.length} مشترك
+                {dashboardPaidSubscribers.length} مشترك
               </span>
             </div>
           </div>
@@ -358,16 +519,16 @@ export const POSQuickView: React.FC<POSQuickViewProps> = ({
                     <div
                       key={sub.id}
                       onClick={() => onOpenReceiptModal(sub, null, true)}
-                      className="flex items-center justify-between p-3 rounded-2xl bg-[#101b35] border border-emerald-500/25 hover:border-emerald-500/50 cursor-pointer transition-all"
+                      className="flex items-center justify-between p-3 rounded-2xl bg-emerald-700 border-2 border-emerald-400 hover:bg-emerald-600 cursor-pointer transition-all shadow-md"
                     >
                       <div className="flex items-center gap-2">
                         <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                         <div>
                           <span className="text-xs font-black text-white block">{sub.fullName}</span>
-                          <span className="text-[10px] text-slate-400">{lineObj?.name || 'الخط الرئيسي'} • {sub.amperes} أمبير</span>
+                          <span className="text-[10px] text-emerald-50">{lineObj?.name || 'الخط الرئيسي'} • {sub.amperes} أمبير</span>
                         </div>
                       </div>
-                      <span className="text-xs font-bold text-emerald-400">تم التسديد</span>
+                      <span className="text-xs font-black text-emerald-900 bg-white px-3 py-1.5 rounded-xl border border-emerald-200">مسدد</span>
                     </div>
                   );
                 })
@@ -395,7 +556,7 @@ export const POSQuickView: React.FC<POSQuickViewProps> = ({
               onClick={() => setSelectedLineFilter('all')}
               className={`px-5 py-2.5 rounded-2xl text-xs font-black transition-all shrink-0 cursor-pointer ${
                 selectedLineFilter === 'all'
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
+                  ? 'bg-[#0B1F3B] text-white shadow-lg shadow-blue-600/30'
                   : 'bg-[#101b35] text-slate-300 hover:bg-[#18264a] border border-blue-900/30'
               }`}
             >
@@ -407,7 +568,7 @@ export const POSQuickView: React.FC<POSQuickViewProps> = ({
                 onClick={() => setSelectedLineFilter(line.id)}
                 className={`px-5 py-2.5 rounded-2xl text-xs font-black transition-all shrink-0 cursor-pointer ${
                   selectedLineFilter === line.id
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
+                    ? 'bg-[#0B1F3B] text-white shadow-lg shadow-blue-600/30'
                     : 'bg-[#101b35] text-slate-300 hover:bg-[#18264a] border border-blue-900/30'
                 }`}
               >
@@ -436,64 +597,44 @@ export const POSQuickView: React.FC<POSQuickViewProps> = ({
           {unpaidSubscribersList.length === 0 ? (
             <div className="text-center py-12 bg-[#101b35]/50 border border-blue-900/20 rounded-3xl text-slate-400 text-xs font-bold space-y-2">
               <CheckCircle2 className="w-8 h-8 mx-auto text-emerald-400" />
-              <p>ممتاز! جميع المشتركين ضمن هذه التصفية قاموا بتسديد اشتراكاتهم بالكامل.</p>
+              <p>{hasMonthlyPricing(pricingTiers) ? 'ممتاز! جميع المشتركين ضمن هذه التصفية قاموا بتسديد اشتراكاتهم بالكامل.' : NO_TARIFF_LABEL + ' — التسديد متوقف'}</p>
             </div>
           ) : (
             unpaidSubscribersList.map(sub => {
-              const calc = calculateSubscriberBill(sub.amperes, sub.tier, pricingTiers);
-              const dueAmount = sub.amountDue > 0 ? sub.amountDue : calc.total;
+              const accountingRow = collectorAccountingById.get(sub.id);
+              const dueAmount = accountingRow
+                ? accountingRow.outstanding
+                : Math.max(0, Number(sub.amountDue || calculateSubscriberBill(sub.amperes, sub.tier, pricingTiers).total || 0));
               const lineObj = lines.find(l => l.id === sub.lineId);
               return (
                 <div
                   key={sub.id}
-                  onClick={() => setPaymentSubscriber(sub)}
-                  className="relative overflow-hidden flex items-center justify-between p-4.5 rounded-3xl bg-[#101b35] border border-blue-900/40 shadow-lg hover:border-blue-500/80 hover:bg-[#152342] transition-all cursor-pointer group"
+                  data-design="collector-approved-card-v3"
+                  onClick={() => { if (permissions.canCollectPayments || permissions.canCancelPayments || permissions.canApplyFreeExemption) setPaymentSubscriber(sub); }}
+                  className="relative overflow-hidden rounded-[26px] border border-rose-300/60 bg-gradient-to-r from-[#c4142d] via-[#aa1028] to-[#7a0b20] px-4 py-5 sm:px-6 sm:py-6 shadow-[0_10px_30px_rgba(120,10,32,0.34)] active:scale-[0.99] transition-transform cursor-pointer"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setPaymentSubscriber(sub); }}
+                  aria-label={`فتح تسديد المشترك ${sub.fullName}`}
                 >
-                  <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-rose-500 rounded-l" />
-
-                  <div className="space-y-1.5 pr-2">
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-sm font-black text-white group-hover:text-blue-300 transition-colors">{sub.fullName}</span>
-                      <span className="text-[10px] font-mono bg-blue-950 text-blue-300 px-2.5 py-0.5 rounded-lg border border-blue-800/40">
-                        كود : {sub.subscriberCode || 'MW-000'}
-                      </span>
+                  <div className="grid grid-cols-[1.25fr_1fr_0.72fr] items-center divide-x divide-white/20" dir="rtl">
+                    <div className="min-w-0 px-3 sm:px-4 text-right">
+                      <span className="block text-[12px] sm:text-sm font-bold text-white/75">اسم المشترك</span>
+                      <span className="mt-1 block truncate text-[22px] sm:text-[28px] font-black leading-tight text-white">{sub.fullName}</span>
                     </div>
 
-                    <div className="flex items-center gap-3 text-xs text-slate-400">
-                      <span className="flex items-center gap-1">
-                        <MapPin className="w-3.5 h-3.5 text-blue-400" />
-                        <span>{lineObj ? lineObj.name : 'الخط الرئيسي'}</span>
-                      </span>
-                      <span>•</span>
-                      <span className="flex items-center gap-1">
-                        <Zap className="w-3.5 h-3.5 text-amber-400" />
-                        <span>{sub.amperes} أمبير</span>
-                      </span>
-                      {sub.phone && (
-                        <>
-                          <span>•</span>
-                          <span className="font-mono">{sub.phone}</span>
-                        </>
-                      )}
+                    <div className="px-3 sm:px-4 text-center">
+                      <span className="block text-[12px] sm:text-sm font-bold text-white/75">المبلغ المطلوب</span>
+                      <span className="mt-1 block whitespace-nowrap text-[21px] sm:text-[27px] font-black leading-tight text-white tabular-nums" dir="ltr">{dueAmount.toLocaleString('en-US')} {generatorSpecs.currency || 'د.ع'}</span>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm font-black text-amber-400 tabular-nums" dir="ltr">
-                      {dueAmount.toLocaleString()} {generatorSpecs.currency || 'د.ع'}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setPaymentSubscriber(sub);
-                      }}
-                      className="min-w-[104px] min-h-[44px] inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-b from-blue-500 to-blue-700 hover:from-blue-400 hover:to-blue-600 text-white text-sm font-black border-2 border-blue-300/60 ring-2 ring-blue-500/20 shadow-lg shadow-blue-950/40 transition-all active:scale-95 cursor-pointer"
-                      aria-label={`تسديد اشتراك ${sub.fullName}`}
-                    >
-                      <CreditCard className="w-4 h-4 shrink-0" />
-                      <span>تسديد الآن</span>
-                    </button>
+                    <div className="px-3 sm:px-4 text-center">
+                      <span className="block text-[12px] sm:text-sm font-bold text-white/75">الأمبير</span>
+                      <div className="mt-1 flex items-center justify-center gap-1.5">
+                        <Zap className="h-5 w-5 sm:h-6 sm:w-6 shrink-0 fill-amber-400 text-[#F2B544]" />
+                        <span className="text-[24px] sm:text-[30px] font-black leading-none text-white tabular-nums">{sub.amperes}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               );

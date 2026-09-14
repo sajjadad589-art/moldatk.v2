@@ -1,7 +1,8 @@
 {
-  "name": "Moldatk - Generator Management System",
-  "description": "Professional Generator Management System (نظام إدارة المولدات - مولدتك) in Arabic with RTL layout, subscriber donut charts, folder-based settings, and theme customization.",
+  "name": "مولدتك - نظام إدارة المولدات",
+  "description": "نظام عربي لإدارة المولدات والمشتركين والجباية والتقارير والطباعة بهوية مولدتك الجديدة.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
-

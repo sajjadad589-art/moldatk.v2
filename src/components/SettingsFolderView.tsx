@@ -27,6 +27,9 @@ import {
 import { SubscriptionTierPricing, GeneratorSpecs, LineDistribution, DeviceViewMode, AuditLogEntry, Collector } from '../types';
 import { formatCurrency } from '../utils/formatters';
 import { SubscriptionInfoButton, SubscriptionInfo } from './SubscriptionStatusUI';
+import { syncCloudCollectorRoster } from '../lib/collectorCloud';
+import { OwnerAIAssistant } from './OwnerAIAssistant';
+import { HelpCenter } from './HelpCenter';
 
 interface SettingsFolderViewProps {
   folders: any[];
@@ -75,6 +78,9 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
   const [collectorName, setCollectorName] = useState('');
   const [collectorPhone, setCollectorPhone] = useState('');
   const [collectorPasscode, setCollectorPasscode] = useState('');
+  const [collectorAssignedLineIds, setCollectorAssignedLineIds] = useState<string[]>([]);
+  const [collectorAssignedAllLines, setCollectorAssignedAllLines] = useState(true);
+  const [collectorSaving, setCollectorSaving] = useState(false);
 
   const [collectorsList, setCollectorsList] = useState<Collector[]>(() =>
     collectors && collectors.length > 0 ? collectors : []
@@ -151,6 +157,8 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
     setCollectorName('');
     setCollectorPhone('');
     setCollectorPasscode('');
+    setCollectorAssignedLineIds([]);
+    setCollectorAssignedAllLines(true);
     setIsAddCollectorModalOpen(true);
   };
 
@@ -159,15 +167,46 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
     setCollectorName(c.name);
     setCollectorPhone(c.phone);
     setCollectorPasscode(c.passcode || '');
+    const ids = Array.isArray(c.assignedLineIds) && c.assignedLineIds.length
+      ? c.assignedLineIds
+      : (c.assignedLineId ? [c.assignedLineId] : []);
+    setCollectorAssignedLineIds(ids);
+    setCollectorAssignedAllLines(c.assignedAllLines === true || ids.length === 0);
     setIsAddCollectorModalOpen(true);
   };
 
-  const handleSaveCollectorSubmit = (e: React.FormEvent) => {
+  const saveCollectorRoster = async (updated: Collector[], successMessage: string) => {
+    setCollectorSaving(true);
+    try {
+      const saved = await syncCloudCollectorRoster(updated);
+      const finalList = saved.length ? saved : updated;
+      setCollectorsList(finalList);
+      if (onUpdateCollectors) onUpdateCollectors(finalList);
+      setIsAddCollectorModalOpen(false);
+      alert(successMessage);
+    } catch (error) {
+      console.error('Collector roster save failed:', error);
+      alert('تعذر حفظ حساب الجابي على السيرفر. تحقق من الإنترنت والبيانات ثم حاول مرة أخرى.');
+    } finally {
+      setCollectorSaving(false);
+    }
+  };
+
+  const handleSaveCollectorSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!collectorName.trim() || !collectorPhone.trim()) {
       alert('يرجى إدخال اسم الجابي ورقم الهاتف (اليوزر)');
       return;
     }
+    if (!collectorAssignedAllLines && collectorAssignedLineIds.length === 0) {
+      alert('اختر كابينة واحدة على الأقل أو فعّل اختيار كل الكابينات');
+      return;
+    }
+
+    const validIds = collectorAssignedAllLines
+      ? []
+      : collectorAssignedLineIds.filter(id => linesData.some(line => line.id === id));
+    const firstLine = validIds.length ? linesData.find(line => line.id === validIds[0]) : undefined;
 
     let updated: Collector[];
     if (editingCollector) {
@@ -175,9 +214,13 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
         ...c,
         name: collectorName.trim(),
         phone: collectorPhone.trim(),
-        passcode: collectorPasscode.trim() || '1234',
+        passcode: collectorPasscode.trim() || c.passcode || '',
+        assignedLineIds: validIds,
+        assignedAllLines: collectorAssignedAllLines,
+        assignedLineId: collectorAssignedAllLines ? undefined : firstLine?.id,
+        assignedLineName: collectorAssignedAllLines ? 'كل الكابينات' : firstLine?.name,
       } : c);
-      alert('تم تحديث بيانات وحساب الجابي بنجاح!');
+      await saveCollectorRoster(updated, 'تم تحديث بيانات الجابي والكابينات المخصصة بنجاح!');
     } else {
       const newCollectorObj: Collector = {
         id: `col-${Date.now()}`,
@@ -185,24 +228,30 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
         phone: collectorPhone.trim(),
         passcode: collectorPasscode.trim() || '1234',
         role: 'collector',
+        assignedLineIds: validIds,
+        assignedAllLines: collectorAssignedAllLines,
+        assignedLineId: collectorAssignedAllLines ? undefined : firstLine?.id,
+        assignedLineName: collectorAssignedAllLines ? 'كل الكابينات' : firstLine?.name,
       };
       updated = [...collectorsList, newCollectorObj];
-      alert('تم إضافة حساب الجابي بنجاح!');
+      await saveCollectorRoster(updated, 'تم إضافة حساب الجابي وربطه بالكابينات بنجاح!');
     }
-
-    setCollectorsList(updated);
-    if (onUpdateCollectors) {
-      onUpdateCollectors(updated);
-    }
-    setIsAddCollectorModalOpen(false);
   };
 
-  const handleDeleteCollector = (id: string) => {
-    if (!window.confirm('هل أنت متأكد من حذف حساب هذا الجابي؟')) return;
+  const handleDeleteCollector = async (id: string) => {
+    if (!window.confirm('هل أنت متأكد من حذف حساب هذا الجابي؟ سيتم إلغاء دخوله للنظام أيضاً.')) return;
     const updated = collectorsList.filter(c => c.id !== id);
-    setCollectorsList(updated);
-    if (onUpdateCollectors) {
-      onUpdateCollectors(updated);
+    setCollectorSaving(true);
+    try {
+      const saved = await syncCloudCollectorRoster(updated);
+      const finalList = saved.length ? saved : updated;
+      setCollectorsList(finalList);
+      if (onUpdateCollectors) onUpdateCollectors(finalList);
+    } catch (error) {
+      console.error('Collector delete failed:', error);
+      alert('تعذر حذف حساب الجابي من السيرفر. لم يتم حذف الحساب محلياً.');
+    } finally {
+      setCollectorSaving(false);
     }
   };
 
@@ -212,7 +261,7 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
     const newName = textInputVal.trim();
     const newList = [
       ...linesData,
-      { id: `line-${Date.now()}`, name: newName, loadAmps: 0, subscribersCount: 0 }
+      { id: `line-${Date.now()}`, name: newName, zone: '', phaseType: 'single-phase', phaseNameAr: 'فيز أحادي (220V)', maxCapacityAmperes: 0, currentLoadAmperes: 0, subscribersCount: 0, technicianName: '', breakerNumber: '' }
     ];
 
     setLinesData(newList);
@@ -228,22 +277,24 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
   };
 
   const handleItemDelete = (id: string) => {
-    const newList = linesData.filter(l => l.id !== id);
+    const newList = linesData.filter(l => l.id !== id).map(line => ({ ...line }));
     setLinesData(newList);
     if (onUpdateLines) {
       onUpdateLines(newList);
     }
+    try { window.dispatchEvent(new Event('moldatk-local-sync')); } catch (e) {}
   };
 
   const handleItemSaveEdit = (id: string) => {
     if (!editTextVal || !editTextVal.trim()) return;
-    const newList = linesData.map(l => l.id === id ? { ...l, name: editTextVal.trim() } : l);
+    const newList = linesData.map(l => l.id === id ? { ...l, name: editTextVal.trim(), lineName: editTextVal.trim(), updatedAt: new Date().toISOString() } as any : l);
     setLinesData(newList);
     setEditId(null);
     setEditTextVal('');
     if (onUpdateLines) {
       onUpdateLines(newList);
     }
+    try { window.dispatchEvent(new Event('moldatk-local-sync')); } catch (e) {}
   };
 
   const handleDragStart = (index: number) => {
@@ -276,6 +327,7 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
 
   return (
     <div className="space-y-6 font-['Cairo'] pb-20" dir="rtl">
+      <div className="grid lg:grid-cols-2 gap-3"><OwnerAIAssistant compact /><HelpCenter /></div>
       
       {/* رأس لوحة الإعدادات */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white dark:bg-[#131E38] p-6 rounded-3xl border border-slate-200 dark:border-blue-900/50 shadow-sm">
@@ -291,7 +343,7 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
         <button
           type="button"
           onClick={() => window.dispatchEvent(new Event('moldatk-open-notifications'))}
-          className="flex items-center justify-center gap-2 w-14 h-14 rounded-2xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-300 border border-blue-200 dark:border-blue-900/50 transition-all shadow-sm cursor-pointer"
+          className="flex items-center justify-center gap-2 w-14 h-14 rounded-2xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-[#142A45]/50 text-blue-600 dark:text-blue-300 border border-blue-200 dark:border-blue-900/50 transition-all shadow-sm cursor-pointer"
           title="إشعارات الإدارة"
         >
           <Bell className="w-5 h-5" />
@@ -313,7 +365,7 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
                 onClick={() => onChangeViewMode('mobile')}
                 className={`py-2.5 px-3 rounded-2xl flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer border ${
                   viewMode === 'mobile'
-                    ? 'bg-blue-600 text-white border-blue-500 shadow-md'
+                    ? 'bg-[#0B1F3B] text-white border-blue-500 shadow-md'
                     : 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800'
                 }`}
               >
@@ -326,7 +378,7 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
                 onClick={() => onChangeViewMode('desktop')}
                 className={`py-2.5 px-3 rounded-2xl flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer border ${
                   viewMode === 'desktop'
-                    ? 'bg-blue-600 text-white border-blue-500 shadow-md'
+                    ? 'bg-[#0B1F3B] text-white border-blue-500 shadow-md'
                     : 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800'
                 }`}
               >
@@ -339,7 +391,7 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
                 onClick={() => onChangeViewMode('auto')}
                 className={`py-2.5 px-3 rounded-2xl flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer border ${
                   viewMode === 'auto'
-                    ? 'bg-blue-600 text-white border-blue-500 shadow-md'
+                    ? 'bg-[#0B1F3B] text-white border-blue-500 shadow-md'
                     : 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800'
                 }`}
               >
@@ -375,7 +427,7 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
               onClick={() => setActiveCategory(cat.id)}
               className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
                 activeCategory === cat.id
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                  ? 'bg-[#0B1F3B] text-white shadow-md shadow-blue-600/30'
                   : 'bg-white dark:bg-[#131E38] hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-blue-900/50'
               }`}
             >
@@ -430,7 +482,7 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
           className="bg-white dark:bg-[#131E38] border border-blue-500/80 hover:border-blue-500 rounded-3xl p-5 shadow-md hover:shadow-lg transition-all cursor-pointer flex flex-col justify-between space-y-4 group"
         >
           <div className="flex items-start justify-between">
-            <div className="p-3 rounded-2xl bg-blue-600 text-white transition-all shadow-md shadow-blue-600/30">
+            <div className="p-3 rounded-2xl bg-[#0B1F3B] text-white transition-all shadow-md shadow-blue-600/30">
               <Layers className="w-5 h-5" />
             </div>
             <span className="px-3 py-1 rounded-full text-[10px] font-black border bg-blue-500/10 text-blue-400 border-blue-500/30">
@@ -481,9 +533,9 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
         >
           <div className="flex items-start justify-between">
             <div className="p-3 rounded-2xl bg-blue-50 dark:bg-blue-950/60 group-hover:bg-blue-600 group-hover:text-white text-blue-500 transition-all">
-              <Activity className="w-5 h-5 text-amber-400" />
+              <Activity className="w-5 h-5 text-[#F2B544]" />
             </div>
-            <span className="px-3 py-1 rounded-full text-[10px] font-black border bg-amber-500/10 text-amber-400 border-amber-500/30">
+            <span className="px-3 py-1 rounded-full text-[10px] font-black border bg-amber-500/10 text-[#F2B544] border-amber-500/30">
               مراقب ({auditLogs.length})
             </span>
           </div>
@@ -506,9 +558,9 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
         >
           <div className="flex items-start justify-between">
             <div className="p-3 rounded-2xl bg-blue-50 dark:bg-blue-950/60 group-hover:bg-blue-600 group-hover:text-white text-blue-500 transition-all">
-              <Zap className="w-5 h-5 text-yellow-400" />
+              <Zap className="w-5 h-5 text-[#F2B544]" />
             </div>
-            <span className="px-3 py-1 rounded-full text-[10px] font-black border bg-amber-500/10 text-amber-400 border-amber-500/30">
+            <span className="px-3 py-1 rounded-full text-[10px] font-black border bg-amber-500/10 text-[#F2B544] border-amber-500/30">
               قريباً...
             </span>
           </div>
@@ -579,7 +631,7 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
                 <button
                   type="button"
                   onClick={handleOpenAddCollector}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black shadow-md cursor-pointer transition-all"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-[#0B1F3B] text-white text-xs font-black shadow-md cursor-pointer transition-all"
                 >
                   <Plus className="w-4 h-4" />
                   <span>إضافة حساب جابي جديد</span>
@@ -605,7 +657,7 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
                             يوزر الدخول: {c.phone}
                           </span>
                           <span>•</span>
-                          <span className="flex items-center gap-1 text-amber-400 font-bold">
+                          <span className="flex items-center gap-1 text-[#F2B544] font-bold">
                             <Key className="w-3.5 h-3.5" />
                             الرمز السري: {c.passcode || '1234'}
                           </span>
@@ -641,7 +693,7 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsCollectorsModalOpen(false)}
-                className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black cursor-pointer shadow-md"
+                className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-[#0B1F3B] text-white text-xs font-black cursor-pointer shadow-md"
               >
                 إغلاق
               </button>
@@ -710,6 +762,43 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
                 </div>
               </div>
 
+              <div className="space-y-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/70 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <label className="text-xs font-black text-slate-800 dark:text-slate-200">الكابينات المسموحة لهذا الجابي</label>
+                    <p className="text-[10px] text-slate-500 mt-1">يمكن اختيار أكثر من كابينة، أو السماح بكل الكابينات.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setCollectorAssignedAllLines(!collectorAssignedAllLines); if (!collectorAssignedAllLines) setCollectorAssignedLineIds([]); }}
+                    className={`px-3 py-2 rounded-xl text-[11px] font-black border transition-all ${collectorAssignedAllLines ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-white dark:bg-slate-950 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700'}`}
+                  >
+                    اختيار كل الكابينات
+                  </button>
+                </div>
+
+                {!collectorAssignedAllLines && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-44 overflow-y-auto">
+                    {linesData.map(line => {
+                      const checked = collectorAssignedLineIds.includes(line.id);
+                      return (
+                        <label key={line.id} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border cursor-pointer text-xs font-bold transition-all ${checked ? 'bg-[#FFF7E3] border-[#D89A21] text-[#0B1F3B]' : 'bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300'}`}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => setCollectorAssignedLineIds(prev => checked ? prev.filter(id => id !== line.id) : [...prev, line.id])}
+                            className="w-4 h-4 accent-[#0B1F3B]"
+                          />
+                          <span className="truncate">{line.name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {collectorAssignedAllLines && <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">هذا الجابي يستطيع مشاهدة والعمل على جميع الكابينات.</p>}
+              </div>
+
               <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-3">
                 <button
                   type="button"
@@ -720,9 +809,10 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black cursor-pointer shadow-md"
+                  disabled={collectorSaving}
+                  className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-[#0B1F3B] text-white text-xs font-black cursor-pointer shadow-md"
                 >
-                  {editingCollector ? 'حفظ التعديلات' : 'حفظ وإضافة الحساب'}
+                  {collectorSaving ? 'جاري الحفظ...' : (editingCollector ? 'حفظ التعديلات' : 'حفظ وإضافة الحساب')}
                 </button>
               </div>
             </form>
@@ -775,7 +865,7 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
                         <div className="flex items-center gap-3 text-[10px] text-slate-400 font-mono">
                           <span className="flex items-center gap-1">
                             <Clock className="w-3 h-3" />
-                            {new Date(log.timestamp).toLocaleString('ar-IQ')}
+                            {new Date(log.timestamp).toLocaleString('ar-IQ-u-nu-latn')}
                           </span>
                           <span>المسؤول: {log.actorName}</span>
                         </div>
@@ -798,7 +888,7 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsAuditModalOpen(false)}
-                className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black cursor-pointer shadow-md"
+                className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-[#0B1F3B] text-white text-xs font-black cursor-pointer shadow-md"
               >
                 إغلاق
               </button>
@@ -837,7 +927,7 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
                     onClick={() => setInvoiceSettings({ ...invoiceSettings, printerType: 'thermal_58' })}
                     className={`p-3 rounded-2xl border text-[11px] font-black transition-all cursor-pointer ${
                       invoiceSettings.printerType === 'thermal_58'
-                        ? 'bg-blue-600 text-white border-blue-500 shadow-md'
+                        ? 'bg-[#0B1F3B] text-white border-blue-500 shadow-md'
                         : 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800'
                     }`}
                   >
@@ -849,7 +939,7 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
                     onClick={() => setInvoiceSettings({ ...invoiceSettings, printerType: 'thermal_80' })}
                     className={`p-3 rounded-2xl border text-[11px] font-black transition-all cursor-pointer ${
                       invoiceSettings.printerType === 'thermal_80'
-                        ? 'bg-blue-600 text-white border-blue-500 shadow-md'
+                        ? 'bg-[#0B1F3B] text-white border-blue-500 shadow-md'
                         : 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800'
                     }`}
                   >
@@ -861,7 +951,7 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
                     onClick={() => setInvoiceSettings({ ...invoiceSettings, printerType: 'a5' })}
                     className={`p-3 rounded-2xl border text-[11px] font-black transition-all cursor-pointer ${
                       invoiceSettings.printerType === 'a5'
-                        ? 'bg-blue-600 text-white border-blue-500 shadow-md'
+                        ? 'bg-[#0B1F3B] text-white border-blue-500 shadow-md'
                         : 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800'
                     }`}
                   >
@@ -999,7 +1089,7 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black cursor-pointer shadow-md"
+                  className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-[#0B1F3B] text-white text-xs font-black cursor-pointer shadow-md"
                 >
                   حفظ الإعدادات
                 </button>
@@ -1034,7 +1124,7 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
               <button
                 type="button"
                 onClick={addLineFromInput}
-                className="flex items-center gap-1.5 px-6 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black transition-all cursor-pointer shadow-md shadow-blue-600/25 shrink-0"
+                className="flex items-center gap-1.5 px-6 py-3 rounded-2xl bg-blue-600 hover:bg-[#0B1F3B] text-white text-xs font-black transition-all cursor-pointer shadow-md shadow-blue-600/25 shrink-0"
               >
                 <Plus className="w-4 h-4" />
                 <span>إضافة</span>
@@ -1129,7 +1219,7 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black cursor-pointer shadow-md"
+                className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-[#0B1F3B] text-white text-xs font-black cursor-pointer shadow-md"
               >
                 إغلاق
               </button>

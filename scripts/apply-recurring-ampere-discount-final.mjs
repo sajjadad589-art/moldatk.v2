@@ -217,7 +217,7 @@ export function calculateMonthlyCharge(
     // Historical onboarding debt must use the exact selected month's tariff and the same recurring ampere discount.
     s = s.replace(
       '    return Math.max(0, (Number(amperes) || 0) * Number(selectedPriorTier.pricePerAmpere || 0) + Number(selectedPriorTier.fixedFee || 0));',
-      '    const original = Math.max(0, Number(amperes) || 0);\\n    const discounted = Math.min(original, Math.max(0, Number(ampereDiscount) || 0));\\n    return Math.max(0, (original - discounted) * Number(selectedPriorTier.pricePerAmpere || 0) + Number(selectedPriorTier.fixedFee || 0));'
+      '    const original = Math.max(0, Number(amperes) || 0);\n    const discounted = Math.min(original, Math.max(0, Number(ampereDiscount) || 0));\n    return Math.max(0, (original - discounted) * Number(selectedPriorTier.pricePerAmpere || 0) + Number(selectedPriorTier.fixedFee || 0));'
     );
     s = s.replace(
       '  }, [amperes, selectedPriorTier]);',

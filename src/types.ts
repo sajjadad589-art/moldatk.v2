@@ -46,6 +46,16 @@ export interface SubscriberInvoice {
   issueDate: string; // YYYY-MM-DD
   paymentDate?: string;
   amperes: number;
+  /** Physical/original subscribed amperes at invoice issue time. */
+  originalAmperes?: number;
+  /** Recurring ampere discount snapshot for this invoice. */
+  discountedAmperes?: number;
+  /** Financial amperes actually billed after discount. */
+  billedAmperes?: number;
+  /** Invoice value before the ampere discount. */
+  grossAmountBeforeDiscount?: number;
+  /** Financial value removed by the recurring ampere discount. */
+  discountAmount?: number;
   tier: SubscriptionTierType;
   pricePerAmpere: number;
   fixedFee: number;
@@ -77,6 +87,10 @@ export interface Subscriber {
   phone: string;
   tier: SubscriptionTierType;
   amperes: number;
+  /** Recurring monthly discount in amperes. Physical load remains unchanged. */
+  ampereDiscount?: number;
+  /** Optional owner note explaining the recurring ampere discount. */
+  ampereDiscountReason?: string;
   lineId?: string;
   lineName?: string;
   /** Legacy alias used by existing UI; kept synchronized with lineName. */
@@ -151,6 +165,8 @@ export interface Collector {
   permissions?: CollectorPermissions; // صلاحيات الجابي (العرض والتعديل)
   assignedLineId?: string;
   assignedLineName?: string;
+  assignedLineIds?: string[];
+  assignedAllLines?: boolean;
   role?: 'collector';
   nationalId?: string;
   notes?: string;
@@ -167,6 +183,8 @@ export interface ActiveUserSession {
   collectorPermissions?: CollectorPermissions;
   assignedLineId?: string;
   assignedLineName?: string;
+  assignedLineIds?: string[];
+  assignedAllLines?: boolean;
   username?: string;
   loginTime?: string;
   email?: string;

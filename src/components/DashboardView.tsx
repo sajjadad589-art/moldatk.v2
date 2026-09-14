@@ -1,5 +1,5 @@
 import { useCashboxBalance } from '../lib/useCashboxBalance';
-import React from 'react';
+import React, { useState } from 'react';
 import {
   DollarSign,
   Activity,
@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import { Subscriber, SubscriptionTierPricing, GeneratorSpecs, LineDistribution, AuditLogEntry } from '../types';
 import { formatCurrency } from '../utils/formatters';
+import { getAmpereDiscountDashboardSummary } from '../utils/discountAccounting';
+import { reconciledCashbox, summarizeSubscribers } from '../utils/authoritativeAccounting';
 
 interface DashboardViewProps {
   subscribers: Subscriber[];
@@ -20,6 +22,7 @@ interface DashboardViewProps {
   lines: LineDistribution[];
   auditLogs?: AuditLogEntry[];
   walletResetTimestamp?: string;
+  activeMonthId?: string;
   onOpenPricingModal: () => void;
   onNavigateToSubscribersTab: (filter?: 'all' | 'paid' | 'unpaid') => void;
   onNavigateToWalletTab: () => void;
@@ -31,35 +34,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   generatorSpecs,
   auditLogs = [],
   walletResetTimestamp,
+  activeMonthId,
   onOpenPricingModal,
   onNavigateToSubscribersTab,
   onNavigateToWalletTab,
 }) => {
-  const totalCount = subscribers.length;
-  const paidSubscribers = subscribers.filter(s => s.paymentStatus === 'paid');
-  const unpaidSubscribers = subscribers.filter(s => s.paymentStatus === 'unpaid' || s.paymentStatus === 'partial');
-
-  const resetTimeMs = walletResetTimestamp ? new Date(walletResetTimestamp).getTime() : 0;
-
-  // القاصة تقرأ حصراً من سجل العمليات المالية الجديدة مع حماية ضد القيم الفارغة أو غير الرقمية
-  const localCollectedRevenue = auditLogs
-    .filter(log => {
-      if (log.category !== 'payment') return false;
-      if (resetTimeMs > 0) {
-        const logTime = log.timestamp ? new Date(log.timestamp).getTime() : 0;
-        if (!Number.isFinite(logTime) || logTime <= resetTimeMs) return false;
-      }
-      return true;
-    })
-    .reduce((acc, log) => acc + (Number(log.amount) || 0), 0);;
-  const totalCollectedRevenue = useCashboxBalance(localCollectedRevenue);
-
-  // حساب الديون غير المسددة بأمان تام لمنع ظهور NaN
-  const totalUnpaidDebt = unpaidSubscribers.reduce((acc, s) => {
-    const due = Number(s.amountDue) || 0;
-    const paid = Number(s.amountPaid) || 0;
-    return acc + Math.max(0, due - paid);
-  }, 0);
+  // AUTHORITATIVE_FINANCE_V2
+  const billingCycleActive = pricingTiers.some(t =>
+    t.type !== 'free' && (Number(t.pricePerAmpere || 0) > 0 || Number(t.fixedFee || 0) > 0)
+  );
+  const dashboardSummary = summarizeSubscribers(subscribers, pricingTiers, activeMonthId);
+  const paidSubscribers = billingCycleActive ? dashboardSummary.paidSubscribers : [];
+  const unpaidSubscribers = billingCycleActive ? dashboardSummary.unpaidSubscribers : [];
+  const totalCount = paidSubscribers.length + unpaidSubscribers.length;
+  const totalUnpaidDebt = billingCycleActive ? dashboardSummary.outstanding : 0;
+  const totalCollectedRevenue = useCashboxBalance(billingCycleActive
+    ? reconciledCashbox(dashboardSummary.collected, auditLogs, walletResetTimestamp, activeMonthId)
+    : 0);
+  // AMPERE_DISCOUNT_DASHBOARD_DESKTOP_V1
+  const ampereDiscountSummary = getAmpereDiscountDashboardSummary(subscribers, pricingTiers, activeMonthId);
+  const [showPreviousDebtList, setShowPreviousDebtList] = useState(false);
 
   return (
     <div className="space-y-6 font-['Cairo']" dir="rtl">
@@ -67,7 +61,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <section id="main-dashboard-widgets" className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <Activity className="w-5 h-5 text-[#1E3A8A] dark:text-blue-400" />
+            <Activity className="w-5 h-5 text-[#0B1F3B] dark:text-[#F2B544]" />
             <h2 className="text-base font-extrabold text-slate-900 dark:text-white">
               لوحة قراءات التحصيل والاشتراكات
             </h2>
@@ -75,7 +69,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           
           <button
             onClick={() => onNavigateToSubscribersTab('all')}
-            className="w-full sm:w-auto justify-center flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-black transition-all duration-200 border border-blue-400/40 shadow-lg shadow-blue-600/30 cursor-pointer"
+            className="w-full sm:w-auto justify-center flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-2xl bg-[#0B1F3B] hover:bg-[#142A45] text-white text-xs font-black transition-all duration-200 border border-blue-400/40 shadow-lg shadow-blue-600/30 cursor-pointer"
           >
             <span>الانتقال إلى قائمة المشتركين التفصيلية</span>
             <ArrowLeft className="w-4 h-4" />
@@ -106,7 +100,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             <div className="w-full text-center py-2 border-t border-slate-100 dark:border-blue-950/50" dir="ltr">
               <span className="text-lg font-black text-emerald-500 dark:text-emerald-400 tabular-nums">
-                {paidSubscribers.reduce((sum, s) => sum + (Number(s.amountPaid) || 0), 0).toLocaleString()} {generatorSpecs.currency}
+                {paidSubscribers.reduce((sum, s) => sum + (Number(s.amountPaid) || 0), 0).toLocaleString('en-US')} {generatorSpecs.currency}
               </span>
             </div>
           </div>
@@ -134,12 +128,67 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             <div className="w-full text-center py-2 border-t border-slate-100 dark:border-blue-950/50" dir="ltr">
               <span className="text-lg font-black text-rose-500 dark:text-rose-400 tabular-nums">
-                {totalUnpaidDebt.toLocaleString()} {generatorSpecs.currency}
+                {totalUnpaidDebt.toLocaleString('en-US')} {generatorSpecs.currency}
               </span>
             </div>
           </div>
         </div>
       </section>
+
+      <section data-ampere-discount-dashboard-desktop-v1 className="max-w-4xl mx-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <button type="button" onClick={() => setShowPreviousDebtList(true)} className="rounded-3xl bg-white dark:bg-[#131E38] border border-rose-200 dark:border-rose-900/50 p-4 text-right shadow-sm hover:border-rose-400 transition-all">
+            <span className="text-[11px] font-black text-slate-500 dark:text-slate-400">ديون الشهر السابق</span>
+            <div className="mt-2 flex items-end justify-between gap-2"><strong className="text-3xl font-black text-rose-600 dark:text-rose-400">{ampereDiscountSummary.previousDebtSubscribers}</strong><span className="text-xs font-black text-rose-600" dir="ltr">{formatCurrency(ampereDiscountSummary.previousDebtAmount, generatorSpecs.currency)}</span></div>
+          </button>
+          <div className="rounded-3xl bg-white dark:bg-[#131E38] border border-blue-200 dark:border-blue-900/50 p-4 shadow-sm">
+            <span className="text-[11px] font-black text-slate-500 dark:text-slate-400">الأمبيرات المحتسبة للجباية</span>
+            <div className="mt-2"><strong className="text-3xl font-black text-blue-600 dark:text-blue-400">{ampereDiscountSummary.billedAmperes.toLocaleString('en-US')}A</strong><p className="text-[10px] font-bold text-slate-400 mt-1">خصم {ampereDiscountSummary.discountedAmperes.toLocaleString('en-US')}A من {ampereDiscountSummary.originalBillableAmperes.toLocaleString('en-US')}A</p></div>
+          </div>
+          <div className="rounded-3xl bg-white dark:bg-[#131E38] border border-amber-200 dark:border-amber-900/50 p-4 shadow-sm">
+            <span className="text-[11px] font-black text-slate-500 dark:text-slate-400">مبالغ الخصومات الشهرية</span>
+            <div className="mt-2"><strong className="text-2xl font-black text-amber-600 dark:text-amber-400" dir="ltr">{formatCurrency(ampereDiscountSummary.monthlyDiscountAmount, generatorSpecs.currency)}</strong><p className="text-[10px] font-bold text-slate-400 mt-1">خصومات أمبيرات معتمدة من الإدارة</p></div>
+          </div>
+        </div>
+      </section>
+
+      {showPreviousDebtList && (
+        <div className="fixed inset-0 z-[80] bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4" dir="rtl">
+          <div className="w-full max-w-xl max-h-[80vh] overflow-y-auto rounded-3xl bg-white dark:bg-[#101a33] border border-slate-200 dark:border-slate-800 shadow-2xl p-5">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div><h3 className="text-base font-black text-slate-950 dark:text-white">مدينو الشهر السابق</h3><p className="text-xs text-slate-500 mt-1">الشهر {ampereDiscountSummary.previousMonthId} — {formatCurrency(ampereDiscountSummary.previousDebtAmount, generatorSpecs.currency)}</p></div>
+              <button type="button" onClick={() => setShowPreviousDebtList(false)} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-black text-slate-700 dark:text-slate-200">إغلاق</button>
+            </div>
+            {ampereDiscountSummary.previousMonthDebtors.length === 0 ? <div className="py-12 text-center text-sm font-black text-emerald-600">لا توجد ديون متبقية من الشهر السابق.</div> : (
+              <div className="space-y-2">{ampereDiscountSummary.previousMonthDebtors.map(row => <div key={row.subscriber.id} className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 px-4 py-3 flex items-center justify-between gap-3"><div><div className="text-sm font-black text-slate-900 dark:text-white">{row.subscriber.fullName}</div><div className="text-[10px] text-slate-400 mt-1">{row.subscriber.code || row.subscriber.subscriberCode}</div></div><strong className="text-sm font-black text-rose-600" dir="ltr">{formatCurrency(row.amount, generatorSpecs.currency)}</strong></div>)}</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
 
       {/* 2. بطاقة القاصة (المحفظة) */}
       <section className="max-w-4xl mx-auto">
@@ -154,7 +203,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div>
               <span className="text-xs font-bold text-emerald-200 tracking-wider uppercase block">القاصة (المحفظة المالية)</span>
               <span className="text-2xl sm:text-3xl font-black text-white tabular-nums block mt-1 tracking-tight">
-                {totalCollectedRevenue.toLocaleString()} {generatorSpecs.currency}
+                {totalCollectedRevenue.toLocaleString('en-US')} {generatorSpecs.currency}
               </span>
               <span className="text-xs text-emerald-100 font-medium block mt-1 opacity-90">إجمالي المبالغ المستحصلة هذا الشهر</span>
             </div>
@@ -171,7 +220,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <section className="bg-white dark:bg-[#111c38] rounded-3xl p-4 sm:p-6 shadow-sm border border-slate-100 dark:border-slate-800 space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-[#1E3A8A] dark:text-blue-400">
+            <div className="p-3 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-[#0B1F3B] dark:text-[#F2B544]">
               <DollarSign className="w-6 h-6" />
             </div>
             <div>
@@ -181,9 +230,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <button
             onClick={onOpenPricingModal}
-            className="w-full sm:w-auto justify-center flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-[#1E3A8A] hover:bg-blue-900 text-white text-xs font-bold transition-all cursor-pointer shadow-md shadow-blue-900/20"
+            className="w-full sm:w-auto justify-center flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-[#0B1F3B] hover:bg-[#142A45] text-white text-xs font-bold transition-all cursor-pointer shadow-md shadow-blue-900/20"
           >
-            <Sliders className="w-4 h-4 text-yellow-400" />
+            <Sliders className="w-4 h-4 text-[#F2B544]" />
             <span>تعديل وضبط التسعيرة</span>
           </button>
         </div>
@@ -192,7 +241,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {pricingTiers.filter(t => t.type !== 'free').map(tier => (
             <div key={tier.id} className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
               <span className="font-bold text-sm text-slate-900 dark:text-white">{tier.nameAr}</span>
-              <div className="text-2xl font-black text-[#1E3A8A] dark:text-blue-300 tabular-nums mt-2">
+              <div className="text-2xl font-black text-[#1E3A8A] dark:text-[#F2B544] tabular-nums mt-2">
                 {formatCurrency(tier.pricePerAmpere)}
               </div>
             </div>

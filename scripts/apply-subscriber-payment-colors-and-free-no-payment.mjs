@@ -8,7 +8,7 @@ const write = (p, c) => fs.writeFileSync(p, c);
   const p = 'src/components/SubscribersView.tsx';
   let c = read(p);
 
-  const start = c.indexOf("export const getSubscriberStyleByStatus = (status: Subscriber['paymentStatus']) => {");
+  const start = c.indexOf('export const getSubscriberStyleByStatus = (status:');
   const end = start >= 0 ? c.indexOf('\n};', start) : -1;
   if (start < 0 || end < 0) throw new Error('getSubscriberStyleByStatus not found');
 

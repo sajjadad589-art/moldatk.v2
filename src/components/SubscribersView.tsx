@@ -1,3 +1,4 @@
+import { hasMonthlyPricing, NO_TARIFF_LABEL } from '../utils/pricingAvailability';
 import React, { useState, useRef } from 'react';
 import {
   Search,
@@ -12,11 +13,12 @@ import {
 } from 'lucide-react';
 import { Subscriber, SubscriptionTierPricing, LineDistribution, SubscriberInvoice } from '../types';
 
-export const getSubscriberStyleByStatus = (status: Subscriber['paymentStatus']) => {
-  if (status === 'paid') return { cardBg: 'bg-emerald-50/60 dark:bg-emerald-950/20', cardBorderAccent: 'border border-emerald-200 dark:border-emerald-900/50', avatarBg: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300', nameText: 'text-slate-900 dark:text-white', badgeBg: 'bg-white/70 dark:bg-slate-900/50', innerSubBox: 'bg-white/70 dark:bg-slate-900/40' };
-  if (status === 'partial') return { cardBg: 'bg-amber-50/60 dark:bg-amber-950/20', cardBorderAccent: 'border border-amber-200 dark:border-amber-900/50', avatarBg: 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300', nameText: 'text-slate-900 dark:text-white', badgeBg: 'bg-white/70 dark:bg-slate-900/50', innerSubBox: 'bg-white/70 dark:bg-slate-900/40' };
-  if (status === 'free') return { cardBg: 'bg-blue-50/60 dark:bg-blue-950/20', cardBorderAccent: 'border border-blue-200 dark:border-blue-900/50', avatarBg: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300', nameText: 'text-slate-900 dark:text-white', badgeBg: 'bg-white/70 dark:bg-slate-900/50', innerSubBox: 'bg-white/70 dark:bg-slate-900/40' };
-  return { cardBg: 'bg-white dark:bg-[#131E38]', cardBorderAccent: 'border border-rose-200 dark:border-rose-900/40', avatarBg: 'bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300', nameText: 'text-slate-900 dark:text-white', badgeBg: 'bg-white/70 dark:bg-slate-900/50', innerSubBox: 'bg-white/70 dark:bg-slate-900/40' };
+export const getSubscriberStyleByStatus = (status: Subscriber['paymentStatus'] | 'no_tariff') => {
+  if (status === 'no_tariff') return { cardBg: 'bg-white dark:bg-white', cardBorderAccent: 'border border-slate-300', avatarBg: 'bg-slate-100 text-slate-700', nameText: 'text-slate-900', badgeBg: 'bg-slate-100 text-slate-700', innerSubBox: 'bg-slate-50' };
+  if (status === 'paid') return { cardBg: 'bg-[#176B45] dark:bg-[#14583A]', cardBorderAccent: 'border border-[#2F8E65] dark:border-[#287A57]', avatarBg: 'bg-white/14 text-white', nameText: 'text-white', badgeBg: 'bg-black/15 text-white', innerSubBox: 'bg-[#105238]/55 dark:bg-[#0F472F]/65' };
+  if (status === 'partial') return { cardBg: 'bg-[#9A741B] dark:bg-[#7D5E16]', cardBorderAccent: 'border border-[#C49A32] dark:border-[#A47F28]', avatarBg: 'bg-white/14 text-white', nameText: 'text-white', badgeBg: 'bg-black/15 text-white', innerSubBox: 'bg-[#765710]/55 dark:bg-[#654A0E]/65' };
+  if (status === 'free') return { cardBg: 'bg-[#46515F] dark:bg-[#394451]', cardBorderAccent: 'border border-[#657180] dark:border-[#586474]', avatarBg: 'bg-white/12 text-white', nameText: 'text-white', badgeBg: 'bg-black/15 text-white', innerSubBox: 'bg-[#303A46]/60 dark:bg-[#2B3540]/70' };
+  return { cardBg: 'bg-[#8A2F3E] dark:bg-[#742837]', cardBorderAccent: 'border border-[#B85B69] dark:border-[#A44A5A]', avatarBg: 'bg-white/15 text-white', nameText: 'text-white', badgeBg: 'bg-black/15 text-white', innerSubBox: 'bg-[#641F2C]/55 dark:bg-[#551A26]/60' };
 };
 
 interface SubscribersViewProps {
@@ -36,6 +38,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
   onOpenSubscriberModal,
   onDeleteSubscriber,
 }) => {
+  const hasPricing = hasMonthlyPricing(pricingTiers);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'paid' | 'unpaid' | 'partial' | 'free'>('all');
   const [selectedLine, setSelectedLine] = useState<string>('all');
@@ -97,10 +100,10 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
     return Number(num).toLocaleString('en-US');
   };
 
-  const countPaid = subscribers.filter(s => s.paymentStatus === 'paid').length;
-  const countUnpaid = subscribers.filter(s => s.paymentStatus === 'unpaid').length;
-  const countPartial = subscribers.filter(s => s.paymentStatus === 'partial').length;
-  const countFree = subscribers.filter(s => s.paymentStatus === 'free').length;
+  const countPaid = hasPricing ? subscribers.filter(s => s.paymentStatus === 'paid').length : 0;
+  const countUnpaid = hasPricing ? subscribers.filter(s => s.paymentStatus === 'unpaid').length : 0;
+  const countPartial = hasPricing ? subscribers.filter(s => s.paymentStatus === 'partial').length : 0;
+  const countFree = hasPricing ? subscribers.filter(s => s.paymentStatus === 'free').length : 0;
 
   const filteredSubscribers = subscribers.filter(sub => {
     const matchesSearch =
@@ -110,10 +113,10 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
 
     if (!matchesSearch) return false;
 
-    if (filterStatus === 'paid' && sub.paymentStatus !== 'paid') return false;
-    if (filterStatus === 'unpaid' && sub.paymentStatus !== 'unpaid') return false;
-    if (filterStatus === 'partial' && sub.paymentStatus !== 'partial') return false;
-    if (filterStatus === 'free' && sub.paymentStatus !== 'free') return false;
+    if (hasPricing && filterStatus === 'paid' && sub.paymentStatus !== 'paid') return false;
+    if (hasPricing && filterStatus === 'unpaid' && sub.paymentStatus !== 'unpaid') return false;
+    if (hasPricing && filterStatus === 'partial' && sub.paymentStatus !== 'partial') return false;
+    if (hasPricing && filterStatus === 'free' && sub.paymentStatus !== 'free') return false;
 
     if (selectedLine !== 'all' && sub.lineName !== selectedLine) return false;
     if (selectedTier !== 'all' && sub.tier !== selectedTier) return false;
@@ -228,7 +231,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
           <button
             type="button"
             onClick={() => onOpenSubscriberModal()}
-            className="flex items-center gap-2 px-6 py-4 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black transition-all shadow-lg shadow-blue-600/25 cursor-pointer"
+            className="flex items-center gap-2 px-6 py-4 rounded-2xl bg-blue-600 hover:bg-[#0B1F3B] text-white text-xs font-black transition-all shadow-lg shadow-blue-600/25 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>إضافة مشترك</span>
@@ -255,7 +258,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
           onClick={() => setSelectedLine('all')}
           className={`px-5 py-2.5 rounded-2xl text-xs font-black transition-all shrink-0 shadow-xs ${
             selectedLine === 'all'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+              ? 'bg-[#0B1F3B] text-white shadow-md shadow-blue-600/30'
               : 'bg-white dark:bg-[#131E38] hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-blue-900/50'
           }`}
         >
@@ -269,7 +272,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
             onClick={() => setSelectedLine(l.name)}
             className={`px-5 py-2.5 rounded-2xl text-xs font-black transition-all shrink-0 shadow-xs ${
               selectedLine === l.name
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                ? 'bg-[#0B1F3B] text-white shadow-md shadow-blue-600/30'
                 : 'bg-white dark:bg-[#131E38] hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-blue-900/50'
             }`}
           >
@@ -311,13 +314,13 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
                 </tr>
               ) : (
                 filteredSubscribers.map(sub => {
-                  const isPaid = sub.paymentStatus === 'paid';
-                  const isPartial = sub.paymentStatus === 'partial';
-                  const isFree = sub.paymentStatus === 'free';
-                  const isUnpaid = sub.paymentStatus === 'unpaid';
+                  const isPaid = hasPricing && sub.paymentStatus === 'paid';
+                  const isPartial = hasPricing && sub.paymentStatus === 'partial';
+                  const isFree = hasPricing && sub.paymentStatus === 'free';
+                  const isUnpaid = hasPricing && sub.paymentStatus === 'unpaid';
 
                   // صندوق كود المشترك الملون حسب الحالة
-                  const codeBoxClass = isUnpaid
+                  const codeBoxClass = !hasPricing ? 'bg-white text-slate-900 border border-slate-300' : isUnpaid
                     ? 'bg-rose-600 text-white font-black shadow-md'
                     : isPartial
                     ? 'bg-amber-400 text-slate-950 font-black shadow-md'
@@ -345,6 +348,7 @@ export const SubscribersView: React.FC<SubscribersViewProps> = ({
                         <span className="font-black text-sm text-slate-900 dark:text-white group-hover:text-blue-500 transition-colors">
                           {sub.fullName}
                         </span>
+                        {!hasPricing && <span className="block text-xs text-slate-600 mt-1">{NO_TARIFF_LABEL} · المطلوب: 0 د.ع</span>}
                       </td>
 
                       {/* عدد الأمبيرات */}

@@ -2,7 +2,7 @@ import React from 'react';
 import {
   Moon,
   Sun,
-  Sliders,
+  Bell,
   LogOut,
 } from 'lucide-react';
 import { GeneratorSpecs } from '../../types';
@@ -13,6 +13,7 @@ interface MobileHeaderProps {
   onToggleTheme: () => void;
   onLogout: () => void;
   onOpenPricingModal: () => void;
+  showSyncStatus?: boolean;
 }
 
 export const MobileHeader: React.FC<MobileHeaderProps> = ({
@@ -21,37 +22,39 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
   onToggleTheme,
   onLogout,
   onOpenPricingModal,
+  showSyncStatus = false,
 }) => {
   return (
-    <header className="sticky top-0 z-40 bg-[#1E3A8A] text-white border-b border-blue-900 shadow-md">
+    <header className="sticky top-0 z-40 bg-[#0B1F3B] text-white border-b border-[#1C3654] shadow-md">
       {/* Top Bar: Brand, Status, and Controls */}
       <div className="px-3.5 py-2.5 flex items-center justify-between gap-2">
         {/* Brand & Live Status */}
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-xl bg-white text-[#1E3A8A] flex items-center justify-center font-black text-base shadow-sm shrink-0">
-            M
-          </div>
+          <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shadow-sm shrink-0 p-1 overflow-hidden"><img src="/brand/moldatk-mark.svg" alt="مولدتك" className="w-full h-full object-contain" /></div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               <h1 className="text-sm font-black tracking-tight truncate">نظام مولدتك</h1>
               <span className="inline-block w-2 h-2 rounded-full shrink-0 bg-emerald-400 animate-pulse" />
             </div>
-            <p className="text-[10px] text-blue-200 truncate leading-none mt-0.5">
-              {generatorSpecs.generatorName}
-            </p>
+            <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
+              <p className="text-[10px] text-slate-300 truncate leading-none">{generatorSpecs.generatorName}</p>
+              {showSyncStatus && <div id="moldatk-sync-status-slot" className="flex items-center shrink-0 scale-[0.82] origin-right" />}
+            </div>
           </div>
         </div>
 
         {/* Action Controls */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Pricing Quick Button */}
+          {/* Notifications Quick Button */}
           <button
-            onClick={onOpenPricingModal}
-            className="px-2.5 py-1 rounded-xl bg-blue-950/70 hover:bg-blue-900 border border-blue-800 text-blue-100 hover:text-white transition-all flex items-center gap-1 text-[11px] font-bold"
-            title="تسعيرة الأمبير"
+            type="button"
+            onClick={() => window.dispatchEvent(new Event('moldatk-open-notifications'))}
+            className="relative w-9 h-9 rounded-xl bg-[#142A45] hover:bg-[#1B3858] border border-white/10 text-white transition-all flex items-center justify-center shadow-sm"
+            title="الإشعارات"
+            aria-label="فتح الإشعارات"
           >
-            <Sliders className="w-3 h-3 text-yellow-400" />
-            <span>التسعيرة</span>
+            <Bell className="w-5 h-5" />
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-amber-400 ring-2 ring-[#0B1F3B]" />
           </button>
 
 
@@ -67,10 +70,10 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
           {/* Theme Toggle */}
           <button
             onClick={onToggleTheme}
-            className="p-1.5 rounded-xl bg-blue-950/70 hover:bg-blue-900 border border-blue-800 text-blue-200 hover:text-white transition-colors"
+            className="p-1.5 rounded-xl bg-[#142A45] hover:bg-[#1B3858] border border-white/10 text-slate-200 hover:text-white transition-colors"
             title="تبديل المظهر"
           >
-            {darkMode ? <Sun className="w-4 h-4 text-amber-300" /> : <Moon className="w-4 h-4 text-blue-200" />}
+            {darkMode ? <Sun className="w-4 h-4 text-[#F2B544]" /> : <Moon className="w-4 h-4 text-blue-200" />}
           </button>
         </div>
       </div>

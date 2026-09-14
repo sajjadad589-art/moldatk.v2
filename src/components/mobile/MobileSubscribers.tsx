@@ -1,5 +1,6 @@
+import { hasMonthlyPricing, NO_TARIFF_LABEL } from '../../utils/pricingAvailability';
 import React, { useMemo, useState } from 'react';
-import { Search, Plus, Phone, Users, X, Trash2 } from 'lucide-react';
+import { Search, Plus, Users, X , Trash2} from 'lucide-react';
 import { Subscriber, SubscriptionTierPricing, LineDistribution } from '../../types';
 import { formatCurrency, formatNumberArabic } from '../../utils/formatters';
 import { getSubscriberStyleByStatus } from '../SubscribersView';
@@ -16,15 +17,32 @@ interface MobileSubscribersProps {
 
 export const MobileSubscribers: React.FC<MobileSubscribersProps> = ({
   subscribers,
+  pricingTiers,
   lines,
   onOpenSubscriberModal,
+  onOpenReceiptModal,
   onDeleteSubscriber,
 }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'unpaid' | 'paid' | 'partial' | 'free'>('all');
+
+  const hasPricing = hasMonthlyPricing(pricingTiers);
+  const readInitialStatusFilter = (): 'all' | 'unpaid' | 'paid' | 'partial' | 'free' => {
+    try {
+      const saved = localStorage.getItem('moldatk_mobile_subscribers_filter');
+      localStorage.removeItem('moldatk_mobile_subscribers_filter');
+      if (saved === 'paid' || saved === 'unpaid' || saved === 'partial' || saved === 'free') return saved;
+    } catch (e) {}
+    return 'all';
+  };
+const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'unpaid' | 'paid' | 'partial' | 'free'>(readInitialStatusFilter);
   const [lineFilter, setLineFilter] = useState<string>('all');
 
   const selectedLine = useMemo(() => lines.find(line => line.id === lineFilter), [lines, lineFilter]);
+
+  const getRemainingAmount = (sub: Subscriber) => Math.max(0, Number(sub.amountDue || 0) - Number(sub.amountPaid || 0));
+  const isFreeSubscriber = (sub: Subscriber) => hasPricing && (sub.paymentStatus === 'free' || sub.tier === 'free');
+  const isPaidSubscriber = (sub: Subscriber) => hasPricing && (!isFreeSubscriber(sub) && (sub.paymentStatus === 'paid' || getRemainingAmount(sub) === 0));
+  const isUnpaidSubscriber = (sub: Subscriber) => hasPricing && (!isFreeSubscriber(sub) && (sub.paymentStatus === 'unpaid' || sub.paymentStatus === 'partial' || getRemainingAmount(sub) > 0));
 
   const filteredSubscribers = subscribers.filter(sub => {
     const needle = searchTerm.trim().toLowerCase();
@@ -32,14 +50,18 @@ export const MobileSubscribers: React.FC<MobileSubscribersProps> = ({
       (sub.fullName || '').toLowerCase().includes(needle) ||
       (sub.phone || '').toLowerCase().includes(needle) ||
       (sub.code || '').toLowerCase().includes(needle) ||
+      (sub.subscriberCode || '').toLowerCase().includes(needle) ||
       (sub.boxNumber || '').toLowerCase().includes(needle) ||
       (sub.lineName || sub.line || '').toLowerCase().includes(needle);
 
-    const isFree = sub.paymentStatus === 'free' || sub.tier === 'free';
-    const matchesStatus = statusFilter === 'all'
+    const matchesStatus = !hasPricing || statusFilter === 'all'
       ? true
       : statusFilter === 'free'
-      ? isFree
+      ? isFreeSubscriber(sub)
+      : statusFilter === 'paid'
+      ? isPaidSubscriber(sub)
+      : statusFilter === 'unpaid'
+      ? isUnpaidSubscriber(sub)
       : sub.paymentStatus === statusFilter;
 
     const matchesLine = lineFilter === 'all'
@@ -50,13 +72,15 @@ export const MobileSubscribers: React.FC<MobileSubscribersProps> = ({
     return matchesSearch && matchesStatus && matchesLine;
   });
 
-  const paidCount = subscribers.filter(s => s.paymentStatus === 'paid').length;
-  const partialCount = subscribers.filter(s => s.paymentStatus === 'partial').length;
-  const unpaidCount = subscribers.filter(s => s.paymentStatus === 'unpaid').length;
-  const freeCount = subscribers.filter(s => s.paymentStatus === 'free' || s.tier === 'free').length;
+  const paidCount = subscribers.filter(isPaidSubscriber).length;
+  const partialCount = hasPricing ? subscribers.filter(s => s.paymentStatus === 'partial').length : 0;
+  const unpaidCount = subscribers.filter(isUnpaidSubscriber).length;
+  const freeCount = subscribers.filter(isFreeSubscriber).length;
+
+
 
   return (
-    <div className="p-2.5 space-y-2.5 max-w-lg mx-auto pb-24">
+    <div className="p-2.5 space-y-2 max-w-lg mx-auto pb-24">
       <div className="space-y-2 sticky top-[53px] z-30 bg-slate-50/95 dark:bg-[#070d1e]/95 backdrop-blur-md pt-1 pb-2">
         <div className="relative">
           <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
@@ -130,77 +154,63 @@ export const MobileSubscribers: React.FC<MobileSubscribersProps> = ({
           <p className="text-xs text-slate-400">غيّر البحث أو فلتر الكابينة أو حالة التسديد</p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {filteredSubscribers.map(sub => {
             const isPartial = sub.paymentStatus === 'partial';
+            const isPaid = sub.paymentStatus === 'paid';
             const isFree = sub.paymentStatus === 'free' || sub.tier === 'free';
-            const styles = getSubscriberStyleByStatus(isFree ? 'free' : sub.paymentStatus);
-            const visibleAmount = isFree
+            const styles = getSubscriberStyleByStatus(!hasPricing ? 'no_tariff' : isFree ? 'free' : sub.paymentStatus);
+
+            // amountDue يمثل المتبقي بعد التسديد، لذلك يصبح صفراً عند السداد الكامل.
+            // في بطاقة المشترك نعرض قيمة العملية/الاشتراك للمسدد، والمتبقي لغير المسدد والجزئي.
+            const latestInvoice = [...(sub.invoicesHistory || [])]
+              .filter(inv => inv.status !== 'cancelled')
+              .sort((a, b) => String(b.monthId || '').localeCompare(String(a.monthId || '')))[0];
+            const paidDisplayAmount = Math.max(
+              0,
+              Number(sub.amountPaid || 0),
+              Number(latestInvoice?.paidAmount || 0),
+              latestInvoice?.status === 'paid' ? Number(latestInvoice?.totalAmount || 0) : 0
+            );
+            const remainingDisplayAmount = Math.max(0, Number(sub.amountDue || 0));
+            const visibleAmount = !hasPricing ? formatCurrency(0) : isFree
               ? 'إعفاء'
-              : isPartial
-              ? formatCurrency(Math.max(0, Number(sub.amountDue || 0) - Number(sub.amountPaid || 0)))
-              : formatCurrency(Number(sub.amountDue || 0));
+              : isPaid
+              ? formatCurrency(paidDisplayAmount)
+              : formatCurrency(remainingDisplayAmount);
 
             return (
-              <div
+              <button
+                type="button"
                 key={sub.id}
                 onClick={() => onOpenSubscriberModal(sub)}
-                className={`rounded-2xl px-3 py-2.5 transition-all cursor-pointer ${styles.cardBg} ${styles.cardBorderAccent}`}
+                data-billing-state={hasPricing ? sub.paymentStatus : 'no_tariff'}
+                className={`w-full rounded-xl px-3 py-2.5 transition-all text-right active:scale-[0.99] ${styles.cardBg} ${styles.cardBorderAccent}`}
               >
-                <div className="grid grid-cols-[1.45fr_.7fr_1fr] gap-2 items-start">
-                  <div className="min-w-0">
-                    <span className="block text-[9px] font-bold text-white/70 mb-0.5">اسم المشترك</span>
-                    <h4 className={`text-sm font-black truncate leading-5 ${styles.nameText}`}>{sub.fullName}</h4>
-                    <span className="text-[9px] font-mono text-white/65 tabular-nums">{sub.code}</span>
+                <div className="grid grid-cols-[1.35fr_.7fr_1fr] gap-2 items-center" dir="rtl">
+                  <div className="min-w-0 text-right">
+                    <span className={`block text-[9px] font-bold leading-3 ${hasPricing ? 'text-white/75' : 'text-slate-600'}`}>اسم المشترك</span>
+                    <span className={`block text-[15px] font-black truncate leading-6 ${styles.nameText}`}>
+                      {sub.fullName}
+                    </span>
                   </div>
 
-                  <div className="text-center">
-                    <span className="block text-[9px] font-bold text-white/70 mb-0.5">الأمبير</span>
-                    <span className="text-sm font-black text-cyan-300 tabular-nums">A {formatNumberArabic(sub.amperes)}</span>
+                  <div className="text-center min-w-0">
+                    <span className={`block text-[9px] font-bold leading-3 ${hasPricing ? 'text-white/75' : 'text-slate-600'}`}>الأمبير</span>
+                    <span className={`block text-[15px] font-black tabular-nums leading-6 whitespace-nowrap ${hasPricing ? 'text-cyan-300' : 'text-slate-900'}`}>
+                      A {formatNumberArabic(sub.amperes)}
+                    </span>
                   </div>
 
-                  <div className="text-left min-w-0">
-                    <span className="block text-[9px] font-bold text-white/70 mb-0.5">المبلغ</span>
-                    <span className="block text-sm font-black text-white tabular-nums truncate">{visibleAmount}</span>
+                  <div className="text-left min-w-0" dir="rtl">
+                    <span className={`block text-[9px] font-bold leading-3 ${hasPricing ? 'text-white/75' : 'text-slate-600'}`}>المبلغ</span>
+                    <span className={`block text-[15px] font-black tabular-nums truncate leading-6 ${styles.nameText}`}>
+                      {visibleAmount}
+                    </span>
+                    {!hasPricing && <span className="block text-[10px] text-slate-600 font-bold">{NO_TARIFF_LABEL}</span>}
                   </div>
                 </div>
-
-                <div className="mt-1.5 pt-1.5 border-t border-white/10 flex items-center justify-between gap-2 min-w-0">
-                  <div className="flex items-center gap-2 min-w-0 text-[9px] text-white/70">
-                    {sub.phone && (
-                      <span className="flex items-center gap-1 tabular-nums truncate">
-                        <Phone className="w-3 h-3 shrink-0" />
-                        {sub.phone}
-                      </span>
-                    )}
-                    {(sub.lineName || sub.line) && (
-                      <span className="px-1.5 py-0.5 rounded-md bg-black/15 truncate max-w-[90px]">
-                        {sub.lineName || sub.line}
-                      </span>
-                    )}
-                  </div>
-
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (window.confirm(`هل تريد حذف المشترك ${sub.fullName}؟ لا يمكن التراجع عن هذه العملية.`)) {
-                        onDeleteSubscriber(sub.id);
-                      }
-                    }}
-                    className="w-7 h-7 shrink-0 rounded-lg bg-black/15 hover:bg-rose-500/30 text-white/80 flex items-center justify-center active:scale-95 transition-all"
-                    title="حذف المشترك"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                {isPartial && (
-                  <div className="mt-1.5 px-2 py-1 rounded-lg bg-black/15 flex items-center justify-between text-[9px] font-bold text-white/80">
-                    <span>المسدد: {formatCurrency(sub.amountPaid || 0)}</span>
-                    <span>المطلوب: {formatCurrency(sub.amountDue || 0)}</span>
-                  </div>
-                )}
-              </div>
+              </button>
             );
           })}
         </div>
@@ -208,7 +218,7 @@ export const MobileSubscribers: React.FC<MobileSubscribersProps> = ({
 
       <button
         onClick={() => onOpenSubscriberModal(null)}
-        className="fixed bottom-20 left-3 z-40 w-11 h-11 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white shadow-xl shadow-blue-500/30 flex items-center justify-center active:scale-95 transition-all"
+        className="fixed bottom-20 left-3 z-40 w-11 h-11 rounded-2xl bg-blue-600 hover:bg-[#0B1F3B] text-white shadow-xl shadow-blue-500/30 flex items-center justify-center active:scale-95 transition-all"
         title="إضافة مشترك جديد"
       >
         <Plus className="w-5 h-5" />

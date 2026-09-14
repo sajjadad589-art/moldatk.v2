@@ -38,10 +38,19 @@ export const LoginView: React.FC<LoginViewProps> = ({ collectors, onLoginSuccess
     if (role === 'admin') {
       setIsSubmitting(true);
       try {
-        const { data, error } = await supabase.auth.signInWithPassword({
+        let { data, error } = await supabase.auth.signInWithPassword({
           email: cleanInput,
           password: cleanPass,
         });
+
+        if ((error || !data.user) && cleanPass.length >= 4 && cleanPass.length < 6) {
+          const retry = await supabase.auth.signInWithPassword({
+            email: cleanInput,
+            password: cleanPass + 'moldatk',
+          });
+          data = retry.data;
+          error = retry.error;
+        }
 
         if (error || !data.user) {
           setErrorMessage('البريد الإلكتروني أو كلمة المرور غير صحيحة');
@@ -66,7 +75,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ collectors, onLoginSuccess
           return;
         }
 
-        if (profile.role !== 'super_admin' && profile.role !== 'generator_admin') {
+        if (profile.role !== 'super_admin' && profile.role !== 'super_admin_manager' && profile.role !== 'generator_admin') {
           await supabase.auth.signOut();
           setErrorMessage('هذا الحساب غير مخول للدخول كتطبيق مالك مولدة');
           return;
@@ -97,12 +106,16 @@ export const LoginView: React.FC<LoginViewProps> = ({ collectors, onLoginSuccess
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4 bg-slate-100 dark:bg-[#070d1e] font-['Cairo',sans-serif] transition-colors">
-      <div className="w-full max-w-md bg-white dark:bg-[#111c38] rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 space-y-6">
+    <div className="min-h-screen w-full flex items-center justify-center p-4 bg-[#F7F9FC] dark:bg-[#081521] font-['Cairo',sans-serif] transition-colors">
+      <div className="w-full max-w-md bg-white dark:bg-[#102139] rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 space-y-6">
         
         <div className="text-center space-y-3">
-          <div className="mx-auto w-full max-w-[250px] rounded-3xl bg-white p-2.5 shadow-lg shadow-blue-950/10 border border-slate-100">
-            <img src="/brand/moldatk-logo.svg" alt="مولدتك" className="w-full h-auto object-contain" />
+          <div className="mx-auto inline-flex items-center justify-center gap-3 rounded-3xl bg-white px-5 py-3 shadow-lg shadow-blue-950/10 border border-slate-100" dir="rtl">
+            <img src="/brand/moldatk-mark.svg" alt="" className="w-14 h-14 object-contain shrink-0" />
+            <div className="text-right leading-tight">
+              <div className="text-3xl font-black tracking-tight text-[#0B1F3B]">مولدتك</div>
+              <div className="text-[10px] font-bold text-slate-500 mt-1">إدارة المولدات بسهولة</div>
+            </div>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400">
             منظومة إدارة المولدات والاشتراكات
@@ -115,11 +128,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ collectors, onLoginSuccess
             onClick={() => { setRole('admin'); setErrorMessage(null); setUsernameInput(''); setPasswordInput(''); }}
             className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               role === 'admin'
-                ? 'bg-[#0b2b59] text-white shadow-sm'
+                ? 'bg-[#0B1F3B] text-white shadow-sm ring-1 ring-[#F2B544]/20'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <ShieldCheck className="w-4 h-4 text-amber-400" />
+            <ShieldCheck className="w-4 h-4 text-[#F2B544]" />
             <span>صاحب المولد</span>
           </button>
           
@@ -128,11 +141,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ collectors, onLoginSuccess
             onClick={() => { setRole('collector'); setErrorMessage(null); setUsernameInput(''); setPasswordInput(''); }}
             className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               role === 'collector'
-                ? 'bg-[#0b2b59] text-white shadow-sm'
+                ? 'bg-[#0B1F3B] text-white shadow-sm ring-1 ring-[#F2B544]/20'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <User className="w-4 h-4 text-amber-300" />
+            <User className="w-4 h-4 text-[#F2B544]" />
             <span>جابي / كادر</span>
           </button>
         </div>
@@ -157,7 +170,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ collectors, onLoginSuccess
                 placeholder={role === 'admin' ? 'name@example.com' : '07800000000'}
                 value={usernameInput}
                 onChange={(e) => setUsernameInput(e.target.value)}
-                className="w-full pl-3 pr-10 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-400 font-bold font-mono"
+                className="w-full pl-3 pr-10 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#F2B544]/45 focus:border-[#D89A21] font-bold font-mono"
               />
             </div>
           </div>
@@ -174,7 +187,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ collectors, onLoginSuccess
                 placeholder={role === 'admin' ? '••••••' : 'رمز الدخول'}
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
-                className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-400 font-mono"
+                className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#F2B544]/45 focus:border-[#D89A21] font-mono"
               />
               <button
                 type="button"
@@ -189,15 +202,22 @@ export const LoginView: React.FC<LoginViewProps> = ({ collectors, onLoginSuccess
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-3 px-4 rounded-xl bg-[#0b2b59] hover:bg-[#123d73] disabled:opacity-60 text-white font-bold text-xs shadow-lg shadow-blue-950/20 transition-all cursor-pointer flex items-center justify-center gap-2 mt-2"
+            className="w-full py-3 px-4 rounded-xl bg-[#0B1F3B] hover:bg-[#142A45] disabled:opacity-60 text-white font-bold text-xs shadow-lg shadow-blue-950/20 transition-all cursor-pointer flex items-center justify-center gap-2 mt-2"
           >
-            <Sparkles className="w-4 h-4 text-amber-400" />
+            <Sparkles className="w-4 h-4 text-[#F2B544]" />
             <span>{isSubmitting ? 'جاري التحقق...' : 'تسجيل الدخول للنظام'}</span>
           </button>
         </form>
 
-        <div className="text-center pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400">
-          جميع حسابات المالك والجباة مرتبطة بـ Supabase Authentication
+        <div className="pt-3 border-t border-slate-100 dark:border-slate-800 text-center space-y-2">
+          <p className="text-[10px] text-slate-400">تسجيل دخول آمن لحسابات المالك والجباة</p>
+          <div className="flex items-center justify-center gap-3 text-[10px] font-bold">
+            <a href="/privacy" className="text-slate-500 hover:text-[#D89A21]">سياسة الخصوصية</a>
+            <span className="text-slate-300">•</span>
+            <a href="/terms" className="text-slate-500 hover:text-[#D89A21]">الشروط والأحكام</a>
+            <span className="text-slate-300">•</span>
+            <a href="/delete-account" className="text-slate-500 hover:text-rose-600">حذف الحساب</a>
+          </div>
         </div>
       </div>
     </div>

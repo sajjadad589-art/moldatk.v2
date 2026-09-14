@@ -5,6 +5,7 @@ import {
   FolderKanban,
   Fuel,
   Activity,
+  FileBarChart2,
 } from 'lucide-react';
 import { GeneratorSpecs, DeviceViewMode } from '../types';
 import { formatNumberArabic } from '../utils/formatters';
@@ -46,6 +47,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: `${formatNumberArabic(totalSubscribersCount)}`,
     },
     {
+      id: 'reports',
+      label: 'التقارير',
+      icon: FileBarChart2,
+      badge: null,
+    },
+    {
       id: 'settings',
       label: 'الإعدادات',
       icon: FolderKanban,
@@ -72,7 +79,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onClick={() => onTabChange(item.id)}
             className={`min-w-0 flex-1 flex flex-col items-center justify-center gap-1 py-2 px-1 rounded-xl transition-all cursor-pointer ${
               isActive
-                ? 'text-blue-600 dark:text-blue-400 font-black bg-blue-50/80 dark:bg-blue-950/60'
+                ? 'text-[#0B1F3B] dark:text-[#F2B544] font-black bg-[#FFF7E3] dark:bg-[#142A45]'
                 : 'text-slate-500 dark:text-slate-400'
             }`}
           >
@@ -97,9 +104,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               type="button"
               onClick={onOpenNewSubscriberModal}
-              className="w-full py-2.5 px-4 rounded-2xl bg-[#1E3A8A] hover:bg-blue-900 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 group cursor-pointer"
+              className="w-full py-2.5 px-4 rounded-2xl bg-[#0B1F3B] hover:bg-[#142A45] text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 group cursor-pointer"
             >
-              <Users className="w-4 h-4 transition-transform group-hover:scale-110 text-yellow-400" />
+              <Users className="w-4 h-4 transition-transform group-hover:scale-110 text-[#F2B544]" />
               <span>إضافة مشترك جديد</span>
             </button>
           </div>
@@ -119,12 +126,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => onTabChange(item.id)}
                 className={`flex items-center justify-between p-3 rounded-2xl cursor-pointer transition-all ${
                   isActive
-                    ? 'bg-blue-50 text-blue-700 font-bold dark:bg-blue-950/60 dark:text-blue-300 shadow-xs'
+                    ? 'bg-[#FFF7E3] text-[#0B1F3B] font-bold dark:bg-[#142A45] dark:text-[#F7E4AF] shadow-xs'
                     : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 font-medium'
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-[#1E3A8A] dark:text-blue-400' : 'text-slate-400'}`} />
+                  <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-[#D89A21] dark:text-[#F2B544]' : 'text-slate-400'}`} />
                   <div className="min-w-0">
                     <span className="text-xs block truncate font-bold">{item.label}</span>
                   </div>

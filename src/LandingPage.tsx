@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ArrowLeft,
   BadgeCheck,
@@ -18,6 +18,7 @@ import {
   Wifi,
   Zap,
 } from 'lucide-react';
+import { DEFAULT_SITE_SETTINGS, loadActiveRelease, loadSiteSettings, whatsappUrl as buildWhatsappUrl, type AppRelease } from './lib/siteManagement';
 
 const features = [
   { icon: Users, title: 'إدارة المشتركين', text: 'إضافة وتعديل ومتابعة حالة كل مشترك بصورة واضحة وسريعة.' },
@@ -49,6 +50,19 @@ const BrandLockup = ({ compact = false }: { compact?: boolean }) => (
 
 export default function LandingPage() {
   const appUrl = `${window.location.origin}/`;
+  const orderUrl = `${window.location.origin}/order`;
+  const [siteSettings, setSiteSettings] = useState(DEFAULT_SITE_SETTINGS);
+  const [activeRelease, setActiveRelease] = useState<AppRelease | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([loadSiteSettings(), loadActiveRelease()]).then(([site, release]) => {
+      if (cancelled) return;
+      setSiteSettings(site);
+      setActiveRelease(release);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <div dir="rtl" className="min-h-screen bg-[#F7F9FC] text-[#0B1F3B] font-['Cairo',sans-serif] selection:bg-[#F2B544] selection:text-[#0B1F3B]">
@@ -140,7 +154,14 @@ export default function LandingPage() {
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-3">
+              <a href={orderUrl} className="group w-full sm:w-auto min-w-[300px] inline-flex items-center justify-center gap-3 px-8 py-5 rounded-[1.35rem] bg-amber-400 text-slate-950 text-lg sm:text-xl font-black hover:bg-amber-300 hover:-translate-y-0.5 transition-all shadow-2xl shadow-amber-950/30 ring-4 ring-amber-400/10">
+              <Zap className="w-6 h-6" /> اطلب اشتراك مولدتك الآن <ArrowLeft className="w-6 h-6 transition-transform group-hover:-translate-x-1" />
+            </a>
+
+            <div className="flex flex-wrap gap-3">
+              <a href="/order" className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-emerald-400 text-slate-950 font-black hover:bg-emerald-300 transition-all">
+                اشترك أو جدد الآن <ArrowLeft className="w-5 h-5" />
+              </a>
                 <a href={appUrl} className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-[#0B1F3B] text-white font-black hover:bg-[#142A45] transition-colors shadow-lg shadow-[#0B1F3B]/10">
                   فتح النظام <ArrowLeft className="w-5 h-5 text-[#F2B544]" />
                 </a>

@@ -5,7 +5,7 @@ if (!fs.existsSync(path)) throw new Error('Collector dashboard accounting: POSQu
 
 let source = fs.readFileSync(path, 'utf8');
 
-if (!source.includes('COLLECTOR_DASHBOARD_ACCOUNTING_SINGLE_SOURCE_V1')) {
+if (!source.includes('COLLECTOR_DASHBOARD_ACCOUNTING_SINGLE_SOURCE_V1') && !source.includes('COLLECTOR_OWNER_ACCOUNTING_PARITY_V2')) {
   const start = source.indexOf('  const totalCollected =');
   const activeTierStart = source.indexOf('  const activeTierPrice =', start);
   const activeTierEnd = activeTierStart >= 0 ? source.indexOf('\n', activeTierStart) : -1;
@@ -118,7 +118,7 @@ if (!source.includes('COLLECTOR_DASHBOARD_ACCOUNTING_SINGLE_SOURCE_V1')) {
   );
 }
 
-if (!source.includes('COLLECTOR_DASHBOARD_ACCOUNTING_SINGLE_SOURCE_V1')) {
+if (!source.includes('COLLECTOR_DASHBOARD_ACCOUNTING_SINGLE_SOURCE_V1') && !source.includes('COLLECTOR_OWNER_ACCOUNTING_PARITY_V2')) {
   throw new Error('Collector dashboard accounting: source-of-truth marker missing');
 }
 if (!source.includes('{dashboardPaidSubscribers.length} مشترك')) {
