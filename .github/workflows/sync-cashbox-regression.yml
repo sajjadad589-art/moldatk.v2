@@ -18,5 +18,6 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npm run lint
       - run: npm run test:sync-cashbox
+      - run: node scripts/live-sync-receipt-cashbox-parity-regression.mjs
       - run: npm run build
       - run: npx tsc --noEmit
