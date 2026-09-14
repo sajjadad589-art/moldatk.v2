@@ -79,8 +79,26 @@ const sync = fs.readFileSync('src/lib/useGeneratorCloudSync.ts', 'utf8');
 const mobileDashboard = fs.readFileSync('src/components/mobile/MobileDashboard.tsx', 'utf8');
 const desktopDashboard = fs.readFileSync('src/components/DashboardView.tsx', 'utf8');
 
-assert(pricing.includes("onSaveMonthlyTariffs(updatedTariffs, monthId, true);"), 'Creating a tariff must activate the monthly cycle immediately');
-assert(pricing.includes("onSaveMonthlyTariffs([], '', false);"), 'The final remaining tariff must be deletable');
+// Creating a month is intentionally a local draft. The monthly cycle starts only after
+// the owner enters prices and explicitly presses Save/Apply. This prevents a zero-price
+// draft from reaching cloud billing while retaining the same one-time rollover semantics.
+const createStart = pricing.indexOf('  const handleCreateNewMonthTariff = () => {');
+const createEnd = createStart >= 0 ? pricing.indexOf('\n\n  const handleDeleteMonth =', createStart) : -1;
+assert(createStart >= 0 && createEnd > createStart, 'Create-month handler must exist');
+const createBlock = pricing.slice(createStart, createEnd);
+assert(!createBlock.includes('onSaveMonthlyTariffs('), 'Creating a tariff draft must not activate billing before prices are saved');
+const saveStart = pricing.indexOf('  const handleSave = () => {');
+const saveEnd = saveStart >= 0 ? pricing.indexOf('\n\n  const getTierIcon', saveStart) : -1;
+assert(saveStart >= 0 && saveEnd > saveStart, 'Explicit Save/Apply handler must exist');
+const saveBlock = pricing.slice(saveStart, saveEnd);
+assert(/onSaveMonthlyTariffs\([\s\S]*?selectedMonthId[\s\S]*?,\s*true\s*\);/.test(saveBlock), 'Explicit Save/Apply must activate the monthly cycle');
+
+const deleteStart = pricing.indexOf('  const handleDeleteMonth = (monthId: string) => {');
+const deleteEnd = deleteStart >= 0 ? pricing.indexOf('\n\n  const handleSave', deleteStart) : -1;
+assert(deleteStart >= 0 && deleteEnd > deleteStart, 'Delete-month handler must exist');
+const deleteBlock = pricing.slice(deleteStart, deleteEnd);
+assert(/remaining\.length\s*===\s*0/.test(deleteBlock), 'Deleting the final tariff must have an explicit empty-list branch');
+assert(/onSaveMonthlyTariffs\(\s*\[\s*\]\s*,[\s\S]*?,\s*false\s*\);/.test(deleteBlock), 'The final remaining tariff must be deletable');
 assert(pricing.includes('لا توجد تسعيرة معتمدة حالياً'), 'Pricing editor must support a genuinely empty tariff list');
 assert(!pricing.includes('لا يمكن حذف آخر تسعيرة موجودة'), 'The last tariff must not be protected from deletion');
 
@@ -105,4 +123,4 @@ assert(sync.includes("deletedTariffs: key('moldatk_deleted_tariffs', generatorId
 assert(sync.includes(".delete().eq('generator_id', generatorId).in('id', deletedTariffIds)"), 'Cloud sync must delete tombstoned tariffs remotely');
 assert(sync.includes('.filter(t => !deletedTariffSet.has(t.id))'), 'Cloud pull must never resurrect a deleted tariff');
 
-console.log('Monthly cycle lifecycle suite passed: monthly reset, carried debt, delete-all tariffs, zero live state, zero dashboard billing readings, idempotent activation, and sync-safe deletion.');
+console.log('Monthly cycle lifecycle suite passed: explicit-save monthly activation, carried debt, delete-all tariffs, zero live state, zero dashboard billing readings, idempotent activation, and sync-safe deletion.');
