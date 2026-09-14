@@ -179,7 +179,16 @@ const write = (p, c) => fs.writeFileSync(p, c);
   if (explicitSaveDraft && !hasExplicitSaveApply) {
     throw new Error('Monthly pricing authoritative fix: explicit Save/Apply activation is missing');
   }
-  if (!c.includes("onSaveMonthlyTariffs([], '', false);")) {
+
+  // Older/final pricing patches can rewrite whitespace, the active-id expression, or the
+  // local helper used by the delete handler. What matters is that deleting the LAST tariff
+  // persists an empty tariff list with shouldRecalculateBills=false.
+  const deleteStart = c.indexOf('  const handleDeleteMonth = (monthId: string) => {');
+  const deleteEnd = deleteStart >= 0 ? c.indexOf('\n\n  const handleSave', deleteStart) : -1;
+  const deleteBlock = deleteStart >= 0 && deleteEnd > deleteStart ? c.slice(deleteStart, deleteEnd) : '';
+  const hasDeleteAllSupport = /onSaveMonthlyTariffs\(\s*\[\s*\]\s*,[\s\S]*?,\s*false\s*\);/.test(deleteBlock)
+    || (/remaining\.length\s*===\s*0/.test(deleteBlock) && /onSaveMonthlyTariffs\([\s\S]*?,\s*false\s*\);/.test(deleteBlock));
+  if (!hasDeleteAllSupport) {
     throw new Error('Monthly pricing authoritative fix: delete-all tariffs support missing');
   }
   write(p, c);
