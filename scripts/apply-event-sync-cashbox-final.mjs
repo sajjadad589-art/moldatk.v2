@@ -81,6 +81,14 @@ for (const [path,relative] of [['src/components/WalletView.tsx','../lib/'],['src
   must(s.includes('useCashboxBalance('),'server balance binding missing: '+path);
   write(path,s);
 }
+let sw = read('public/sw.js');
+sw = sw.replace(
+  "if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));",
+  "if (response.ok) { const copy = response.clone(); event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.put(request, copy))); }"
+);
+must(!sw.includes('cache.put(request, response.clone())'), 'service worker clones consumed response asynchronously');
+write('public/sw.js', sw);
+
 must(!app.includes("from './lib/useGeneratorCloudSync'"),'legacy hook still imported');
 console.log('Event-driven single-flight sync and server-confirmed cashbox reset installed.');
 
