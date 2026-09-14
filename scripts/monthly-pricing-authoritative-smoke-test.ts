@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import type { MonthlyTariffRecord, Subscriber, SubscriptionTierPricing } from '../src/types';
 import { startFreshMonthlyCycle, repriceActiveMonthlyCycle, zeroLiveMonthlyCycle } from '../src/utils/monthlyCycleEngine';
+import { buildCanonicalMonthlyTiers, hasAllCanonicalMonthlyTiers } from '../src/utils/monthlyTariffTierTemplate';
 
 const tiers = (price: number): SubscriptionTierPricing[] => [{ id: 'normal', nameAr: 'نهاري', nameEn: 'Normal', type: 'normal', pricePerAmpere: price, fixedFee: 0, description: '', badgeColor: 'blue', is24Hours: false, priorityLevel: 1 }];
 const aug: MonthlyTariffRecord = { id: '2026-08', month: 8, year: 2026, monthNameAr: '8-2026', tiers: tiers(6000), createdAt: '2026-08-01', isCurrentActive: true };
@@ -34,4 +36,31 @@ const zeroed = zeroLiveMonthlyCycle([freshOct])[0];
 assert.equal(zeroed.amountDue, 0);
 assert.equal(zeroed.amountPaid, 0);
 assert.equal(zeroed.invoicesHistory?.length, freshOct.invoicesHistory?.length);
-console.log('Authoritative monthly pricing regression passed.');
+
+// Regression: an active monthly tariff with an empty tiers array must still show
+// all four pricing cards instead of rendering a blank pricing section.
+const recoveredEmpty = buildCanonicalMonthlyTiers([], []);
+assert.equal(recoveredEmpty.length, 4);
+assert.equal(hasAllCanonicalMonthlyTiers(recoveredEmpty), true);
+assert.deepEqual(recoveredEmpty.map(t => t.type), ['normal', 'commercial', 'golden', 'free']);
+assert.deepEqual(recoveredEmpty.map(t => t.nameAr), ['نهاري', 'محلات', 'ذهبي', 'مجاني']);
+
+// Existing month prices are authoritative and must survive recovery unchanged.
+const recoveredExisting = buildCanonicalMonthlyTiers([
+  { id: 'n', nameAr: 'نهاري', nameEn: 'Normal', type: 'normal', pricePerAmpere: 7000, fixedFee: 0, description: '', badgeColor: 'blue', is24Hours: false, priorityLevel: 1 },
+  { id: 'c', nameAr: 'محلات', nameEn: 'Commercial', type: 'commercial', pricePerAmpere: 10000, fixedFee: 0, description: '', badgeColor: 'amber', is24Hours: false, priorityLevel: 2 },
+  { id: 'g', nameAr: 'ذهبي', nameEn: 'Golden', type: 'golden', pricePerAmpere: 16000, fixedFee: 0, description: '', badgeColor: 'emerald', is24Hours: true, priorityLevel: 3 },
+], []);
+assert.equal(recoveredExisting.find(t => t.type === 'normal')?.pricePerAmpere, 7000);
+assert.equal(recoveredExisting.find(t => t.type === 'commercial')?.pricePerAmpere, 10000);
+assert.equal(recoveredExisting.find(t => t.type === 'golden')?.pricePerAmpere, 16000);
+assert.equal(recoveredExisting.find(t => t.type === 'free')?.pricePerAmpere, 0);
+
+// The build-time finalizer must wire the recovery helper into the actual editor.
+const pricingSource = fs.readFileSync('src/components/PricingModal.tsx', 'utf8');
+assert.match(pricingSource, /buildCanonicalMonthlyTiers\(normalizedMonthTiers, pricingTiers\)/);
+assert.match(pricingSource, /buildCanonicalMonthlyTiers\(currentMonthRecord\.tiers \|\| \[\], pricingTiers\)/);
+assert.match(pricingSource, /onSaveMonthlyTariffs\(completeTariffs, selectedMonthId, true\)/);
+assert.match(pricingSource, /disabled=\{!isEditable \|\| isFree\}/);
+
+console.log('Authoritative monthly pricing regression passed, including tier-card recovery.');
