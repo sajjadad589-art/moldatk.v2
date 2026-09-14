@@ -13,7 +13,7 @@ export type SubscriptionInfo = {
   suspensionReason?: string | null;
 };
 
-const formatDate = (value: string) => new Intl.DateTimeFormat('ar-IQ', { dateStyle: 'long', timeStyle: 'short' }).format(new Date(value));
+const formatDate = (value: string) => new Intl.DateTimeFormat('ar-IQ-u-nu-latn', { dateStyle: 'long', timeStyle: 'short' }).format(new Date(value));
 const whatsappUrl = 'https://wa.me/9647766334555';
 
 export const daysUntilExpiry = (endsAt: string) => Math.ceil((new Date(endsAt).getTime() - Date.now()) / 86400000);

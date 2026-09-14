@@ -95,7 +95,7 @@ const replaceBlock = (src, pattern, replacement, label) => {
     `localStorage.setItem(getStorageKey('moldatk_audit_logs'), JSON.stringify([]));\n          try { window.dispatchEvent(new Event('moldatk-local-sync')); } catch (e) {}\n          showToast('تم مسح سجل الحركات');`
   );
 
-  must(s.includes('moldatk_wallet_reset_nonce'), 'wallet reset nonce missing');
+  must(s.includes('moldatk_wallet_reset_nonce') || s.includes('await resetCashbox(generatorId)'), 'wallet reset handler missing');
   must(s.includes('moldatk_lines_updated_at'), 'lines update timestamp missing');
   write(path, s);
 }

@@ -44,9 +44,21 @@ export const GeneratorNotifications: React.FC<GeneratorNotificationsProps> = ({ 
 
   useEffect(() => {
     void load();
-    const timer = window.setInterval(() => void load(), 60_000);
+    const timer = window.setInterval(() => void load(), 30_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  // MOLDATK_AUTO_POPUP_NOTIFICATIONS_V1
+  useEffect(() => {
+    const newest = items[0];
+    if (!newest?.id) return;
+    const key = 'moldatk_last_seen_popup_notification';
+    const seen = localStorage.getItem(key);
+    if (seen !== newest.id) {
+      localStorage.setItem(key, newest.id);
+      setOpen(true);
+    }
+  }, [items]);
 
   useEffect(() => {
     const handleOpen = () => {
@@ -83,7 +95,7 @@ export const GeneratorNotifications: React.FC<GeneratorNotificationsProps> = ({ 
 
   return (
     <>
-      {!hideFloatingTriggers && !isNative && !pushEnabled && webPushSupported() && (
+      {false && !hideFloatingTriggers && !isNative && !pushEnabled && webPushSupported() && (
         <button
           type="button"
           onClick={() => void handleEnablePush()}
@@ -95,7 +107,7 @@ export const GeneratorNotifications: React.FC<GeneratorNotificationsProps> = ({ 
         </button>
       )}
 
-      {!hideFloatingTriggers && <button
+      {false && !hideFloatingTriggers && <button
         type="button"
         onClick={() => { setOpen(true); void load(); }}
         className="fixed left-5 bottom-20 z-[95] w-12 h-12 rounded-full bg-blue-700 hover:bg-blue-800 text-white shadow-xl flex items-center justify-center"
@@ -160,7 +172,7 @@ export const GeneratorNotifications: React.FC<GeneratorNotificationsProps> = ({ 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-3">
                     <h3 className="font-black text-slate-900 dark:text-white">{n.title}</h3>
-                    <span className="text-[10px] text-slate-400 shrink-0">{new Intl.DateTimeFormat('ar-IQ', { dateStyle: 'medium' }).format(new Date(n.created_at))}</span>
+                    <span className="text-[10px] text-slate-400 shrink-0">{new Intl.DateTimeFormat('ar-IQ-u-nu-latn', { dateStyle: 'medium' }).format(new Date(n.created_at))}</span>
                   </div>
                   <p className="text-sm text-slate-600 dark:text-slate-300 mt-1.5 leading-6 whitespace-pre-wrap">{n.body}</p>
                 </div>

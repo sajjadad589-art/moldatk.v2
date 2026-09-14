@@ -49,7 +49,7 @@ if (existingStatusStart >= 0) {
   must(existingStatusEnd > existingStatusStart, 'existing status helper bounds missing');
   let end = existingStatusEnd + 3;
   const remainingStart = s.indexOf('\nconst subscriptionRemainingText =', end);
-  if (remainingStart === end) {
+  if (remainingStart >= end) {
     const remainingEnd = s.indexOf('\n};', remainingStart);
     if (remainingEnd > remainingStart) end = remainingEnd + 3;
   }

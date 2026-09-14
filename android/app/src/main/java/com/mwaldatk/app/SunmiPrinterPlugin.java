@@ -6,6 +6,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.Layout;
@@ -103,8 +104,10 @@ public class SunmiPrinterPlugin extends Plugin {
     }
 
     private static final int PAPER_WIDTH_PX = 384;
-    private static final int PADDING = 10;
+    private static final int PADDING = 16;
     private static final int CONTENT_WIDTH = PAPER_WIDTH_PX - (PADDING * 2);
+    private static final int RECEIPT_LOGO_SIZE = 64;
+    private static final int RECEIPT_LOGO_GAP = 8;
 
     private void printReceiptNow(PluginCall call, JSObject r) {
         new Thread(() -> {
@@ -134,11 +137,9 @@ public class SunmiPrinterPlugin extends Plugin {
         List<DrawLine> lines = new ArrayList<>();
 
         String generatorName = val(r, "header", "المولدة");
-        lines.add(new DrawLine(generatorName, 31f, true, Layout.Alignment.ALIGN_CENTER, 10, true));
-        lines.add(new DrawLine("إيصال تسديد", 24f, true, Layout.Alignment.ALIGN_CENTER, 8));
+        lines.add(new DrawLine("مولدتك", 31f, true, Layout.Alignment.ALIGN_CENTER, 5));
+        lines.add(new DrawLine(generatorName, 24f, true, Layout.Alignment.ALIGN_CENTER, 10, true));
 
-        String receiptNumber = raw(r, "receiptNumber");
-        if (!receiptNumber.isEmpty()) addField(lines, "رقم الإيصال", receiptNumber, false);
 
         String issueDate = raw(r, "issueDate");
         if (!issueDate.isEmpty()) addField(lines, "التاريخ", issueDate, true);
@@ -148,7 +149,7 @@ public class SunmiPrinterPlugin extends Plugin {
         String subscriberName = raw(r, "subscriberName");
         if (!subscriberName.isEmpty()) {
             lines.add(new DrawLine("اسم المشترك", 18f, true, Layout.Alignment.ALIGN_NORMAL, 1));
-            lines.add(new DrawLine(subscriberName, 29f, true, Layout.Alignment.ALIGN_NORMAL, 7));
+            lines.add(new DrawLine(subscriberName, 31f, true, Layout.Alignment.ALIGN_NORMAL, 9));
         }
 
         String phone = raw(r, "phone");
@@ -160,9 +161,6 @@ public class SunmiPrinterPlugin extends Plugin {
         String amperes = raw(r, "amperes");
         if (!amperes.isEmpty()) addField(lines, "عدد الأمبيرات", amperes, false);
 
-        String pricePerAmp = raw(r, "pricePerAmp");
-        if (!pricePerAmp.isEmpty()) addField(lines, "سعر الأمبير الشهري", pricePerAmp, true);
-
         String month = raw(r, "month");
         if (!month.isEmpty()) addField(lines, "شهر التسديد", month, true);
 
@@ -171,31 +169,45 @@ public class SunmiPrinterPlugin extends Plugin {
 
         lines.add(separatorLine());
 
+        String previousDebt = raw(r, "previousDebt");
+        if (!previousDebt.isEmpty()) addField(lines, "الدين السابق", previousDebt, true);
+        String currentCharge = raw(r, "currentCharge");
+        if (!currentCharge.isEmpty()) addField(lines, "استحقاق الشهر الحالي", currentCharge, true);
+        String totalBeforePayment = raw(r, "totalBeforePayment");
+        if (!totalBeforePayment.isEmpty()) addField(lines, "الإجمالي قبل التسديد", totalBeforePayment, true);
+
+        lines.add(separatorLine());
+
         String paidAmount = raw(r, "paidAmount");
         String totalAmount = raw(r, "totalAmount");
         String finalAmount = !paidAmount.isEmpty() ? paidAmount : totalAmount;
         if (!finalAmount.isEmpty()) {
-            lines.add(new DrawLine("مبلغ التسديد", 19f, true, Layout.Alignment.ALIGN_NORMAL, 1));
+            lines.add(new DrawLine("المبلغ المستلم", 19f, true, Layout.Alignment.ALIGN_NORMAL, 1));
             lines.add(new DrawLine(finalAmount, 29f, true, Layout.Alignment.ALIGN_NORMAL, 7));
         }
 
-        String remainingAmount = raw(r, "remainingAmount");
+        String appliedToPreviousDebt = raw(r, "appliedToPreviousDebt");
+        if (!appliedToPreviousDebt.isEmpty()) addField(lines, "تسديد الدين السابق", appliedToPreviousDebt, false);
+        String appliedToCurrentMonth = raw(r, "appliedToCurrentMonth");
+        if (!appliedToCurrentMonth.isEmpty()) addField(lines, "تسديد الشهر الحالي", appliedToCurrentMonth, false);
+
+        String remainingAmount = raw(r, "totalOutstandingAfter");
+        if (remainingAmount.isEmpty()) remainingAmount = raw(r, "remainingAmount");
         if (!remainingAmount.isEmpty() && !remainingAmount.startsWith("0 ") && !remainingAmount.equals("0") && !remainingAmount.equals("0 د.ع")) {
-            addField(lines, "المتبقي", remainingAmount, false);
+            addField(lines, "المتبقي بعد التسديد", remainingAmount, true);
         }
 
         lines.add(separatorLine());
 
         if (!finalAmount.isEmpty()) {
-            lines.add(new DrawLine("المبلغ النهائي\n" + finalAmount, 31f, true, Layout.Alignment.ALIGN_CENTER, 10, true));
+            lines.add(new DrawLine("المبلغ المستلم\n" + finalAmount, 31f, true, Layout.Alignment.ALIGN_CENTER, 10, true));
         }
 
         lines.add(new DrawLine("شكراً لتسديدكم", 19f, true, Layout.Alignment.ALIGN_CENTER, 8));
         lines.add(separatorLine());
-        lines.add(new DrawLine("مولدتي", 31f, true, Layout.Alignment.ALIGN_CENTER, 2));
         lines.add(new DrawLine("نظام إدارة المولدات والجباية", 16f, true, Layout.Alignment.ALIGN_CENTER, 2));
 
-        int totalHeight = PADDING * 2;
+        int totalHeight = PADDING * 2 + 18 + RECEIPT_LOGO_SIZE + RECEIPT_LOGO_GAP;
         List<StaticLayout> layouts = new ArrayList<>();
         for (DrawLine dl : lines) {
             StaticLayout sl = buildLayout(dl);
@@ -208,7 +220,26 @@ public class SunmiPrinterPlugin extends Plugin {
         Canvas canvas = new Canvas(bitmap);
         canvas.drawColor(Color.WHITE);
 
-        float y = PADDING;
+        // Outer frame around the complete 58mm receipt, with extra safe top spacing.
+        Paint outerBorder = new Paint(Paint.ANTI_ALIAS_FLAG);
+        outerBorder.setColor(Color.BLACK);
+        outerBorder.setStyle(Paint.Style.STROKE);
+        outerBorder.setStrokeWidth(3f);
+        RectF outerRect = new RectF(5f, 5f, PAPER_WIDTH_PX - 5f, totalHeight - 5f);
+        canvas.drawRoundRect(outerRect, 12f, 12f, outerBorder);
+
+        // MOLDATK_RECEIPT_NATIVE_LOGO_V1
+        float logoTop = PADDING + 14;
+        try {
+            Drawable logo = getContext().getDrawable(R.drawable.ic_moldatk_launcher);
+            if (logo != null) {
+                int logoLeft = (PAPER_WIDTH_PX - RECEIPT_LOGO_SIZE) / 2;
+                logo.setBounds(logoLeft, (int) logoTop, logoLeft + RECEIPT_LOGO_SIZE, (int) logoTop + RECEIPT_LOGO_SIZE);
+                logo.draw(canvas);
+            }
+        } catch (Exception ignored) {}
+
+        float y = PADDING + 18 + RECEIPT_LOGO_SIZE + RECEIPT_LOGO_GAP;
         for (int i = 0; i < lines.size(); i++) {
             DrawLine dl = lines.get(i);
             StaticLayout sl = layouts.get(i);

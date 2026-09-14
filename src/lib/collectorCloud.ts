@@ -31,6 +31,8 @@ const fromRow = (row: any): Collector => ({
   permissions: normalizePermissions(row.permissions),
   assignedLineId: row.assigned_line_id || undefined,
   assignedLineName: row.assigned_line_name || undefined,
+  assignedLineIds: Array.isArray(row.assigned_line_ids) ? row.assigned_line_ids.map((x: unknown) => String(x)) : [],
+  assignedAllLines: Boolean(row.assigned_all_lines),
   nationalId: row.national_id || '',
   notes: row.notes || '',
   isActive: row.is_active !== false,
@@ -89,7 +91,7 @@ export async function loginCollectorWithCloud(phoneInput: string, pinInput: stri
 
   const { data: collector, error: collectorError } = await supabase
     .from('generator_collectors')
-    .select('id,name,phone,is_active,permissions,assigned_line_id,assigned_line_name')
+    .select('id,name,phone,is_active,permissions,assigned_line_id,assigned_line_name,assigned_line_ids,assigned_all_lines')
     .eq('id', data.user.id)
     .single();
   if (collectorError || !collector || collector.is_active === false) {
@@ -104,6 +106,8 @@ export async function loginCollectorWithCloud(phoneInput: string, pinInput: stri
     collectorPermissions: normalizePermissions(collector.permissions),
     assignedLineId: collector.assigned_line_id || undefined,
     assignedLineName: collector.assigned_line_name || undefined,
+    assignedLineIds: Array.isArray(collector.assigned_line_ids) ? collector.assigned_line_ids.map((x: unknown) => String(x)) : [],
+    assignedAllLines: Boolean(collector.assigned_all_lines),
     generatorId: profile.generator_id,
     loginTime: new Date().toISOString(),
   };

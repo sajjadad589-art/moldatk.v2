@@ -52,9 +52,10 @@ type RenewalCustomer = {
 type Stage = 'choose' | 'details' | 'plans' | 'payment' | 'receipt' | 'review' | 'approved' | 'rejected';
 type Mode = 'new_subscription' | 'renewal';
 
-const iqd = (value: number) => `${new Intl.NumberFormat('ar-IQ').format(value)} د.ع`;
+const iqd = (value: number) => `${new Intl.NumberFormat('ar-IQ-u-nu-latn').format(value)} د.ع`;
 const daysForPlan = (plan: PaidPlan) => Number(plan.duration_days || plan.duration_months * 30 || 0);
 const TRACKING_KEY = 'moldatk_customer_order_tracking';
+const SALES_SESSION_KEY = 'moldatk_sales_agent_session';
 
 export const CustomerOrderAssistant: React.FC = () => {
   const [plans, setPlans] = useState<PaidPlan[]>([]);
@@ -72,6 +73,7 @@ export const CustomerOrderAssistant: React.FC = () => {
   const [renewalCustomer, setRenewalCustomer] = useState<RenewalCustomer | null>(null);
   const [question, setQuestion] = useState('');
   const [qa, setQa] = useState<Array<{ who: 'user' | 'agent'; text: string }>>([]);
+  const [agentBusy, setAgentBusy] = useState(false);
 
   const [newForm, setNewForm] = useState({
     customer_name: '', phone: '', generator_name: '', area: '', email: '', password: '', password2: '', notes: ''
@@ -284,20 +286,34 @@ export const CustomerOrderAssistant: React.FC = () => {
     setReceiptFile(null); setStatusNote(''); setRenewalCustomer(null); setMessage(null);
   };
 
-  const askAgent = () => {
+  const askAgent = async () => {
     const q = question.trim();
-    if (!q) return;
-    const t = q.toLowerCase();
-    let answer = 'أكدر أساعدك بالباقات، التجديد، طرق الدفع، الأجهزة، وطريقة تفعيل الحساب. وإذا تريد نكمل الطلب، اختار من الخطوات الظاهرة فوق.';
-    if (t.includes('فحص') || t.includes('test')) answer = 'باقة الفحص ما تنطلب من الموقع. الطلب الآلي مخصص للباقات المدفوعة فقط.';
-    else if (t.includes('سعر') || t.includes('باق')) answer = plans.length ? `حالياً عدنا ${plans.length} باقات مدفوعة، والأسعار الظاهرة عند اختيار الباقة هي الأسعار الرسمية المثبتة بالنظام.` : 'حالياً ماكو باقات مدفوعة مفعلة للطلب من الموقع.';
-    else if (t.includes('تجديد') || t.includes('منتهي') || t.includes('خلص')) answer = 'إي، إذا اشتراكك منتهي اختار «تجديد اشتراك»، سجل دخولك، وبعد تأكيد الدفع تتجدد نفس المولدة وتبقى بياناتك مثل ما هي.';
-    else if (t.includes('كي') || t.includes('qi')) answer = 'إذا تختار كي كارد أطلعلك رقم الحساب المسجل بالإدارة والمبلغ المطلوب، وبعد التحويل ترفع الوصل هنا.';
-    else if (t.includes('زين') || t.includes('cash')) answer = 'إذا تختار زين كاش أطلعلك رقم الهاتف المخصص للتحويل والمبلغ المطلوب، وبعدها ترفع الوصل.';
-    else if (t.includes('ايفون') || t.includes('iphone')) answer = 'تقدر تستخدم مولدتك على iPhone من Safari وتضيفه للشاشة الرئيسية.';
-    else if (t.includes('اندرويد') || t.includes('android') || t.includes('sunmi')) answer = 'مولدتك يشتغل على Android وأجهزة SUNMI، ونسخة Android تدعم خصائص الجهاز مثل الطباعة.';
-    setQa(prev => [...prev, { who: 'user', text: q }, { who: 'agent', text: answer }].slice(-8));
+    if (!q || agentBusy) return;
     setQuestion('');
+    setQa(prev => [...prev, { who: 'user', text: q }].slice(-16));
+    setAgentBusy(true);
+    try {
+      let sessionToken = localStorage.getItem(SALES_SESSION_KEY) || '';
+      if (!sessionToken) {
+        sessionToken = crypto.randomUUID();
+        localStorage.setItem(SALES_SESSION_KEY, sessionToken);
+      }
+      const { data, error } = await supabase.functions.invoke('sales-agent-ai', {
+        body: {
+          action: 'chat',
+          session_token: sessionToken,
+          message: q,
+          mode,
+          stage,
+        },
+      });
+      if (error || !data?.ok) throw new Error(data?.error || error?.message || 'تعذر الوصول للمساعد الذكي');
+      setQa(prev => [...prev, { who: 'agent', text: String(data.answer || 'اكتبلي سؤالك بطريقة ثانية حتى أساعدك أدق.') }].slice(-16));
+    } catch (e: any) {
+      setQa(prev => [...prev, { who: 'agent', text: e?.message || 'صار خلل مؤقت بالمساعد. تقدر تكمل الطلب من الخطوات الظاهرة.' }].slice(-16));
+    } finally {
+      setAgentBusy(false);
+    }
   };
 
   if (loading) {
@@ -315,7 +331,7 @@ export const CustomerOrderAssistant: React.FC = () => {
               <div className="w-12 h-12 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center"><MessageCircle className="w-6 h-6" /></div>
               <div>
                 <h1 className="text-xl sm:text-2xl font-black">مساعد اشتراكات مولدتك</h1>
-                <p className="text-xs text-slate-400 mt-1">طلب جديد أو تجديد — من المحادثة إلى التفعيل</p>
+                <p className="text-xs text-slate-400 mt-1">محادثة AI حقيقية — تسأل، تختار، وتكمل الطلب إلى التفعيل</p>
               </div>
             </div>
           </div>
@@ -444,9 +460,9 @@ export const CustomerOrderAssistant: React.FC = () => {
             )}
 
             <div className="border-t border-white/10 pt-5">
-              <div className="flex items-center gap-2 mb-3 text-xs text-slate-400"><Zap className="w-4 h-4 text-amber-300"/> عندك سؤال قبل ما تكمل؟ احچي وياي.</div>
+              <div className="flex items-center gap-2 mb-3 text-xs text-slate-400"><Zap className="w-4 h-4 text-amber-300"/> عندك سؤال؟ احچي ويا المساعد الذكي بصورة طبيعية، مو ردود محفوظة.</div>
               {qa.length > 0 && <div className="space-y-2 mb-3">{qa.map((x,i)=><div key={i} className={`text-sm px-3 py-2 rounded-2xl max-w-[85%] ${x.who==='user'?'mr-auto bg-blue-500/15 border border-blue-400/20':'ml-auto bg-white/10 border border-white/10'}`}>{x.text}</div>)}</div>}
-              <div className="flex gap-2"><input value={question} onChange={e=>setQuestion(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();askAgent();}}} placeholder="مثلاً: شنو الباقة الأوفر؟" className="flex-1 rounded-2xl bg-white/5 border border-white/10 px-4 py-3 outline-none focus:border-amber-400/50 text-sm"/><button onClick={askAgent} className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center"><Send className="w-4 h-4"/></button></div>
+              <div className="flex gap-2"><input value={question} disabled={agentBusy} onChange={e=>setQuestion(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();void askAgent();}}} placeholder="اسألني بأي صيغة... مثلاً: ليش آخذ السنوي؟" className="flex-1 rounded-2xl bg-white/5 border border-white/10 px-4 py-3 outline-none focus:border-amber-400/50 text-sm disabled:opacity-60"/><button disabled={agentBusy || !question.trim()} onClick={() => void askAgent()} className="w-14 h-14 rounded-2xl bg-amber-400 disabled:opacity-50 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-950/20">{agentBusy?<Loader2 className="w-5 h-5 animate-spin"/>:<Send className="w-5 h-5"/>}</button></div>
             </div>
           </div>
         </div>

@@ -48,43 +48,39 @@ export const PricingModal: React.FC<PricingModalProps> = ({
 
   // Month Names in Arabic
   const monthNamesArabic = [
-    'كانون الثاني (شهر 1)',
-    'شباط (شهر 2)',
-    'آذار (شهر 3)',
-    'نيسان (شهر 4)',
-    'أيار (شهر 5)',
-    'حزيران (شهر 6)',
-    'تموز (شهر 7)',
-    'آب (شهر 8)',
-    'أيلول (شهر 9)',
-    'تشرين الأول (شهر 10)',
-    'تشرين الثاني (شهر 11)',
-    'كانون الأول (شهر 12)',
+    'كانون الثاني', 'شباط', 'آذار', 'نيسان', 'أيار', 'حزيران',
+    'تموز', 'آب', 'أيلول', 'تشرين الأول', 'تشرين الثاني', 'كانون الأول',
   ];
+
+  const fixedTierName = (type: string) => {
+    switch (type) {
+      case 'golden': return 'ذهبي';
+      case 'commercial': return 'محلات';
+      case 'free': return 'مجاني';
+      case 'normal':
+      default: return 'نهاري';
+    }
+  };
+
+  const numericMonthLabel = (month: number, year: number) => String(month) + '-' + String(year);
+
+  const normalizeTierNames = (tiers: SubscriptionTierPricing[]) =>
+    tiers.map(t => ({ ...t, nameAr: fixedTierName(t.type) }));
 
   useEffect(() => {
     if (isOpen) {
       if (monthlyTariffs && monthlyTariffs.length > 0) {
-        setTariffs(monthlyTariffs);
+        setTariffs(monthlyTariffs.map(month => ({ ...month, monthNameAr: numericMonthLabel(month.month, month.year), tiers: normalizeTierNames(month.tiers || []).map(t => month.isCurrentActive ? ({ ...t, fixedFee: 0 }) : t) })));
         const active = monthlyTariffs.find(m => m.isCurrentActive) || monthlyTariffs[0];
         setSelectedMonthId(active.id);
       } else {
-        const defaultRecord: MonthlyTariffRecord = {
-          id: '2026-08',
-          month: 8,
-          year: 2026,
-          monthNameAr: 'شهر 8 (آب 2026)',
-          tiers: pricingTiers.map(t => ({ ...t, fixedFee: 0 })),
-          createdAt: new Date().toISOString().split('T')[0],
-          isCurrentActive: true,
-        };
-        setTariffs([defaultRecord]);
-        setSelectedMonthId(defaultRecord.id);
+        setTariffs([]);
+        setSelectedMonthId('');
       }
       setSavedSuccess(false);
       setIsAddingNewMonth(false);
     }
-  }, [isOpen, monthlyTariffs, pricingTiers]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -181,11 +177,13 @@ export const PricingModal: React.FC<PricingModalProps> = ({
     if (exists) {
       setSelectedMonthId(monthId);
       setIsAddingNewMonth(false);
+      window.alert('تسعيرة هذا الشهر موجودة مسبقاً. تم فتحها فقط ولم يتم إنشاء دورة شهرية ثانية.');
       return;
     }
 
-    const monthLabel = `شهر ${newMonthNumber} (${monthNamesArabic[newMonthNumber - 1]} ${newYearNumber})`;
-    const baseTiers = currentTiers.map(t => ({ ...t, fixedFee: 0, description: '' }));
+    const monthLabel = numericMonthLabel(newMonthNumber, newYearNumber);
+    const sourceTiers = currentTiers.length > 0 ? currentTiers : pricingTiers;
+    const baseTiers = normalizeTierNames(sourceTiers).map(t => ({ ...t, fixedFee: 0, description: '' }));
 
     const newRecord: MonthlyTariffRecord = {
       id: monthId,
@@ -193,7 +191,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
       year: newYearNumber,
       monthNameAr: monthLabel,
       tiers: baseTiers,
-      createdAt: new Date().toISOString().split('T')[0],
+      createdAt: new Date().toISOString(),
       isCurrentActive: true,
     };
 
@@ -204,20 +202,38 @@ export const PricingModal: React.FC<PricingModalProps> = ({
 
     setTariffs(updatedTariffs);
     setSelectedMonthId(monthId);
+    // ثبّت الشهر الجديد فوراً حتى لا يختفي مع أي Pull، لكن لا تحسب المشتركين قبل حفظ الأسعار النهائية.
+    onSaveMonthlyTariffs(updatedTariffs, monthId, true);
     setIsAddingNewMonth(false);
   };
 
   const handleDeleteMonth = (monthId: string) => {
-    if (tariffs.length <= 1) return;
+    const target = tariffs.find(m => m.id === monthId);
+    if (!target) return;
+
+    const warning = target.isCurrentActive
+      ? 'تحذير: هذه هي التسعيرة النشطة. سيتم إيقاف هذه الدورة الشهرية. سجل الفواتير والتسديدات والديون السابقة سيبقى محفوظاً. هل تريد المتابعة؟'
+      : 'هل تريد حذف تسعيرة ' + (target.monthNameAr || target.id) + '؟ سجل الفواتير والتسديدات والديون السابقة سيبقى محفوظاً.';
+    if (!window.confirm(warning)) return;
+
     const remaining = tariffs.filter(m => m.id !== monthId);
-    if (remaining.length > 0) {
-      if (!remaining.some(m => m.isCurrentActive)) {
-        remaining[0].isCurrentActive = true;
-      }
-      setTariffs(remaining);
-      setSelectedMonthId(remaining[0].id);
+    if (remaining.length === 0) {
+      setTariffs([]);
+      setSelectedMonthId('');
+      onSaveMonthlyTariffs([], '', false);
+      return;
     }
+
+    const existingActive = remaining.find(m => m.isCurrentActive);
+    const nextActive = target.isCurrentActive
+      ? [...remaining].sort((a, b) => b.id.localeCompare(a.id))[0]
+      : (existingActive || [...remaining].sort((a, b) => b.id.localeCompare(a.id))[0]);
+    const updated = remaining.map(m => ({ ...m, isCurrentActive: m.id === nextActive.id }));
+    setTariffs(updated);
+    setSelectedMonthId(nextActive.id);
+    onSaveMonthlyTariffs(updated, nextActive.id, false);
   };
+
 
   const handleSave = () => {
     if (!isEditable) {
@@ -289,7 +305,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
 
               <button
                 onClick={() => setIsAddingNewMonth(!isAddingNewMonth)}
-                className="flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0"
+                className="flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-[#0B1F3B] text-white text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0"
               >
                 <Plus className="w-4 h-4" />
                 <span>إضافة تسعيرة شهر جديد</span>
@@ -297,6 +313,11 @@ export const PricingModal: React.FC<PricingModalProps> = ({
             </div>
 
             <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              {tariffs.length === 0 && (
+                <div className="w-full rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-white/70 dark:bg-slate-800/60 px-4 py-3 text-center text-xs font-bold text-slate-500 dark:text-slate-400">
+                  لا توجد تسعيرة معتمدة حالياً — أضف تسعيرة شهر جديد لبدء دورة شهرية جديدة.
+                </div>
+              )}
               {tariffs.map(month => {
                 const isSelected = selectedMonthId === month.id;
                 return (
@@ -304,7 +325,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
                     key={month.id}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer border ${
                       isSelected
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                        ? 'bg-[#0B1F3B] text-white border-blue-600 shadow-sm'
                         : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-blue-400'
                     }`}
                     onClick={() => setSelectedMonthId(month.id)}
@@ -316,9 +337,9 @@ export const PricingModal: React.FC<PricingModalProps> = ({
                       </span>
                     )}
 
-                    {tariffs.length > 1 && !month.isCurrentActive && (
+                    {true && (
                       <button
-                        title="حذف هذا الشهر من السجل"
+                        title="حذف تسعيرة هذا الشهر"
                         onClick={e => {
                           e.stopPropagation();
                           handleDeleteMonth(month.id);
@@ -344,7 +365,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
                   >
                     {monthNamesArabic.map((name, i) => (
                       <option key={i + 1} value={i + 1}>
-                        {name}
+                        {i + 1}
                       </option>
                     ))}
                   </select>
@@ -388,11 +409,11 @@ export const PricingModal: React.FC<PricingModalProps> = ({
               {isEditable ? (
                 <History className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               ) : (
-                <Lock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                <Lock className="w-5 h-5 text-amber-600 dark:text-[#F2B544]" />
               )}
               <div>
                 <span className="text-xs font-extrabold text-slate-900 dark:text-white block flex items-center gap-2">
-                  <span>تسعيرة: {currentMonthRecord?.monthNameAr}</span>
+                  <span>تسعيرة: {currentMonthRecord?.monthNameAr || 'لا توجد تسعيرة'}</span>
                   {!isEditable && (
                     <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 text-[10px] font-bold">
                       أرشيف (للقراءة فقط)
@@ -400,7 +421,9 @@ export const PricingModal: React.FC<PricingModalProps> = ({
                   )}
                 </span>
                 <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                  {isEditable
+                  {!currentMonthRecord
+                    ? 'لا توجد دورة شهرية نشطة حالياً. مبالغ المشتركين الحالية تكون صفراً لحين اعتماد شهر جديد.'
+                    : isEditable
                     ? 'هذا هو الشهر النشط حالياً لإصدار فواتير المشتركين وقابل للتعديل'
                     : 'هذا الشهر يعتبر أرشيفاً سابقاً، الأسعار هنا للقراءة فقط ولا يمكن تعديلها.'}
                 </span>
@@ -415,7 +438,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
                 فئات الاشتراكات والأسعار لـ ({currentMonthRecord?.monthNameAr}):
               </span>
 
-              {isEditable && (
+              {false && isEditable && (
                 <button
                   onClick={handleAddNewTier}
                   className="flex items-center gap-1 px-3 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold transition-all border border-slate-200 dark:border-slate-700 cursor-pointer"
@@ -448,9 +471,9 @@ export const PricingModal: React.FC<PricingModalProps> = ({
                         </div>
                         <input
                           type="text"
-                          disabled={!isEditable}
-                          value={tier.nameAr}
-                          onChange={e => handleNameChange(tier.id, e.target.value)}
+                          disabled={true}
+                          value={fixedTierName(tier.type)}
+                          readOnly
                           className="font-bold text-sm text-slate-900 dark:text-white bg-transparent border-b border-dashed border-slate-300 dark:border-slate-700 outline-none w-full px-1 disabled:opacity-80"
                         />
                       </div>
@@ -467,7 +490,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
                           <span>24 ساعة</span>
                         </label>
 
-                        {isEditable && currentTiers.length > 1 && (
+                        {false && isEditable && currentTiers.length > 1 && (
                           <button
                             onClick={() => handleDeleteTier(tier.id)}
                             title="حذف هذا النوع"
@@ -511,7 +534,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
           <div className="bg-gradient-to-r from-blue-900 to-indigo-950 text-white rounded-2xl p-4 border border-blue-800 shadow-inner">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
               <div className="flex items-center gap-2">
-                <Calculator className="w-5 h-5 text-amber-400" />
+                <Calculator className="w-5 h-5 text-[#F2B544]" />
                 <span className="text-xs sm:text-sm font-bold">محاكي الفاتورة التقديرية الفوري</span>
               </div>
               <div className="flex items-center gap-2">
@@ -575,7 +598,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
               className={`flex items-center gap-2 px-5 py-2 text-xs font-bold text-white rounded-xl shadow-lg transition-all cursor-pointer ${
                 savedSuccess
                   ? 'bg-emerald-600 shadow-emerald-500/20'
-                  : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/25'
+                  : 'bg-[#0B1F3B] hover:bg-[#142A45] shadow-blue-500/25'
               }`}
             >
               {savedSuccess ? (

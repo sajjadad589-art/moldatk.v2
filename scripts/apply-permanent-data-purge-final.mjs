@@ -240,8 +240,10 @@ function replaceAllJsxPropExpressions(source, propName, replacementExpression) {
 `;
 
   if (!source.includes('const handleDeleteSubscriberPermanent = async (subId: string) =>')) {
-    const insertion = source.indexOf('  const handleSaveSubscriber = (newSub: Subscriber) => {');
-    must(insertion >= 0, 'handleSaveSubscriber insertion point missing');
+    let insertion = source.indexOf('  const handleSaveSubscriber = (newSub: Subscriber) => {');
+    if (insertion < 0) insertion = source.indexOf('  const addAuditLog = (entry: any) => {');
+    if (insertion < 0) insertion = source.indexOf('  if (!userSession) {');
+    must(insertion >= 0, 'subscriber delete handler insertion point missing');
     source = source.slice(0, insertion) + permanentSubscriberDelete + source.slice(insertion);
   }
 

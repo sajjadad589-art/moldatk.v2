@@ -12,6 +12,7 @@ import {
   CircleDollarSign,
   HandCoins,
   ShieldCheck,
+  RotateCcw,
 } from 'lucide-react';
 import type { MonthlyTariffRecord, Subscriber } from '../../types';
 import { buildMonthlyReports, type MonthlyReport } from '../../utils/monthlyAccounting';
@@ -21,6 +22,8 @@ interface MobileMonthlyReportsProps {
   subscribers: Subscriber[];
   currency: string;
   monthlyTariffs?: MonthlyTariffRecord[];
+  reportResetMarkers?: Array<{ year: number; resetAt: string }>;
+  onResetYear?: (year: number) => void;
 }
 
 const emptyReportFromTariff = (tariff: MonthlyTariffRecord): MonthlyReport => ({
@@ -46,7 +49,7 @@ const emptyReportFromTariff = (tariff: MonthlyTariffRecord): MonthlyReport => ({
 
 const monthShort = (monthId: string) => {
   const [year, month] = monthId.split('-');
-  return `${Number(month)}/${year}`;
+  return `${Number(month)}-${year}`;
 };
 
 const Ring: React.FC<{
@@ -88,15 +91,36 @@ export const MobileMonthlyReports: React.FC<MobileMonthlyReportsProps> = ({
   subscribers,
   currency,
   monthlyTariffs = [],
+  reportResetMarkers = [],
+  onResetYear,
 }) => {
   const reports = useMemo(() => {
+    const resetMap = new Map<number, number>();
+    for (const marker of reportResetMarkers) {
+      const t = Date.parse(marker.resetAt);
+      if (Number.isFinite(t)) resetMap.set(marker.year, Math.max(resetMap.get(marker.year) || 0, t));
+    }
+    const cleanSubscribers = subscribers.map(sub => ({
+      ...sub,
+      invoicesHistory: (sub.invoicesHistory || []).filter(inv => {
+        const year = Number(String(inv.monthId || '').slice(0, 4));
+        const resetAt = resetMap.get(year);
+        if (!resetAt) return true;
+        const issueAt = Date.parse(inv.issueDate || (inv.monthId + '-01'));
+        return !Number.isFinite(issueAt) || issueAt > resetAt;
+      }),
+    }));
+
     const map = new Map<string, MonthlyReport>();
-    for (const report of buildMonthlyReports(subscribers)) map.set(report.monthId, report);
+    for (const report of buildMonthlyReports(cleanSubscribers)) map.set(report.monthId, report);
     for (const tariff of monthlyTariffs) {
+      const resetAt = resetMap.get(Number(tariff.year));
+      const createdAt = Date.parse(tariff.createdAt || (tariff.id + '-01'));
+      if (resetAt && Number.isFinite(createdAt) && createdAt <= resetAt) continue;
       if (!map.has(tariff.id)) map.set(tariff.id, emptyReportFromTariff(tariff));
     }
     return [...map.values()].sort((a, b) => b.monthId.localeCompare(a.monthId));
-  }, [subscribers, monthlyTariffs]);
+  }, [subscribers, monthlyTariffs, reportResetMarkers]);
 
   const [selectedMonthId, setSelectedMonthId] = useState<string>(() => reports[0]?.monthId || '');
   const [openList, setOpenList] = useState<'paid' | 'outstanding' | null>(null);
@@ -133,6 +157,15 @@ export const MobileMonthlyReports: React.FC<MobileMonthlyReportsProps> = ({
     setOpenList(null);
   };
 
+  const resetSelectedYear = () => {
+    if (!onResetYear) return;
+    const year = Number(String(selected.monthId).slice(0, 4));
+    if (!Number.isFinite(year)) return;
+    if (!window.confirm('تصفير حسابات التقارير لسنة ' + year + '؟ هذا الإجراء يصفر عرض التقارير السنوية فقط ولا يحذف ديون أو فواتير أو تسديدات المشتركين الأصلية.')) return;
+    onResetYear(year);
+    setOpenList(null);
+  };
+
   return (
     <div className="p-3.5 pb-24 space-y-3.5" dir="rtl">
       <div className="flex items-center justify-between px-1">
@@ -140,7 +173,7 @@ export const MobileMonthlyReports: React.FC<MobileMonthlyReportsProps> = ({
           <h2 className="text-base font-black text-white">التقارير</h2>
           <p className="text-[11px] text-slate-400 mt-1">أرشيف كل شهر يبقى ثابت حتى بعد إضافة تسعيرة الشهر التالي</p>
         </div>
-        <div className="w-10 h-10 rounded-2xl bg-blue-600/15 text-blue-400 flex items-center justify-center">
+        <div className="w-10 h-10 rounded-2xl bg-[#0B1F3B]/15 text-blue-400 flex items-center justify-center">
           <CalendarRange className="w-5 h-5" />
         </div>
       </div>
@@ -157,7 +190,7 @@ export const MobileMonthlyReports: React.FC<MobileMonthlyReportsProps> = ({
           <span className="truncate">{older ? monthShort(older.monthId) : '—'}</span>
         </button>
 
-        <div className="h-12 rounded-xl bg-blue-600 text-white flex items-center justify-center gap-2 px-2 shadow-md shadow-blue-900/30">
+        <div className="h-12 rounded-xl bg-[#0B1F3B] text-white flex items-center justify-center gap-2 px-2 shadow-md shadow-blue-900/30">
           <CalendarRange className="w-4 h-4" />
           <span className="text-base font-black tabular-nums">{monthShort(selected.monthId)}</span>
         </div>
@@ -173,10 +206,23 @@ export const MobileMonthlyReports: React.FC<MobileMonthlyReportsProps> = ({
         </button>
       </div>
 
-      <div className="text-center text-[11px] font-bold text-slate-400">
-        البيانات المعروضة تخص <span className="text-blue-400 font-black">{selected.monthNameAr}</span>
+      <div className="WORKMODE_MONTH_SELECT_DROPDOWN rounded-2xl bg-white dark:bg-[#111c38] border border-slate-200 dark:border-slate-800 p-3">
+        <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 block mb-1">اختيار الشهر</label>
+        <select value={selectedMonthId} onChange={e => selectMonth(e.target.value)} className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-sm font-black text-slate-900 dark:text-white">
+          {reports.map(r => <option key={r.monthId} value={r.monthId}>{monthShort(r.monthId)}</option>)}
+        </select>
       </div>
 
+      <div className="text-center text-[11px] font-bold text-slate-400">
+        اضغط على أي عداد لعرض قائمته فقط — لا تظهر القوائم الطويلة تلقائياً
+      </div>
+
+      {onResetYear && (
+        <button type="button" onClick={resetSelectedYear} className="w-full h-11 rounded-2xl border border-rose-500/30 bg-rose-500/5 text-rose-300 text-[11px] font-black flex items-center justify-center gap-2">
+          <RotateCcw className="w-4 h-4" />
+          تصفير حسابات سنة {String(selected.monthId).slice(0, 4)} في التقارير
+        </button>
+      )}
       <div className="grid grid-cols-2 gap-2.5">
         <div className="rounded-3xl bg-[#111c38] border border-blue-900/60 p-4 flex items-center justify-between gap-2">
           <div>
@@ -234,9 +280,9 @@ export const MobileMonthlyReports: React.FC<MobileMonthlyReportsProps> = ({
         <div className="rounded-2xl bg-amber-500/10 border border-amber-500/25 p-3 flex items-center justify-between">
           <div>
             <span className="text-[10px] font-bold text-amber-200/80 block">مسدد جزئياً</span>
-            <strong className="text-lg font-black text-amber-400">{formatNumberArabic(selected.partialCount)}</strong>
+            <strong className="text-lg font-black text-[#F2B544]">{formatNumberArabic(selected.partialCount)}</strong>
           </div>
-          <HandCoins className="w-5 h-5 text-amber-400" />
+          <HandCoins className="w-5 h-5 text-[#F2B544]" />
         </div>
         <div className="rounded-2xl bg-slate-500/10 border border-slate-500/25 p-3 flex items-center justify-between">
           <div>

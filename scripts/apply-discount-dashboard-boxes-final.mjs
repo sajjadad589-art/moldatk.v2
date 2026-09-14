@@ -18,7 +18,7 @@ function previousMonthId(monthId: string): string {
   let month = Number(monthRaw) || 1;
   month -= 1;
   if (month <= 0) { month = 12; year -= 1; }
-  return \`${year}-\${String(month).padStart(2, '0')}\`;
+  return year + '-' + String(month).padStart(2, '0');
 }
 
 function newest(list: SubscriberInvoice[]): SubscriberInvoice | undefined {
@@ -125,7 +125,7 @@ export function getAmpereDiscountDashboardSummary(
       s = s.replace(importAnchor, `${importAnchor}\nimport { getAmpereDiscountDashboardSummary } from '../../utils/discountAccounting';`);
     }
 
-    const summaryAnchor = '  const currentMonthTotal = dashboardSummary.monthTotal;';
+    const summaryAnchor = '  const currentMonthTotal = billingCycleActive ? dashboardSummary.monthTotal : 0;';
     must(s.includes(summaryAnchor), 'mobile authoritative summary anchor missing');
     s = s.replace(
       summaryAnchor,
@@ -205,7 +205,9 @@ export function getAmpereDiscountDashboardSummary(
       s = s.replace(importAnchor, `${importAnchor}\nimport { getAmpereDiscountDashboardSummary } from '../utils/discountAccounting';`);
     }
 
-    const summaryAnchor = '  const totalCollectedRevenue = reconciledCashbox(dashboardSummary.collected, auditLogs, walletResetTimestamp, activeMonthId);';
+    const summaryAnchor = `  const totalCollectedRevenue = billingCycleActive
+    ? reconciledCashbox(dashboardSummary.collected, auditLogs, walletResetTimestamp, activeMonthId)
+    : 0;`;
     must(s.includes(summaryAnchor), 'desktop authoritative summary anchor missing');
     s = s.replace(
       summaryAnchor,

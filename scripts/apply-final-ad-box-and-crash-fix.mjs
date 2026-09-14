@@ -93,7 +93,9 @@ for (const path of ['public/sw.js', 'src/main.tsx']) {
     .replaceAll('1.3.23', '1.3.18')
     .replaceAll('1.3.24', '1.3.18')
     .replaceAll('1.3.25', '1.3.18')
-    .replaceAll('1.3.26', '1.3.18'));
+    .replaceAll('1.3.26', '1.3.18')
+    .replaceAll('1.3.27', '1.3.18')
+    .replaceAll('1.3.28', '1.3.18'));
 }
 
 write('public/manifest.webmanifest', JSON.stringify({

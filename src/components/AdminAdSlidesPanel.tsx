@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ExternalLink, Image as ImageIcon, ToggleLeft, ToggleRight, Trash2, UploadCloud } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { SeasonalCampaignsPanel } from './SeasonalCampaignsPanel';
 
 type AdminAdSlide = {
   id: string;
@@ -119,9 +118,7 @@ export const AdminAdSlidesPanel: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <SeasonalCampaignsPanel />
-
-      <form onSubmit={uploadSlides} className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 h-fit">
+<form onSubmit={uploadSlides} className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 h-fit">
         <h2 className="text-lg font-black flex items-center gap-2">
           <ImageIcon className="w-5 h-5" />
           إدارة سلايدات الإعلانات

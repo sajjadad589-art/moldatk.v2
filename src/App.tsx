@@ -1,9 +1,12 @@
+import { useEventDrivenGeneratorSync as useGeneratorCloudSync, flushGeneratorSync } from './lib/useEventDrivenGeneratorSync';
+import { resetCashbox } from './lib/cashboxCloud';
+import { hasMonthlyPricing, suspendSubscriberBilling } from './utils/pricingAvailability';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   INITIAL_PRICING_TIERS,
   INITIAL_MONTHLY_TARIFFS,
@@ -39,16 +42,28 @@ import { WalletView } from './components/WalletView';
 import { SettingsFolderView } from './components/SettingsFolderView';
 import { GeneratorMonitorView } from './components/GeneratorMonitorView';
 import { MobileLayout } from './components/mobile/MobileLayout';
+import { MobileMonthlyReports } from './components/mobile/MobileMonthlyReports';
 import { Sparkles } from 'lucide-react';
 import { calculateSubscriberBill } from './utils/formatters';
+import { activateMonthlyTariffForSubscribers, calculateMonthlyCharge, getInvoiceRemaining } from './utils/monthlyAccounting';
+import { normalizeMonthlyTariffs, startFreshMonthlyCycle, repriceActiveMonthlyCycle, summarizeExistingMonthlyCycle, zeroLiveMonthlyCycle } from './utils/monthlyCycleEngine';
+import { hasPaymentsInMonth, removeUnpaidMonthLedger } from './utils/monthlyTariffDeletion';
 import { SuperAdminDashboard } from './components/SuperAdminDashboard';
 import { supabase } from './lib/supabase';
-import { Capacitor } from '@capacitor/core';
+import { loadCloudCollectors, syncCloudCollectorRoster } from './lib/collectorCloud';
+import { persistCollectorSubscriber } from './lib/subscriberCloud';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { ExpiredSubscriptionScreen, SuspendedAccountScreen, SubscriptionWarningBanner, SubscriptionInfo, daysUntilExpiry } from './components/SubscriptionStatusUI';
 import { GeneratorNotifications } from './components/GeneratorNotifications';
+import { OwnerAIWatcher } from './components/OwnerAIWatcher';
 import { PricingModal } from './components/PricingModal';
 import { FolderDetailModal } from './components/FolderDetailModal';
+import type { SecureResetResult } from './components/SecureSystemReset';
+
+const BackNavigation = registerPlugin<{ exitApp(): Promise<void> }>('BackNavigation');
+
+const ENABLE_NATIVE_PUSH = import.meta.env.VITE_ENABLE_NATIVE_PUSH === 'true';
 
 // نافذة العرض الحقيقية للجهاز (مثل شاشة SUNMI V2 الصغيرة جداً) تُستخدم لتحديد
 // متى تُعرض واجهة الهاتف المخصصة بدل واجهة سطح المكتب ذات الشريط الجانبي الواسع.
@@ -78,13 +93,16 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
       if (!saved) return null;
       const parsed = JSON.parse(saved) as ActiveUserSession;
       // المسار /super-admin لا يسمح بإعادة استخدام جلسة الأدمن القديمة المحلية.
-      if (forceSuperAdmin && parsed.role !== 'super_admin') return null;
+      if (forceSuperAdmin && parsed.role !== 'super_admin' && parsed.role !== 'super_admin_manager') return null;
       return parsed;
     } catch (e) {
       return null;
     }
   });
 
+
+  // مزامنة مركزية: أي إضافة/تعديل/حذف للمشتركين تنتقل بين كل الأجهزة التابعة لنفس المولدة.
+  useGeneratorCloudSync(userSession);
 
   const getStorageKey = (baseKey: string, session: ActiveUserSession | null = userSession) => {
     // كل حساب مرتبط بمولدة واحدة لديه مخزن مستقل: مالك المولدة + الجباة التابعون له.
@@ -186,10 +204,19 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
     return result;
   };
 
-  const [subscriptionInfo, setSubscriptionInfo] = useState<SubscriptionInfo | null>(null);
+  const [subscriptionInfo, setSubscriptionInfo] = useState<SubscriptionInfo | null>(() => {
+    try {
+      if (!userSession?.generatorId) return null;
+      const cached = localStorage.getItem(`moldatk_subscription_info_${userSession.generatorId}`);
+      return cached ? JSON.parse(cached) as SubscriptionInfo : null;
+    } catch (e) {
+      return null;
+    }
+  });
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+  const [subscriptionUnavailable, setSubscriptionUnavailable] = useState(false);
 
-  const [darkMode, setDarkMode] = useState<boolean>(true);
+  const [darkMode, setDarkMode] = useState<boolean>(false);
   const isMobileViewport = useIsMobileViewport();
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [viewMode, setViewMode] = useState<any>(() => {
@@ -199,6 +226,17 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
       return 'auto';
     }
   });
+
+  // WORKMODE_APP_MOBILE_THEME_STATE
+  const [mobileTheme, setMobileTheme] = useState<string>(() => {
+    try { return localStorage.getItem('moldatk_mobile_theme') || 'ocean-calm'; } catch (e) { return 'ocean-calm'; }
+  });
+
+  const markLocalWrite = () => {
+    try {
+      if (userSession?.generatorId) localStorage.setItem(getStorageKey('moldatk_last_local_write'), String(Date.now()));
+    } catch (e) {}
+  };
 
   // تطبيق الثيم فعلياً على عنصر html حتى تعمل جميع dark: classes وتبقى ألوان الواجهة صحيحة.
   useEffect(() => {
@@ -211,6 +249,19 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
       localStorage.setItem('moldatk_view_mode', viewMode);
     } catch (e) {}
   }, [viewMode]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('moldatk_mobile_theme', mobileTheme);
+      document.documentElement.setAttribute('data-moldatk-theme', mobileTheme);
+    } catch (e) {}
+  }, [mobileTheme]);
+
+  useEffect(() => {
+    const expired = () => showToast('انتهت الجلسة، سجل دخولك من جديد حتى تستمر المزامنة');
+    window.addEventListener('moldatk-auth-expired', expired as EventListener);
+    return () => window.removeEventListener('moldatk-auth-expired', expired as EventListener);
+  }, []);
 
   const [subscribers, setSubscribers] = useState<Subscriber[]>(() =>
     readLocalJson<Subscriber[]>(
@@ -244,6 +295,29 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
       userSession?.role === 'generator_admin' ? [] : INITIAL_COLLECTORS
     )
   );
+
+  // حسابات الجباة مصدرها Supabase، وليس localStorage فقط.
+  // هذا يمنع ظهور جابي وهمي بالواجهة بدون Auth/Profile حقيقي في السيرفر.
+  useEffect(() => {
+    if (userSession?.role !== 'generator_admin' || !userSession.generatorId) return;
+    let cancelled = false;
+    void loadCloudCollectors(userSession.generatorId)
+      .then(remoteCollectors => {
+        if (cancelled) return;
+        const scopedCollectors = remoteCollectors.map(c => ({ ...c, generatorId: userSession.generatorId }));
+        setCollectors(scopedCollectors);
+        try {
+          localStorage.setItem(getStorageKey('moldatk_collectors'), JSON.stringify(scopedCollectors));
+          markLocalWrite();
+        window.dispatchEvent(new Event('moldatk-local-sync'));
+        } catch (e) {}
+      })
+      .catch(error => {
+        console.error('Failed to load cloud collectors:', error);
+        showToast('تعذر تحميل حسابات الجباة من السيرفر');
+      });
+    return () => { cancelled = true; };
+  }, [userSession?.role, userSession?.generatorId]);
 
   const [pricingModalOpen, setPricingModalOpen] = useState(false);
   const [activeSettingsFolderKey, setActiveSettingsFolderKey] = useState<string | null>(null);
@@ -344,10 +418,57 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
+  const lastBackPressRef = useRef(0);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') return;
+
+    const handleAndroidBack = () => {
+      // ضغطة واحدة تغلق النافذة/القائمة الحالية أولاً.
+      if (isReceiptModalOpen) {
+        setIsReceiptModalOpen(false);
+        setSelectedReceiptSubscriber(null);
+        setSelectedReceiptInvoice(null);
+        return;
+      }
+      if (isSubscriberModalOpen) {
+        setIsSubscriberModalOpen(false);
+        setSubscriberToEdit(null);
+        return;
+      }
+      if (pricingModalOpen) {
+        setPricingModalOpen(false);
+        return;
+      }
+      if (activeSettingsFolderKey) {
+        setActiveSettingsFolderKey(null);
+        return;
+      }
+      if (activeTab !== 'dashboard') {
+        setActiveTab('dashboard');
+        return;
+      }
+
+      // إذا نحن بالواجهة الرئيسية: أول ضغطة تنبه، والثانية خلال ثانيتين تغلق التطبيق.
+      const now = Date.now();
+      if (now - lastBackPressRef.current <= 2000) {
+        lastBackPressRef.current = 0;
+        void BackNavigation.exitApp();
+        return;
+      }
+
+      lastBackPressRef.current = now;
+      showToast('اضغط رجوع مرة ثانية للخروج من التطبيق');
+    };
+
+    window.addEventListener('moldatk-android-back', handleAndroidBack);
+    return () => window.removeEventListener('moldatk-android-back', handleAndroidBack);
+  }, [isReceiptModalOpen, isSubscriberModalOpen, pricingModalOpen, activeSettingsFolderKey, activeTab]);
+
   // تسجيل جهاز صاحب المولدة في Firebase Cloud Messaging وحفظ Token في Supabase.
   // يعمل فقط داخل تطبيق Android الحقيقي، ولا يشتغل عند فتح النسخة من المتصفح.
   useEffect(() => {
-    if (userSession?.role !== 'generator_admin' || !Capacitor.isNativePlatform()) return;
+    if (!ENABLE_NATIVE_PUSH || !['generator_admin', 'collector', 'super_admin', 'super_admin_manager'].includes(String(userSession?.role || '')) || !Capacitor.isNativePlatform()) return;
 
     let disposed = false;
     const listenerHandles: Array<{ remove: () => Promise<void> }> = [];
@@ -425,38 +546,75 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
   }, [userSession?.role, userSession?.generatorId]);
 
   useEffect(() => {
+    const handleAuthExpired = () => {
+      setUserSession(null);
+      setSubscriptionInfo(null);
+      try { localStorage.removeItem('moldatk_session'); } catch {}
+      void supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+      showToast('انتهت جلسة الدخول، سجل الدخول مرة أخرى');
+    };
+
+    window.addEventListener('moldatk-auth-expired', handleAuthExpired);
+    return () => window.removeEventListener('moldatk-auth-expired', handleAuthExpired);
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
-    const loadSubscription = async () => {
+    // SUBSCRIPTION_LOCK_STABILITY_V1: background refresh must never unlock an expired/suspended account.
+    const loadSubscription = async (showBlockingLoader = false) => {
       if (!userSession || (userSession.role !== 'generator_admin' && userSession.role !== 'collector') || !userSession.generatorId) {
         setSubscriptionInfo(null);
         return;
       }
-      setSubscriptionLoading(userSession.role === 'generator_admin');
+      if (showBlockingLoader) setSubscriptionLoading(true);
       const [g, sub] = await Promise.all([
-        supabase.from('generators').select('id,name,owner_name,phone,area,status,suspension_reason').eq('id', userSession.generatorId).single(),
-        userSession.role === 'generator_admin'
-          ? supabase.from('subscriptions').select('starts_at,ends_at,status').eq('generator_id', userSession.generatorId).order('ends_at', { ascending: false }).limit(1).maybeSingle()
-          : Promise.resolve({ error: null, data: null } as any),
+        supabase.from('generators').select('id,name,owner_name,phone,area,status,suspension_reason').eq('id', userSession.generatorId).maybeSingle(),
+        supabase.from('subscriptions').select('starts_at,ends_at,status').eq('generator_id', userSession.generatorId).order('ends_at', { ascending: false }).limit(1).maybeSingle(),
       ]);
       if (!cancelled) {
-        if (!g.error && g.data && (userSession.role === 'collector' || (!sub.error && sub.data))) {
+        const requestFailed = Boolean(g.error || (userSession.role === 'generator_admin' && sub.error));
+
+        if (requestFailed) {
+          // فشل الشبكة أو Supabase لا يعني أن الاشتراك انتهى. أبقِ آخر حالة ناجحة محفوظة.
+          setSubscriptionUnavailable(true);
+          if (userSession.role === 'generator_admin') {
+            try {
+              const cached = localStorage.getItem(`moldatk_subscription_info_${userSession.generatorId}`);
+              if (cached) setSubscriptionInfo(JSON.parse(cached) as SubscriptionInfo);
+            } catch (e) {}
+          }
+          if (showBlockingLoader) setSubscriptionLoading(false);
+          return;
+        }
+
+        setSubscriptionUnavailable(false);
+
+        if (g.data) {
           const serverGeneratorName = g.data.name || 'مولدتك';
           const serverOwnerName = g.data.owner_name || 'صاحب المولدة';
 
-          if (userSession.role === 'generator_admin' && sub.data) {
-            setSubscriptionInfo({
-              generatorId: g.data.id,
-              generatorName: serverGeneratorName,
-              ownerName: serverOwnerName,
-              phone: g.data.phone,
-              startsAt: sub.data.starts_at,
-              endsAt: sub.data.ends_at,
-              subscriptionStatus: sub.data.status,
-              accountStatus: g.data.status,
-              suspensionReason: g.data.suspension_reason,
-            });
-          } else {
-            setSubscriptionInfo(null);
+          if (userSession.role === 'generator_admin') {
+            if (sub.data) {
+              const nextSubscriptionInfo: SubscriptionInfo = {
+                generatorId: g.data.id,
+                generatorName: serverGeneratorName,
+                ownerName: serverOwnerName,
+                phone: g.data.phone,
+                startsAt: sub.data.starts_at,
+                endsAt: sub.data.ends_at,
+                subscriptionStatus: sub.data.status,
+                accountStatus: g.data.status,
+                suspensionReason: g.data.suspension_reason,
+              };
+              setSubscriptionInfo(nextSubscriptionInfo);
+              try {
+                localStorage.setItem(`moldatk_subscription_info_${userSession.generatorId}`, JSON.stringify(nextSubscriptionInfo));
+              } catch (e) {}
+            } else {
+              // الاستعلام نجح فعلاً ولا يوجد اشتراك: هذه حالة حقيقية وليست انقطاع شبكة.
+              setSubscriptionInfo(null);
+              try { localStorage.removeItem(`moldatk_subscription_info_${userSession.generatorId}`); } catch (e) {}
+            }
           }
 
           setGeneratorSpecs(prev => {
@@ -483,19 +641,17 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
 
             return updated;
           });
-        } else {
-          setSubscriptionInfo(null);
         }
         setSubscriptionLoading(false);
       }
     };
-    void loadSubscription();
-    const timer = window.setInterval(() => void loadSubscription(), 30 * 1000);
+    void loadSubscription(true);
+    const timer = window.setInterval(() => void loadSubscription(false), 30 * 1000);
     return () => { cancelled = true; window.clearInterval(timer); };
   }, [userSession?.role, userSession?.generatorId]);
 
   const activeMonthRecord = monthlyTariffs.find(m => m.isCurrentActive) || monthlyTariffs[0];
-  const pricingTiers: SubscriptionTierPricing[] = activeMonthRecord?.tiers || INITIAL_PRICING_TIERS;
+  const pricingTiers: SubscriptionTierPricing[] = activeMonthRecord?.tiers || [];
 
   const generateUniqueSubscriberCode = (existingSubscribers: Subscriber[]) => {
     const rawPrefix = userSession?.generatorId ? userSession.generatorId.replace(/-/g, '').slice(0, 5).toUpperCase() : 'LOCAL';
@@ -531,57 +687,161 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
   const handleOpenPricingModal = () => setPricingModalOpen(true);
 
   const handleSaveMonthlyTariffs = (updatedTariffs: MonthlyTariffRecord[], activeMonthId: string, shouldRecalculateBills: boolean) => {
-    const normalized = updatedTariffs.map(record => ({
-      ...record,
-      isCurrentActive: record.id === activeMonthId,
-    }));
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const previousActiveRecord = monthlyTariffs.find(record => record.isCurrentActive) || monthlyTariffs[0];
+    const previousActiveId = previousActiveRecord?.id || '';
+    const previousTariffIds = new Set(monthlyTariffs.map(record => record.id));
+
+    const normalized = normalizeMonthlyTariffs(updatedTariffs, activeMonthId, now);
+    const activeRecord = normalized.find(record => record.isCurrentActive);
+    const incomingIds = new Set(normalized.map(record => record.id));
+
+    // Tariff deletions are authoritative and must not return after a realtime/cloud pull.
+    try {
+      const tombstoneKey = getStorageKey('moldatk_deleted_tariffs');
+      const raw = localStorage.getItem(tombstoneKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      const tombstones = new Set<string>(Array.isArray(parsed) ? parsed.map(String) : []);
+      for (const oldRecord of monthlyTariffs) {
+        if (!incomingIds.has(oldRecord.id)) tombstones.add(oldRecord.id);
+      }
+      for (const currentRecord of normalized) tombstones.delete(currentRecord.id);
+      localStorage.setItem(tombstoneKey, JSON.stringify(Array.from(tombstones)));
+    } catch (e) {}
+
+    const activationKey = getStorageKey('moldatk_active_monthly_cycle');
+    let lastActivatedId = previousActiveId;
+    try {
+      lastActivatedId = localStorage.getItem(activationKey) || previousActiveId;
+    } catch (e) {}
+
+    const requestedAccountingUpdate = Boolean(shouldRecalculateBills && activeRecord);
+    const isBrandNewMonth = Boolean(
+      requestedAccountingUpdate &&
+      activeRecord &&
+      (!previousTariffIds.has(activeRecord.id) || activeRecord.id !== lastActivatedId)
+    );
+    const isSameActiveMonthEdit = Boolean(
+      requestedAccountingUpdate &&
+      activeRecord &&
+      activeRecord.id === previousActiveId &&
+      activeRecord.id === lastActivatedId
+    );
+    const activeMonthChangedWithoutNewCycle = Boolean(
+      activeRecord && previousActiveId && activeRecord.id !== previousActiveId && !isBrandNewMonth
+    );
+
+    let nextSubscribers = subscribers;
+    let subscribersChanged = false;
+
+    if (!activeRecord || normalized.length === 0) {
+      // Empty tariff list = no current monthly billing cycle. Historical invoices stay intact.
+      nextSubscribers = zeroLiveMonthlyCycle(subscribers);
+      subscribersChanged = true;
+      try { localStorage.removeItem(activationKey); } catch (e) {}
+    } else if (isBrandNewMonth) {
+      // THIS is the only place where paid/partial counters are reset.
+      // Old unpaid balances remain in historical invoices and become carried debt.
+      nextSubscribers = startFreshMonthlyCycle(subscribers, previousActiveRecord, activeRecord, now);
+      subscribersChanged = true;
+      try { localStorage.setItem(activationKey, activeRecord.id); } catch (e) {}
+    } else if (isSameActiveMonthEdit) {
+      // Editing prices in the already-active month must NEVER erase payments.
+      nextSubscribers = repriceActiveMonthlyCycle(subscribers, activeRecord, now);
+      subscribersChanged = true;
+    } else if (activeMonthChangedWithoutNewCycle || (previousActiveId && !incomingIds.has(previousActiveId))) {
+      // Deleting the active tariff and falling back to an older remaining month restores that
+      // month's existing ledger instead of inventing a new bill or keeping the deleted month live.
+      nextSubscribers = summarizeExistingMonthlyCycle(subscribers, activeRecord);
+      subscribersChanged = true;
+      try { localStorage.setItem(activationKey, activeRecord.id); } catch (e) {}
+    }
 
     setMonthlyTariffs(normalized);
+    if (subscribersChanged) setSubscribers(nextSubscribers);
+
     try {
       localStorage.setItem(getStorageKey('moldatk_monthly_tariffs'), JSON.stringify(normalized));
+      if (subscribersChanged) {
+        localStorage.setItem(getStorageKey('moldatk_subscribers'), JSON.stringify(nextSubscribers));
+      }
+      // Persist BOTH snapshots before sync can pull an older server state back into the UI.
       window.dispatchEvent(new Event('moldatk-local-sync'));
     } catch (e) {}
 
-    const activeRecord = normalized.find(m => m.id === activeMonthId) || normalized[0];
-
-    if (shouldRecalculateBills && activeRecord) {
-      setSubscribers(prev => {
-        const recalculated = prev.map(sub => {
-          const calc = calculateSubscriberBill(sub.amperes, sub.tier, activeRecord.tiers);
-
-          if (sub.paymentStatus === 'paid') {
-            return sub;
-          }
-
-          if (sub.paymentStatus === 'free' || sub.tier === 'free') {
-            return { ...sub, amountDue: 0, amountPaid: 0 };
-          }
-
-          if (sub.paymentStatus === 'partial') {
-            const remaining = Math.max(calc.total - (sub.amountPaid || 0), 0);
-            return { ...sub, amountDue: remaining };
-          }
-
-          return { ...sub, amountDue: calc.total };
-        });
-
-        try {
-          localStorage.setItem(getStorageKey('moldatk_subscribers'), JSON.stringify(recalculated));
-        } catch (e) {}
-
-        return recalculated;
-      });
-    }
-
     addAuditLog({
       category: 'pricing',
-      title: 'تعديل تسعيرة الأمبير',
-      details: `تم حفظ تسعيرة ${activeRecord?.monthNameAr || 'الشهر الحالي'} بنجاح`,
-      entityName: activeRecord?.monthNameAr || 'تسعيرة الشهر',
+      title: !activeRecord
+        ? 'إيقاف الدورة الشهرية'
+        : isBrandNewMonth
+        ? 'اعتماد دورة شهرية جديدة'
+        : isSameActiveMonthEdit
+        ? 'تعديل تسعيرة الشهر النشط'
+        : 'تحديث سجل التسعيرات',
+      details: !activeRecord
+        ? 'تم حذف جميع التسعيرات وتصفير الحالة الشهرية الحالية مع إبقاء السجل التاريخي محفوظاً'
+        : isBrandNewMonth
+        ? 'تم اعتماد ' + (activeRecord.monthNameAr || activeRecord.id) + ' كدورة جديدة: تصفير المسدد للشهر الجديد، إعادة المشتركين غير المجانيين إلى غير مسدد، وترحيل الديون السابقة بدون حذفها'
+        : isSameActiveMonthEdit
+        ? 'تم تعديل أسعار ' + (activeRecord.monthNameAr || activeRecord.id) + ' بدون تصفير أو حذف أي تسديد مسجل في نفس الشهر'
+        : 'تم تحديث سجل التسعيرات مع الحفاظ على السجل المحاسبي',
+      entityName: activeRecord?.monthNameAr || activeRecord?.id || 'بدون تسعيرة',
+      newValue: JSON.stringify({
+        activeMonthId: activeRecord?.id || null,
+        monthlyCycleReset: isBrandNewMonth,
+        tariffsCount: normalized.length,
+        updatedAt: nowIso,
+      }),
       actorName: userSession?.username || userSession?.collectorName || 'مدير المنظومة',
     });
 
-    showToast('تم حفظ تسعيرة الأمبير بنجاح');
+    showToast(!activeRecord
+      ? 'تم حذف جميع التسعيرات وتصفير الحالة الشهرية الحالية'
+      : isBrandNewMonth
+      ? 'تم اعتماد الشهر الجديد وتصفير المسدد وترحيل الديون السابقة'
+      : isSameActiveMonthEdit
+      ? 'تم حفظ التسعيرة بدون المساس بالتسديدات الحالية'
+      : 'تم تحديث سجل التسعيرات');
+  };
+
+
+  const handleUpdateCollectors = async (newCollectors: Collector[]) => {
+    const normalizePhone = (value: string) => String(value || '').replace(/\D/g, '');
+    const seenPhones = new Set<string>();
+    const scopedCollectors = newCollectors.map(item => ({
+      ...item,
+      generatorId: userSession?.generatorId || item.generatorId || undefined,
+      phone: normalizePhone(item.phone),
+    }));
+
+    for (const collector of scopedCollectors) {
+      if (collector.phone.length < 10) throw new Error('invalid_collector_phone');
+      if (seenPhones.has(collector.phone)) throw new Error('duplicate_collector_phone');
+      seenPhones.add(collector.phone);
+      const pin = String(collector.passcode || '').trim();
+      if (pin && !/^\d{4,8}$/.test(pin)) throw new Error('invalid_collector_pin');
+    }
+
+    const previous = collectors;
+    if (userSession?.role !== 'generator_admin' || !userSession.generatorId) {
+      setCollectors(scopedCollectors);
+      localStorage.setItem(getStorageKey('moldatk_collectors'), JSON.stringify(scopedCollectors));
+      window.dispatchEvent(new Event('moldatk-local-sync'));
+      return;
+    }
+
+    try {
+      const saved = await syncCloudCollectorRoster(scopedCollectors);
+      setCollectors(saved);
+      localStorage.setItem(getStorageKey('moldatk_collectors'), JSON.stringify(saved));
+      window.dispatchEvent(new Event('moldatk-local-sync'));
+      showToast('تم حفظ بيانات الجباة وتحديث تسجيل الدخول');
+    } catch (error) {
+      setCollectors(previous);
+      try { localStorage.setItem(getStorageKey('moldatk_collectors'), JSON.stringify(previous)); } catch (e) {}
+      throw error;
+    }
   };
 
   const handleOpenFolderModal = (folderKey: string) => setActiveSettingsFolderKey(folderKey);
@@ -677,16 +937,35 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
     showToast('تم حفظ إعدادات القالب');
   };
 
-  const handleSaveSubscriber = (newSub: Subscriber) => {
+  const handleSaveSubscriber = async (newSub: Subscriber) => {
+    const matchedTier = pricingTiers.find(t => t.id === newSub.tier || t.type === newSub.tier);
+    const matchedLine = lines.find(l => l.id === newSub.lineId || l.name === newSub.lineName || l.name === newSub.line);
+    const rawTier = String(newSub.tier || 'normal').replace(/^tier-/, '');
+    const normalizedTier = (matchedTier?.type || (['normal', 'commercial', 'golden', 'free', 'custom'].includes(rawTier) ? rawTier : 'normal')) as Subscriber['tier'];
+    let normalizedSub: Subscriber = {
+      ...newSub,
+      code: newSub.code || newSub.subscriberCode || generateUniqueSubscriberCode(subscribers),
+      subscriberCode: newSub.subscriberCode || newSub.code || generateUniqueSubscriberCode(subscribers),
+      tier: normalizedTier,
+      lineId: matchedLine?.id || newSub.lineId,
+      line: matchedLine?.name || newSub.line || newSub.lineName,
+      lineName: matchedLine?.name || newSub.lineName || newSub.line,
+    };
+
+    // No active tariff: profile edits preserve the historical ledger, including
+    // when an old payment dialog was open while pricing was removed remotely.
+    if (!hasMonthlyPricing(pricingTiers)) {
+      const previous = subscribers.find(s => s.id === normalizedSub.id);
+      normalizedSub = suspendSubscriberBilling({ ...normalizedSub,
+        invoicesHistory: previous?.invoicesHistory || [],
+        paymentStatus: previous?.paymentStatus || normalizedSub.paymentStatus,
+        lastPaymentDate: previous?.lastPaymentDate,
+      });
+    }
+
+    // Local-first: payment/status changes become visible immediately and never wait for network.
     setSubscribers(prev => {
-      const exists = prev.some(s => s.id === newSub.id);
-      const normalizedSub: Subscriber = {
-        ...newSub,
-        code: newSub.code || newSub.subscriberCode || generateUniqueSubscriberCode(prev),
-        subscriberCode: newSub.subscriberCode || newSub.code || generateUniqueSubscriberCode(prev),
-        line: newSub.line || newSub.lineName,
-        lineName: newSub.lineName || newSub.line,
-      };
+      const exists = prev.some(s => s.id === normalizedSub.id);
       const updated = exists ? prev.map(s => (s.id === normalizedSub.id ? normalizedSub : s)) : [normalizedSub, ...prev];
       try {
         localStorage.setItem(getStorageKey('moldatk_subscribers'), JSON.stringify(updated));
@@ -694,11 +973,97 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
       } catch (e) {}
       return updated;
     });
-    setSubscriberToEdit(newSub);
-    showToast('تم حفظ بيانات المشترك بنجاح');
+    setSubscriberToEdit(normalizedSub);
+
+    const shouldSyncCloud = (userSession?.role === 'generator_admin' || userSession?.role === 'collector') && Boolean(userSession.generatorId);
+    const onlineNow = typeof navigator === 'undefined' ? true : navigator.onLine;
+    let cloudSynced = false;
+
+    if (shouldSyncCloud && onlineNow && userSession?.generatorId) {
+      try {
+        await persistCollectorSubscriber(userSession.generatorId, normalizedSub);
+        cloudSynced = true;
+      } catch (error: any) {
+        console.error('Subscriber cloud save deferred:', error);
+      }
+    }
+
+    if (shouldSyncCloud && !cloudSynced) {
+      try {
+        window.dispatchEvent(new CustomEvent('moldatk-sync-progress', { detail: { active: false, progress: 0, pending: true, message: 'محفوظ محلياً — بانتظار المزامنة' } }));
+      } catch (e) {}
+      showToast(onlineNow ? 'تم الحفظ محلياً وستتم إعادة المزامنة تلقائياً' : 'تم الحفظ بدون إنترنت وسيتم رفعه عند رجوع الاتصال');
+    } else {
+      showToast('تم حفظ بيانات المشترك ومزامنتها بنجاح');
+    }
+  };
+
+  const handleDeleteSubscriberPermanent = async (subId: string) => {
+    if (!subId) return;
+
+    // Legacy local-only admin mode has no cloud account. Production generator
+    // owners always use the protected permanent server purge below.
+    if (userSession?.role === 'admin' && !userSession.generatorId) {
+      setSubscribers(prev => {
+        const updated = prev.filter(sub => sub.id !== subId);
+        try { localStorage.setItem(getStorageKey('moldatk_subscribers'), JSON.stringify(updated)); } catch (e) {}
+        return updated;
+      });
+      setIsSubscriberModalOpen(false);
+      showToast('تم حذف المشترك محلياً');
+      return;
+    }
+
+    if (userSession?.role !== 'generator_admin' || !userSession.generatorId) {
+      showToast('حذف المشترك متاح لصاحب المولدة فقط');
+      return;
+    }
+
+    const { data, error } = await supabase.functions.invoke('generator-data-admin', {
+      body: { action: 'delete_subscriber', subscriber_id: subId },
+    });
+    if (error || !data?.ok) {
+      showToast('تعذر حذف المشترك نهائياً: ' + (data?.error || error?.message || 'خطأ غير معروف'));
+      return;
+    }
+
+    const { data: extraDeleteData, error: extraDeleteError } = await supabase.functions.invoke('generator-data-cleanup', {
+      body: { action: 'delete_subscriber_extras', subscriber_id: subId },
+    });
+    if (extraDeleteError || !extraDeleteData?.ok) {
+      showToast('تم حذف البيانات المالية للمشترك لكن تعذر تنظيف سجلات AI المرتبطة. أعد المحاولة لإكمال الحذف.');
+      return;
+    }
+
+    setSubscribers(prev => {
+      const updated = prev.filter(sub => sub.id !== subId);
+      try { localStorage.setItem(getStorageKey('moldatk_subscribers'), JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    setAuditLogs(prev => {
+      const updated = prev.filter(log => log.entityId !== subId);
+      try { localStorage.setItem(getStorageKey('moldatk_audit_logs'), JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    try {
+      const tombstoneKey = getStorageKey('moldatk_deleted_subscribers');
+      const deleted = JSON.parse(localStorage.getItem(tombstoneKey) || '[]') as string[];
+      localStorage.setItem(tombstoneKey, JSON.stringify(deleted.filter(id => id !== subId)));
+    } catch (e) {}
+
+    if (subscriberToEdit?.id === subId) setSubscriberToEdit(null);
+    if (selectedReceiptSubscriber?.id === subId) {
+      setSelectedReceiptSubscriber(null);
+      setSelectedReceiptInvoice(null);
+      setIsReceiptModalOpen(false);
+    }
+    setIsSubscriberModalOpen(false);
+    window.dispatchEvent(new Event('moldatk-local-sync'));
+    showToast('تم حذف المشترك وجميع فواتيره وديونه وتسديداته نهائياً');
   };
 
   const addAuditLog = (entry: any) => {
+    if (!hasMonthlyPricing(pricingTiers) && ['payment', 'cancellation'].includes(entry.category)) return;
     const newLog = {
       ...entry,
       id: `log-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -706,7 +1071,11 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
     };
     setAuditLogs(prev => {
       const updated = [newLog, ...prev] as AuditLogEntry[];
-      try { localStorage.setItem(getStorageKey('moldatk_audit_logs'), JSON.stringify(updated)); } catch (e) {}
+      try {
+        localStorage.setItem(getStorageKey('moldatk_audit_logs'), JSON.stringify(updated));
+        markLocalWrite();
+        window.dispatchEvent(new Event('moldatk-local-sync'));
+      } catch (e) {}
       return updated;
     });
   };
@@ -715,21 +1084,168 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
     return <LoginView collectors={forceSuperAdmin ? [] : loadCollectorLoginIndex()} onLoginSuccess={handleLoginSuccess} />;
   }
 
-  if (forceSuperAdmin && userSession.role !== 'super_admin') {
+  if (forceSuperAdmin && userSession.role !== 'super_admin' && userSession.role !== 'super_admin_manager') {
     return <LoginView collectors={[]} onLoginSuccess={handleLoginSuccess} />;
   }
 
-  if (userSession.role === 'super_admin') {
+  if (userSession.role === 'super_admin' || userSession.role === 'super_admin_manager') {
     return <SuperAdminDashboard onLogout={handleLogout} />;
   }
 
-  if (userSession.role === 'generator_admin' && !subscriptionLoading && subscriptionInfo?.accountStatus === 'suspended') {
+  const subscriptionAccessControlled = userSession.role === 'generator_admin' || userSession.role === 'collector';
+
+  // SUBSCRIPTION_LOCK_STABILITY_V1: a refresh may update data, but it can never temporarily expose the app.
+  if (subscriptionAccessControlled && subscriptionInfo?.accountStatus === 'suspended') {
     return <SuspendedAccountScreen reason={subscriptionInfo.suspensionReason} onLogout={handleLogout} />;
   }
 
-  if (userSession.role === 'generator_admin' && !subscriptionLoading && (!subscriptionInfo || subscriptionInfo.subscriptionStatus !== 'active' || daysUntilExpiry(subscriptionInfo.endsAt) <= 0)) {
+  if (subscriptionAccessControlled && subscriptionInfo && (subscriptionInfo.subscriptionStatus !== 'active' || daysUntilExpiry(subscriptionInfo.endsAt) <= 0)) {
     return <ExpiredSubscriptionScreen onLogout={handleLogout} />;
   }
+
+  if (subscriptionAccessControlled && !subscriptionInfo) {
+    if (subscriptionLoading) {
+      return (
+        <div dir="rtl" className="min-h-screen bg-[#F7F9FC] dark:bg-[#081521] flex items-center justify-center p-5 font-['Cairo',sans-serif]">
+          <div className="w-full max-w-md bg-white dark:bg-[#111c38] rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl p-8 text-center">
+            <div className="w-10 h-10 mx-auto rounded-full border-4 border-slate-200 border-t-blue-600 animate-spin mb-4" />
+            <div className="font-black text-slate-900 dark:text-white">جاري التحقق من حالة الاشتراك...</div>
+          </div>
+        </div>
+      );
+    }
+    return <ExpiredSubscriptionScreen onLogout={handleLogout} />;
+  }
+
+  const reportResetMarkers = auditLogs
+    .filter(log => log.title === 'تصفير تقارير السنة' && log.newValue)
+    .map(log => {
+      try { return JSON.parse(log.newValue || '{}') as { year: number; resetAt: string }; } catch { return null; }
+    })
+    .filter((x): x is { year: number; resetAt: string } => Boolean(x && Number.isFinite(Number(x.year)) && x.resetAt));
+
+  const handleResetReportYear = (year: number) => {
+    if (userSession?.role !== 'generator_admin') {
+      showToast('هذه الصلاحية متاحة لصاحب المولدة فقط');
+      return;
+    }
+    const marker = { year, resetAt: new Date().toISOString() };
+    addAuditLog({
+      category: 'system',
+      title: 'تصفير تقارير السنة',
+      details: 'تم تصفير عرض حسابات التقارير لسنة ' + year + ' بدون حذف الديون أو الفواتير الأصلية',
+      entityName: String(year),
+      newValue: JSON.stringify(marker),
+      actorName: userSession?.username || 'صاحب المولدة',
+    });
+    showToast('تم تصفير حسابات التقارير لسنة ' + year);
+  };
+
+  const handleSecureSystemReset = async (password: string): Promise<SecureResetResult> => {
+    if (userSession?.role !== 'generator_admin' || !userSession.generatorId) {
+      return { ok: false, message: 'هذه العملية متاحة لصاحب المولدة فقط.' };
+    }
+    const generatorId = userSession.generatorId;
+    const markerKey = getStorageKey('moldatk_factory_reset_in_progress');
+
+    try {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      const email = userData.user?.email || userSession.email;
+      if (!email) return { ok: false, message: 'تعذر تحديد بريد حساب صاحب المولدة.' };
+
+      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      if (authError) return { ok: false, message: 'كلمة المرور غير صحيحة. لم يتم حذف أي بيانات.' };
+
+      const backup = {
+        exportedAt: new Date().toISOString(),
+        generatorId,
+        generatorSpecs,
+        subscribers,
+        monthlyTariffs,
+        auditLogs,
+        lines,
+        collectors,
+        invoiceTemplate,
+        walletResetTimestamp,
+      };
+      try {
+        localStorage.setItem('moldatk_emergency_backup_last_' + generatorId + '_SAFE', JSON.stringify(backup));
+      } catch (backupError) {
+        console.warn('Could not keep local emergency backup:', backupError);
+      }
+
+      const isIOSBrowser = /iPad|iPhone|iPod/i.test(navigator.userAgent)
+        || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      const shouldAutoDownloadBackup = !isIOSBrowser && !Capacitor.isNativePlatform();
+      if (shouldAutoDownloadBackup) {
+        const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'moldatk-backup-before-reset-' + new Date().toISOString().replace(/[:.]/g, '-') + '.json';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } else {
+        console.info('Reset backup kept safely inside Moldatk; automatic file preview skipped on iOS/native app.');
+      }
+
+      // Freeze both push and pull before the server purge starts. The marker is
+      // removed only after the local scoped cache is empty as well.
+      localStorage.setItem(markerKey, '1');
+
+      const { data: extraResetData, error: extraResetError } = await supabase.functions.invoke('generator-data-cleanup', {
+        body: { action: 'reset_extras' },
+      });
+      if (extraResetError || !extraResetData?.ok) {
+        throw new Error(extraResetData?.error || extraResetError?.message || 'تعذر تنظيف البيانات التشغيلية الإضافية');
+      }
+
+      const { data: resetData, error: resetError } = await supabase.functions.invoke('generator-data-admin', {
+        body: { action: 'reset_generator_data' },
+      });
+      if (resetError || !resetData?.ok) {
+        throw new Error(resetData?.error || resetError?.message || 'تعذر تصفير البيانات السحابية');
+      }
+
+      const scopedSuffix = '_' + generatorId;
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const currentKey = localStorage.key(i);
+        if (currentKey && currentKey.endsWith(scopedSuffix) && currentKey !== markerKey) keysToRemove.push(currentKey);
+      }
+      keysToRemove.forEach(currentKey => localStorage.removeItem(currentKey));
+
+      setSubscribers([]);
+      setMonthlyTariffs([]);
+      setAuditLogs([]);
+      setLines([]);
+      setCollectors([]);
+      setWalletResetTimestamp('');
+      setGeneratorSpecs(prev => ({
+        ...INITIAL_GENERATOR_SPECS,
+        generatorName: prev.generatorName,
+        ownerName: prev.ownerName,
+        location: prev.location,
+      }));
+      setInvoiceTemplate(INITIAL_INVOICE_TEMPLATE);
+      setSubscriberToEdit(null);
+      setSelectedReceiptSubscriber(null);
+      setSelectedReceiptInvoice(null);
+
+      localStorage.removeItem(markerKey);
+      window.dispatchEvent(new Event('moldatk-local-sync'));
+      showToast('تم تصفير بيانات النظام سحابياً ومحلياً بالكامل وإنشاء نسخة احتياطية');
+      window.setTimeout(() => window.location.reload(), 900);
+      return { ok: true };
+    } catch (e: any) {
+      localStorage.removeItem(markerKey);
+      console.error('Secure Moldatk reset failed:', e);
+      return { ok: false, message: 'تعذر إكمال التصفير بأمان: ' + (e?.message || 'خطأ غير معروف') };
+    }
+  };
 
   const isAdmin = userSession.role === 'admin' || userSession.role === 'generator_admin';
   const shouldShowMobileLayout =
@@ -750,6 +1266,12 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
           pricingTiers={pricingTiers}
           generatorSpecs={generatorSpecs}
           collectorName={userSession.collectorName || 'جابي ميداني'}
+          allowedLineIds={userSession.assignedLineIds || (userSession.assignedLineId ? [userSession.assignedLineId] : [])}
+          assignedAllLines={userSession.assignedAllLines === true || (!userSession.assignedLineId && !(userSession.assignedLineIds || []).length)}
+          activeMonthId={activeMonthRecord?.id}
+          activeMonthNameAr={activeMonthRecord?.monthNameAr}
+          collectorPermissions={userSession.collectorPermissions}
+          assignedLineId={userSession.assignedLineId}
           collectors={collectors}
           lines={lines}
           onSaveSubscriber={handleSaveSubscriber}
@@ -795,7 +1317,8 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
           onClose={() => setIsSubscriberModalOpen(false)}
           subscriberToEdit={subscriberToEdit}
           pricingTiers={pricingTiers}
-          lines={lines}
+          monthlyTariffs={monthlyTariffs}
+          lines={userSession.assignedLineId ? lines.filter(l => l.id === userSession.assignedLineId) : lines}
           onSaveSubscriber={handleSaveSubscriber}
           isReadOnlyAmperes={false}
         />
@@ -810,6 +1333,7 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
       <div dir="rtl">
         {subscriptionInfo && <SubscriptionWarningBanner info={subscriptionInfo} />}
         {userSession.role === 'generator_admin' && <GeneratorNotifications hideFloatingTriggers={activeTab === 'settings'} />}
+        {userSession.role === 'generator_admin' && <OwnerAIWatcher onOpenAssistant={() => { setActiveTab('settings'); window.setTimeout(() => window.dispatchEvent(new Event('moldatk-open-owner-ai')), 220); }} />}
         {toastMessage && (
           <div className="fixed bottom-20 left-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-xs font-bold">
             <Sparkles className="w-4 h-4 text-amber-400" />
@@ -822,6 +1346,7 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
           onTabChange={setActiveTab}
           subscribers={subscribers}
           pricingTiers={pricingTiers}
+              activeMonthId={activeMonthRecord?.id}
           generatorSpecs={generatorSpecs}
           lines={lines}
           folders={settingsFolders}
@@ -846,21 +1371,34 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
             setAutoPrintReceipt(true);
             setIsReceiptModalOpen(true);
           }}
-          onDeleteSubscriber={subId => {
-            setSubscribers(prev => {
-              const updated = prev.filter(s => s.id !== subId);
-              try { localStorage.setItem(getStorageKey('moldatk_subscribers'), JSON.stringify(updated)); } catch (e) {}
-              window.dispatchEvent(new Event('moldatk-local-sync'));
-              return updated;
-            });
-            showToast('تم حذف المشترك بنجاح');
-          }}
+          onDeleteSubscriber={handleDeleteSubscriberPermanent}
           onTogglePaymentStatus={() => {}}
           onUpdateSpecs={newSpecs => setGeneratorSpecs(prev => ({ ...prev, ...newSpecs }))}
           onExportData={handleExportBackup}
           onResetData={handleResetFactoryData}
           subscriptionInfo={subscriptionInfo}
           subscriptionLoading={subscriptionLoading}
+          collectors={collectors}
+          auditLogs={auditLogs}
+          walletResetTimestamp={walletResetTimestamp}
+          onClearWalletLogs={async () => {
+                const generatorId = userSession?.generatorId;
+                if (!generatorId || userSession?.role !== 'generator_admin') return;
+                try {
+                  await flushGeneratorSync(generatorId);
+                  const confirmed = await resetCashbox(generatorId);
+                  setWalletResetTimestamp(confirmed.reset_at || '');
+                  showToast('تم تصفير القاصة وحفظه في السحابة');
+                } catch (error) {
+                  console.error('Cashbox reset failed:', error);
+                  showToast('لم يتم تأكيد التصفير. تحقق من الاتصال وأعد المحاولة');
+                }
+              }}
+          monthlyTariffs={monthlyTariffs}
+          reportResetMarkers={reportResetMarkers}
+          onResetReportYear={handleResetReportYear}
+          isOwner={userSession?.role === 'generator_admin'}
+          onSecureReset={handleSecureSystemReset}
         />
 
         <SubscriberModal
@@ -868,21 +1406,17 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
           onClose={() => { setIsSubscriberModalOpen(false); setSubscriberToEdit(null); }}
           subscriberToEdit={subscriberToEdit}
           pricingTiers={pricingTiers}
+          monthlyTariffs={monthlyTariffs}
+          activeMonthId={activeMonthRecord?.id}
+          activeMonthNameAr={activeMonthRecord?.monthNameAr}
           lines={lines}
           onSaveSubscriber={handleSaveSubscriber}
-          onDeleteSubscriber={(subId) => {
-            setSubscribers(prev => {
-              const updated = prev.filter(s => s.id !== subId);
-              try { localStorage.setItem(getStorageKey('moldatk_subscribers'), JSON.stringify(updated)); } catch (e) {}
-              return updated;
-            });
-            setIsSubscriberModalOpen(false);
-          }}
+          onDeleteSubscriber={handleDeleteSubscriberPermanent}
           onTogglePaymentStatus={() => {}}
-          onOpenReceiptModal={(sub, inv) => {
+          onOpenReceiptModal={(sub, inv, shouldAutoPrint = false) => {
             setSelectedReceiptSubscriber(sub);
             setSelectedReceiptInvoice(inv || null);
-            setAutoPrintReceipt(false);
+            setAutoPrintReceipt(shouldAutoPrint);
             setIsReceiptModalOpen(true);
           }}
           onAddAuditLog={addAuditLog}
@@ -932,16 +1466,32 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
           onUpdateLines={(newLines) => {
             setLines(newLines);
             localStorage.setItem(getStorageKey('moldatk_lines'), JSON.stringify(newLines));
+            markLocalWrite();
+            window.dispatchEvent(new Event('moldatk-local-sync'));
           }}
-          onUpdateCollectors={(newCollectors) => {
-            setCollectors(newCollectors);
-            localStorage.setItem(getStorageKey('moldatk_collectors'), JSON.stringify(newCollectors));
-          }}
-          onUpdateInvoiceTemplate={handleUpdateInvoiceTemplate}
+          onUpdateCollectors={newCollectors => {
+                const scopedCollectors = newCollectors.map(c => ({ ...c, generatorId: userSession?.generatorId || c.generatorId || null }));
+                void syncCloudCollectorRoster(scopedCollectors)
+                  .then(savedCollectors => {
+                    const persistedCollectors = savedCollectors.map(c => ({ ...c, generatorId: userSession?.generatorId || c.generatorId || null }));
+                    setCollectors(persistedCollectors);
+                    try {
+                      localStorage.setItem(getStorageKey('moldatk_collectors'), JSON.stringify(persistedCollectors));
+                      window.dispatchEvent(new Event('moldatk-local-sync'));
+                    } catch (e) {}
+                    showToast('تم إنشاء وحفظ حسابات الجباة بنجاح');
+                  })
+                  .catch(error => {
+                    console.error('Collector account sync failed:', error);
+                    showToast('فشل إنشاء حساب الجابي على السيرفر. تأكد من رقم الهاتف والرمز السري ثم أعد المحاولة');
+                  });
+              }}
+              onUpdateInvoiceTemplate={handleUpdateInvoiceTemplate}
           onClearAuditLogs={() => {
             setAuditLogs([]);
             localStorage.setItem(getStorageKey('moldatk_audit_logs'), JSON.stringify([]));
-            showToast('تم مسح سجل الحركات');
+          try { window.dispatchEvent(new Event('moldatk-local-sync')); } catch (e) {}
+          showToast('تم مسح سجل الحركات');
           }}
           onExportBackup={handleExportBackup}
           onImportBackup={handleImportBackup}
@@ -953,9 +1503,10 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
 
   // واجهة لوحة تحكم المدير الكاملة (شاشات واسعة: حاسوب / تابلت)
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-[#070d1e] text-slate-900 dark:text-slate-100 flex flex-col font-['Cairo',sans-serif]" dir="rtl">
+    <div className="min-h-screen bg-[#F7F9FC] dark:bg-[#081521] text-slate-900 dark:text-slate-100 flex flex-col font-['Cairo',sans-serif]" dir="rtl">
       {subscriptionInfo && <SubscriptionWarningBanner info={subscriptionInfo} />}
         {userSession.role === 'generator_admin' && <GeneratorNotifications hideFloatingTriggers={activeTab === 'settings'} />}
+        {userSession.role === 'generator_admin' && <OwnerAIWatcher onOpenAssistant={() => { setActiveTab('settings'); window.setTimeout(() => window.dispatchEvent(new Event('moldatk-open-owner-ai')), 220); }} />}
       {toastMessage && (
         <div className="fixed bottom-20 left-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-xs font-bold">
           <Sparkles className="w-4 h-4 text-amber-400" />
@@ -992,6 +1543,7 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
               lines={lines}
               auditLogs={auditLogs}
               walletResetTimestamp={walletResetTimestamp}
+              activeMonthId={activeMonthRecord?.id}
               onOpenPricingModal={handleOpenPricingModal}
               onNavigateToSubscribersTab={() => setActiveTab('subscribers')}
               onNavigateToWalletTab={() => setActiveTab('wallet')}
@@ -1011,31 +1563,44 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
                 setAutoPrintReceipt(true);
                 setIsReceiptModalOpen(true);
               }}
-              onDeleteSubscriber={isAdmin ? (subId) => {
-                setSubscribers(prev => {
-                  const updated = prev.filter(s => s.id !== subId);
-                  try { localStorage.setItem(getStorageKey('moldatk_subscribers'), JSON.stringify(updated)); } catch (e) {}
-                  window.dispatchEvent(new Event('moldatk-local-sync'));
-                  return updated;
-                });
-                showToast('تم حذف المشترك بنجاح');
-              } : undefined}
+              onDeleteSubscriber={handleDeleteSubscriberPermanent}
             />
+          )}
+
+          {activeTab === 'reports' && (
+            <div className="max-w-6xl mx-auto">
+              <MobileMonthlyReports
+                subscribers={subscribers}
+                currency={generatorSpecs.currency}
+                monthlyTariffs={monthlyTariffs}
+                reportResetMarkers={reportResetMarkers}
+                onResetYear={userSession?.role === 'generator_admin' ? handleResetReportYear : undefined}
+              />
+            </div>
           )}
 
           {activeTab === 'wallet' && (
             <WalletView
               subscribers={subscribers}
+              pricingTiers={pricingTiers}
               collectors={collectors}
               auditLogs={auditLogs}
               walletResetTimestamp={walletResetTimestamp}
+              activeMonthId={activeMonthRecord?.id}
               currency={generatorSpecs.currency}
               onBack={() => setActiveTab('dashboard')}
-              onClearWalletLogs={() => {
-                const resetAt = new Date().toISOString();
-                setWalletResetTimestamp(resetAt);
-                try { localStorage.setItem(getStorageKey('moldatk_wallet_reset_timestamp'), resetAt); } catch (e) {}
-                showToast('تم تصفير القاصة بنجاح');
+              onClearWalletLogs={async () => {
+                const generatorId = userSession?.generatorId;
+                if (!generatorId || userSession?.role !== 'generator_admin') return;
+                try {
+                  await flushGeneratorSync(generatorId);
+                  const confirmed = await resetCashbox(generatorId);
+                  setWalletResetTimestamp(confirmed.reset_at || '');
+                  showToast('تم تصفير القاصة وحفظه في السحابة');
+                } catch (error) {
+                  console.error('Cashbox reset failed:', error);
+                  showToast('لم يتم تأكيد التصفير. تحقق من الاتصال وأعد المحاولة');
+                }
               }}
             />
           )}
@@ -1057,17 +1622,11 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
                 setLines(newLines);
                 try {
                   localStorage.setItem(getStorageKey('moldatk_lines'), JSON.stringify(newLines));
-                  window.dispatchEvent(new Event('moldatk-local-sync'));
+                  markLocalWrite();
+        window.dispatchEvent(new Event('moldatk-local-sync'));
                 } catch (e) {}
               }}
-              onUpdateCollectors={newCollectors => {
-                const scopedCollectors = newCollectors.map(c => ({ ...c, generatorId: userSession?.generatorId || c.generatorId || null }));
-                setCollectors(scopedCollectors);
-                try {
-                  localStorage.setItem(getStorageKey('moldatk_collectors'), JSON.stringify(scopedCollectors));
-                  window.dispatchEvent(new Event('moldatk-local-sync'));
-                } catch (e) {}
-              }}
+              onUpdateCollectors={handleUpdateCollectors}
               onOpenPricingModal={handleOpenPricingModal}
               subscriptionInfo={subscriptionInfo}
               subscriptionLoading={subscriptionLoading}
@@ -1088,23 +1647,17 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
         onClose={() => { setIsSubscriberModalOpen(false); setSubscriberToEdit(null); }}
         subscriberToEdit={subscriberToEdit}
         pricingTiers={pricingTiers}
+          monthlyTariffs={monthlyTariffs}
         lines={lines}
         onSaveSubscriber={handleSaveSubscriber}
-        onDeleteSubscriber={(subId) => {
-          setSubscribers(prev => {
-            const updated = prev.filter(s => s.id !== subId);
-            try { localStorage.setItem(getStorageKey('moldatk_subscribers'), JSON.stringify(updated)); } catch (e) {}
-            return updated;
-          });
-          setIsSubscriberModalOpen(false);
-        }}
+        onDeleteSubscriber={handleDeleteSubscriberPermanent}
         onTogglePaymentStatus={() => {}}
-        onOpenReceiptModal={(sub, inv) => {
-          setSelectedReceiptSubscriber(sub);
-          setSelectedReceiptInvoice(inv || null);
-          setAutoPrintReceipt(false);
-          setIsReceiptModalOpen(true);
-        }}
+        onOpenReceiptModal={(sub, inv, shouldAutoPrint = false) => {
+            setSelectedReceiptSubscriber(sub);
+            setSelectedReceiptInvoice(inv || null);
+            setAutoPrintReceipt(shouldAutoPrint);
+            setIsReceiptModalOpen(true);
+          }}
         onAddAuditLog={addAuditLog}
       />
 
@@ -1149,19 +1702,36 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
           localStorage.setItem(getStorageKey('moldatk_generator'), JSON.stringify(specs));
         }}
         onUpdateLines={(newLines) => {
-          setLines(newLines);
-          localStorage.setItem(getStorageKey('moldatk_lines'), JSON.stringify(newLines));
+          const fixedLines = newLines.map(line => ({ ...line, updatedAt: (line as any).updatedAt || new Date().toISOString() } as any));
+          setLines(fixedLines);
+          try {
+            localStorage.setItem(getStorageKey('moldatk_lines'), JSON.stringify(fixedLines));
+            localStorage.setItem(getStorageKey('moldatk_lines_updated_at'), new Date().toISOString());
+            window.dispatchEvent(new Event('moldatk-local-sync'));
+          } catch (e) {}
         }}
-        onUpdateCollectors={(newCollectors) => {
-          const scopedCollectors = newCollectors.map(c => ({ ...c, generatorId: userSession?.generatorId || c.generatorId || null }));
-          setCollectors(scopedCollectors);
-          localStorage.setItem(getStorageKey('moldatk_collectors'), JSON.stringify(scopedCollectors));
-          window.dispatchEvent(new Event('moldatk-local-sync'));
-        }}
-        onUpdateInvoiceTemplate={handleUpdateInvoiceTemplate}
+        onUpdateCollectors={newCollectors => {
+                const scopedCollectors = newCollectors.map(c => ({ ...c, generatorId: userSession?.generatorId || c.generatorId || null }));
+                void syncCloudCollectorRoster(scopedCollectors)
+                  .then(savedCollectors => {
+                    const persistedCollectors = savedCollectors.map(c => ({ ...c, generatorId: userSession?.generatorId || c.generatorId || null }));
+                    setCollectors(persistedCollectors);
+                    try {
+                      localStorage.setItem(getStorageKey('moldatk_collectors'), JSON.stringify(persistedCollectors));
+                      window.dispatchEvent(new Event('moldatk-local-sync'));
+                    } catch (e) {}
+                    showToast('تم إنشاء وحفظ حسابات الجباة بنجاح');
+                  })
+                  .catch(error => {
+                    console.error('Collector account sync failed:', error);
+                    showToast('فشل إنشاء حساب الجابي على السيرفر. تأكد من رقم الهاتف والرمز السري ثم أعد المحاولة');
+                  });
+              }}
+              onUpdateInvoiceTemplate={handleUpdateInvoiceTemplate}
         onClearAuditLogs={() => {
           setAuditLogs([]);
           localStorage.setItem(getStorageKey('moldatk_audit_logs'), JSON.stringify([]));
+          try { window.dispatchEvent(new Event('moldatk-local-sync')); } catch (e) {}
           showToast('تم مسح سجل الحركات');
         }}
         onExportBackup={handleExportBackup}

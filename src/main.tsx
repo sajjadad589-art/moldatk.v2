@@ -3,8 +3,10 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import LandingPage from './LandingPage';
 import { AndroidUpdateChecker } from './components/AndroidUpdateChecker';
+import { SyncProgressIndicator } from './components/SyncProgressIndicator';
 import { SeasonalCampaignRuntime } from './components/SeasonalCampaignRuntime';
 import { CustomerOrderAssistant } from './components/CustomerOrderAssistant';
+import LegalPage from './components/LegalPage';
 import './index.css';
 
 function RootRouter() {
@@ -21,6 +23,10 @@ function RootRouter() {
       window.removeEventListener('popstate', handleLocationChange);
     };
   }, []);
+
+  if (window.location.pathname === '/privacy') return <LegalPage kind="privacy" />;
+  if (window.location.pathname === '/terms') return <LegalPage kind="terms" />;
+  if (window.location.pathname === '/delete-account') return <LegalPage kind="delete-account" />;
 
   if (window.location.pathname === '/download' || window.location.pathname === '/about') {
     return <LandingPage />;
@@ -45,13 +51,17 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <SeasonalCampaignRuntime />
     <RootRouter />
     <AndroidUpdateChecker />
+    <SyncProgressIndicator />
   </React.StrictMode>
 );
 
 // تفعيل نسخة الويب المصغرة على iPhone/Android. لا نعتمد عليها داخل Capacitor للطباعة أو الميزات الأصلية.
 if ('serviceWorker' in navigator && !window.location.protocol.startsWith('file')) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(error => {
+    navigator.serviceWorker.register('/sw.js?v=1.3.28', { updateViaCache: 'none' }).then(registration => {
+      void registration.update();
+      window.setInterval(() => void registration.update(), 60 * 1000);
+    }).catch(error => {
       console.warn('PWA service worker registration failed:', error);
     });
   });

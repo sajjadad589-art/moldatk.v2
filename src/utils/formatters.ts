@@ -1,11 +1,11 @@
 export function formatCurrency(amount: number, currency: string = 'د.ع'): string {
   if (isNaN(amount)) return `0 ${currency}`;
-  return `${amount.toLocaleString('ar-IQ')} ${currency}`;
+  return `${amount.toLocaleString('en-US')} ${currency}`;
 }
 
 export function formatNumberArabic(num: number): string {
   if (isNaN(num)) return '0';
-  return num.toLocaleString('ar-IQ');
+  return num.toLocaleString('en-US');
 }
 
 export function calculateSubscriberBill(

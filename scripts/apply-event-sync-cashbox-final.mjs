@@ -67,7 +67,8 @@ for (const [path,relative] of [['src/components/WalletView.tsx','../lib/'],['src
   const authoritativeCashbox = useCashboxBalance(reconciledCashbox(walletSummary.collected, auditLogs, walletResetTimestamp, activeMonthId));
 
 `;
-    const firstEffect = s.indexOf('  useEffect(() => {');
+    const effectMatch = s.match(/\n\s*useEffect\(\(\) => \{/);
+    const firstEffect = effectMatch ? effectMatch.index + 1 : -1;
     must(firstEffect >= 0, 'wallet component effect anchor missing');
     s = s.slice(0, firstEffect) + walletHookBlock + s.slice(firstEffect);
     s=s.replace('if (logTime < resetTimeMs) return false;', 'if (!Number.isFinite(logTime) || logTime <= resetTimeMs) return false;');
@@ -92,3 +93,4 @@ write('public/sw.js', sw);
 must(!app.includes("from './lib/useGeneratorCloudSync'"),'legacy hook still imported');
 console.log('Event-driven single-flight sync and server-confirmed cashbox reset installed.');
 
+await import('./apply-no-tariff-final.mjs');

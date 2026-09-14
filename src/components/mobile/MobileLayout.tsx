@@ -1,3 +1,4 @@
+import { useCashboxBalance } from '../../lib/useCashboxBalance';
 import React from 'react';
 import { MobileHeader } from './MobileHeader';
 import { MobileDashboard } from './MobileDashboard';
@@ -6,6 +7,7 @@ import { MobileMonthlyReports } from './MobileMonthlyReports';
 import { MobileMonitor } from './MobileMonitor';
 import { MobileSettings } from './MobileSettings';
 import { MobileBottomNav } from '../MobileBottomNav';
+import { WalletView } from '../WalletView';
 import {
   Subscriber,
   SubscriptionTierPricing,
@@ -13,14 +15,21 @@ import {
   LineDistribution,
   SettingsFolderItem,
   DeviceViewMode,
+  MonthlyTariffRecord,
+  Collector,
+  AuditLogEntry,
 } from '../../types';
 import { SubscriptionInfo } from '../SubscriptionStatusUI';
+import { reconciledCashbox, summarizeSubscribers } from '../../utils/authoritativeAccounting';
+import type { SecureResetResult } from '../SecureSystemReset';
 
 interface MobileLayoutProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
   subscribers: Subscriber[];
   pricingTiers: SubscriptionTierPricing[];
+  monthlyTariffs?: MonthlyTariffRecord[];
+  activeMonthId?: string;
   generatorSpecs: GeneratorSpecs;
   lines: LineDistribution[];
   folders: SettingsFolderItem[];
@@ -41,6 +50,10 @@ interface MobileLayoutProps {
   onResetData: () => void;
   subscriptionInfo?: SubscriptionInfo | null;
   subscriptionLoading?: boolean;
+  collectors?: Collector[];
+  auditLogs?: AuditLogEntry[];
+  walletResetTimestamp?: string;
+  onClearWalletLogs?: () => void;
 }
 
 export const MobileLayout: React.FC<MobileLayoutProps> = ({
@@ -48,6 +61,8 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   onTabChange,
   subscribers,
   pricingTiers,
+  monthlyTariffs = [],
+  activeMonthId,
   generatorSpecs,
   lines,
   folders,
@@ -68,15 +83,79 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   onResetData,
   subscriptionInfo = null,
   subscriptionLoading = false,
+  collectors = [],
+  auditLogs = [],
+  walletResetTimestamp,
+  onClearWalletLogs,
+  reportResetMarkers,
+  onResetReportYear,
+  isOwner,
+  onSecureReset,
 }) => {
+  // WORKMODE_MOBILELAYOUT_THEME_FALLBACK
+  const __moldatkTheme = (() => { try { return localStorage.getItem('moldatk_mobile_theme') || 'ocean-calm'; } catch (e) { return 'ocean-calm'; } })();
+  const __setMoldatkTheme = (theme: string) => { try { localStorage.setItem('moldatk_mobile_theme', theme); document.documentElement.setAttribute('data-moldatk-theme', theme); } catch (e) {} };
+  // DASHBOARD_CASHBOX_WALLETVIEW_PARITY_V3
+  const dashboardWalletResetTime = walletResetTimestamp ? new Date(walletResetTimestamp).getTime() : 0;
+  const dashboardFinancialLogs = auditLogs.filter(log => {
+    if (log.category !== 'payment' && log.category !== 'cancellation') return false;
+    if (dashboardWalletResetTime > 0 && log.timestamp) {
+      const logTime = new Date(log.timestamp).getTime();
+      if (Number.isFinite(logTime) && logTime < dashboardWalletResetTime) return false;
+    }
+    return true;
+  });
+
+  const dashboardCashboxAmount = (() => {
+    const ordered = [...dashboardFinancialLogs].sort((a, b) =>
+      new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime()
+    );
+    const unmatchedPayments = new Map<string, number[]>();
+    let payments = 0;
+    let cancellations = 0;
+
+    ordered.forEach(log => {
+      const entityKey = String(log.entityId || 'unknown');
+      if (log.category === 'payment') {
+        const amount = Math.max(0, Number(log.amount) || 0);
+        payments += amount;
+        if (amount > 0) {
+          const stack = unmatchedPayments.get(entityKey) || [];
+          stack.push(amount);
+          unmatchedPayments.set(entityKey, stack);
+        }
+        return;
+      }
+
+      let amount = Math.max(0, Number(log.amount) || 0);
+      const stack = unmatchedPayments.get(entityKey) || [];
+      if (!amount && stack.length) amount = stack.pop() || 0;
+      else if (amount && stack.length) stack.pop();
+      unmatchedPayments.set(entityKey, stack);
+      cancellations += amount;
+    });
+
+    return Math.max(0, payments - cancellations);
+  })();
+
+  // MOBILE_CASHBOX_SINGLE_SOURCE_V3
+  const mobileCashboxSummary = summarizeSubscribers(subscribers, pricingTiers, activeMonthId);
+  const mobileCashboxAmount = useCashboxBalance(reconciledCashbox(
+    mobileCashboxSummary.collected,
+    auditLogs,
+    walletResetTimestamp,
+    activeMonthId,
+  ));
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#070d1e] text-slate-900 dark:text-slate-100 flex flex-col font-['Cairo',sans-serif] selection:bg-blue-600 selection:text-white pb-16">
+    <div data-moldatk-theme={__moldatkTheme} className="moldatk-mobile-shell min-h-screen bg-[#F7F9FC] dark:bg-[#081521] text-slate-900 dark:text-slate-100 flex flex-col font-['Cairo',sans-serif] selection:bg-[#F2B544] selection:text-[#0B1F3B] pb-16">
       <MobileHeader
         generatorSpecs={generatorSpecs}
         darkMode={darkMode}
         onToggleTheme={onToggleTheme}
         onLogout={onLogout}
         onOpenPricingModal={onOpenPricingModal}
+        showSyncStatus={activeTab === 'dashboard'}
       />
 
       <main className="flex-1 w-full max-w-lg mx-auto">
@@ -89,6 +168,8 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
             onOpenPricingModal={onOpenPricingModal}
             onOpenNewSubscriberModal={onOpenNewSubscriberModal}
             onNavigateToTab={onTabChange}
+            activeMonthId={activeMonthId}
+            cashboxAmount={mobileCashboxAmount}
           />
         )}
 
@@ -108,7 +189,24 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
           <MobileMonthlyReports
             subscribers={subscribers}
             currency={generatorSpecs.currency || 'د.ع'}
+            monthlyTariffs={monthlyTariffs}
           />
+        )}
+
+        {activeTab === 'wallet' && (
+          <div className="p-3.5 pb-24">
+            <WalletView
+              subscribers={subscribers}
+              pricingTiers={pricingTiers}
+              activeMonthId={activeMonthId}
+              collectors={collectors}
+              auditLogs={auditLogs}
+              walletResetTimestamp={walletResetTimestamp}
+              currency={generatorSpecs.currency}
+              onBack={() => onTabChange('dashboard')}
+              onClearWalletLogs={onClearWalletLogs}
+            />
+          </div>
         )}
 
         {activeTab === 'monitor' && (
@@ -134,6 +232,8 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
             onResetData={onResetData}
             subscriptionInfo={subscriptionInfo}
             subscriptionLoading={subscriptionLoading}
+            isOwner={isOwner}
+            onSecureReset={onSecureReset}
           />
         )}
       </main>

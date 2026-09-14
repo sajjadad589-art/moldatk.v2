@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   Clock,
-  Activity,
   Zap,
 } from 'lucide-react';
 import { GeneratorSpecs } from '../types';
@@ -22,29 +21,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   onTabChange,
 }) => {
   const [timeString, setTimeString] = useState<string>('');
-  const [isOnline, setIsOnline] = useState<boolean>(true);
   const [dynamicGeneratorName, setDynamicGeneratorName] = useState<string>(generatorSpecs.generatorName || 'مولدة المحاربين');
 
   useEffect(() => {
     const safeName = generatorSpecs?.generatorName?.trim() || 'مولدتك';
     setDynamicGeneratorName(safeName);
   }, [generatorSpecs?.generatorName]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setIsOnline(navigator.onLine);
-      const handleOnline = () => setIsOnline(true);
-      const handleOffline = () => setIsOnline(false);
-
-      window.addEventListener('online', handleOnline);
-      window.addEventListener('offline', handleOffline);
-
-      return () => {
-        window.removeEventListener('online', handleOnline);
-        window.removeEventListener('offline', handleOffline);
-      };
-    }
-  }, []);
 
   useEffect(() => {
     const updateTime = () => {
@@ -93,22 +75,17 @@ export const Navbar: React.FC<NavbarProps> = ({
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-[#1E3A8A] text-white shadow-md border-b border-blue-900/60 transition-colors duration-200">
+    <header className="sticky top-0 z-40 w-full bg-[#0B1F3B] text-white shadow-md border-b border-[#1C3654] transition-colors duration-200">
       
       {/* شريط المعلومات العلوي (يتم إعادة ترتيبة وتصغيره حصرياً في منظور الهاتف) */}
-      <div className={`px-3 py-1.5 bg-[#14265e] text-blue-200 text-xs border-b border-blue-800/60 flex items-center ${isMobileView ? 'flex-col gap-1.5 px-2' : 'justify-between'}`}>
+      <div className={`px-3 py-1.5 bg-[#081521] text-slate-300 text-xs border-b border-white/10 flex items-center ${isMobileView ? 'flex-col gap-1.5 px-2' : 'justify-between'}`}>
         
         {/* في وضع الهاتف: نقل أزرار الاتصال والوضع المظلم إلى الأعلى مكان النص المحذوف */}
         {isMobileView ? (
           <div className="w-full flex items-center justify-between gap-1 min-w-0">
-            <div className={`px-2.5 py-1 rounded-full border flex items-center gap-1 text-[10px] font-bold ${
-              isOnline ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-            }`}>
-              <Activity className="w-3 h-3 shrink-0" />
-              <span>{isOnline ? 'متصل' : 'غير متصل'}</span>
-            </div>
+            <div id="moldatk-sync-status-slot" className="flex items-center shrink-0" />
 
-            <div className="flex items-center gap-1.5 bg-blue-950/60 p-1 rounded-full px-2.5 border border-blue-800/60">
+            <div className="flex items-center gap-1.5 bg-[#142A45]/90 p-1 rounded-full px-2.5 border border-white/10">
               <span className="text-[10px] uppercase font-bold text-blue-100">
                 {darkMode ? 'DARK' : 'LIGHT'}
               </span>
@@ -120,8 +97,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             </div>
 
-            <div className="flex items-center gap-1.5 bg-blue-900/50 px-2 py-0.5 rounded-lg border border-blue-700/50">
-              <Clock className="w-3.5 h-3.5 text-yellow-400" />
+            <div className="flex items-center gap-1.5 bg-[#142A45]/90 px-2 py-0.5 rounded-lg border border-white/10">
+              <Clock className="w-3.5 h-3.5 text-[#F2B544]" />
               <span className="text-white font-mono font-bold text-xs tracking-tight tabular-nums" dir="ltr">
                 {timeString}
               </span>
@@ -134,14 +111,14 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                 <span>نظام مولدتك لإدارة الطاقة والاشتراكات</span>
               </div>
-              <span className="text-blue-400/65 hidden sm:inline">•</span>
-              <span className="text-blue-200/80 hidden sm:inline text-[11px]">
+              <span className="text-[#F2B544]/60 hidden sm:inline">•</span>
+              <span className="text-slate-300/80 hidden sm:inline text-[11px]">
                 {generatorSpecs.ownerName}
               </span>
             </div>
 
-            <div className="flex items-center gap-2.5 bg-blue-900/50 px-3 py-1 rounded-xl border border-blue-700/50">
-              <Clock className="w-4 h-4 text-yellow-400" />
+            <div className="flex items-center gap-2.5 bg-[#142A45]/90 px-3 py-1 rounded-xl border border-white/10">
+              <Clock className="w-4 h-4 text-[#F2B544]" />
               <span className="text-white font-mono font-black tracking-wider text-sm tabular-nums" dir="ltr">
                 {timeString}
               </span>
@@ -159,17 +136,13 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={() => onTabChange('dashboard')}
             className="flex items-center gap-2.5 cursor-pointer group"
           >
-            <div className={`bg-white rounded-xl flex items-center justify-center text-[#1E3A8A] font-black shadow-md shrink-0 ${isMobileView ? 'w-8 h-8 text-base' : 'w-10 h-10 text-xl'}`}>
-              M
+            <div className={`bg-white rounded-xl flex items-center justify-center shadow-md shrink-0 overflow-hidden ${isMobileView ? 'w-8 h-8 p-1' : 'w-10 h-10 p-1'}`}>
+              <img src="/brand/moldatk-mark.svg" alt="مولدتك" className="w-full h-full object-contain" />
             </div>
             <div>
               <h1 className={`font-bold tracking-tight text-white flex items-center gap-1.5 ${isMobileView ? 'text-base' : 'text-xl lg:text-2xl'}`}>
                 <span>مولدتك</span>
-                {!isMobileView && (
-                  <span className="text-blue-300 font-light text-xs mr-1 uppercase tracking-wider">
-                    Moldatk
-                  </span>
-                )}
+                
               </h1>
             </div>
           </div>
@@ -181,10 +154,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             isMobileView ? 'px-2.5 py-1 max-w-full' : 'px-6 py-2 rounded-2xl gap-2.5'
           } ${
             darkMode 
-              ? 'bg-blue-950/80 border-2 border-cyan-400 text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.5)]' 
-              : 'bg-blue-900/90 border-2 border-amber-300 text-amber-200 shadow-[0_0_12px_rgba(251,191,36,0.4)]'
+              ? 'bg-[#081521] border border-[#F2B544]/45 text-[#F7E4AF] shadow-sm' 
+              : 'bg-[#142A45] border border-[#F2B544]/45 text-[#F7E4AF] shadow-sm'
           }`}>
-            <Zap className={`animate-bounce ${isMobileView ? 'w-3.5 h-3.5' : 'w-5 h-5'} ${darkMode ? 'text-cyan-400' : 'text-amber-300'}`} />
+            <Zap className={`animate-bounce ${isMobileView ? 'w-3.5 h-3.5' : 'w-5 h-5'} ${'text-[#F2B544]'}`} />
             <span className={`font-black tracking-wide ${isMobileView ? 'text-[11px] truncate max-w-[105px]' : 'text-base lg:text-lg'}`}>
               {dynamicGeneratorName}
             </span>
@@ -194,14 +167,9 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* أزرار التحكم الجانبية (تظهر فقط في وضع الحاسوب، أما في وضع الهاتف فقد تم نقلها للأعلى) */}
         {!isMobileView && (
           <div className="flex items-center gap-3 sm:gap-4">
-            <div className={`px-3 py-1.5 rounded-full border flex items-center gap-1.5 text-xs font-bold transition-all shadow-sm ${
-              isOnline ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-            }`}>
-              <Activity className="w-3.5 h-3.5 shrink-0" />
-              <span>{isOnline ? 'متصل بالإنترنت' : 'غير متصل بالإنترنت'}</span>
-            </div>
+            <div id="moldatk-sync-status-slot" className="flex items-center shrink-0" />
 
-            <div className="flex items-center gap-2 bg-blue-950/60 p-1.5 rounded-full px-3 border border-blue-800/60 shadow-sm">
+            <div className="flex items-center gap-2 bg-[#142A45]/90 p-1.5 rounded-full px-3 border border-white/10 shadow-sm">
               <div className={`w-3.5 h-3.5 rounded-full ${darkMode ? 'bg-indigo-400' : 'bg-yellow-400'} shadow-sm`}></div>
               <span className="text-[11px] uppercase font-bold tracking-wider text-blue-100 hidden md:inline">
                 {darkMode ? 'DARK' : 'LIGHT'}
