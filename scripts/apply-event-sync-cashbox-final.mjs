@@ -94,3 +94,4 @@ must(!app.includes("from './lib/useGeneratorCloudSync'"),'legacy hook still impo
 console.log('Event-driven single-flight sync and server-confirmed cashbox reset installed.');
 
 await import('./apply-no-tariff-final.mjs');
+await import('./apply-live-sync-receipt-cashbox-parity-final.mjs');
