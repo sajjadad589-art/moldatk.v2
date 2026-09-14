@@ -26,7 +26,7 @@ export function useCashboxBalance(fallback: number) {
       });
       if (error) throw error;
       const value = Number((data as CashboxResponse)?.balance);
-      if (Number.isFinite(value)) {
+      if ((data as CashboxResponse)?.balance != null && Number.isFinite(value)) {
         setServerBalance(value);
         localStorage.setItem(`moldatk_cashbox_server_${generatorId}`, JSON.stringify(data));
       }
