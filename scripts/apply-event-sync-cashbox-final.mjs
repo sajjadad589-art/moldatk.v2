@@ -112,3 +112,4 @@ console.log('Event-driven single-flight sync and server-confirmed cashbox reset 
 await import('./apply-no-tariff-final.mjs');
 await import('./apply-live-sync-receipt-cashbox-parity-final.mjs');
 await import('./apply-pwa-back-cashbox-recovery-final.mjs');
+await import('./apply-financial-integrity-final.mjs');
