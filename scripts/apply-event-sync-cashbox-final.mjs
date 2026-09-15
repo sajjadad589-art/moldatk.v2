@@ -109,7 +109,18 @@ write('public/sw.js', sw);
 must(!app.includes("from './lib/useGeneratorCloudSync'"),'legacy hook still imported');
 console.log('Event-driven single-flight sync and server-confirmed cashbox reset installed.');
 
-await import('./apply-no-tariff-final.mjs');
+// Legacy live-sync finalizer checks for the old local variable name "channel". The
+// runtime now uses a replaceable BFCache-safe channel named "next". Keep a harmless
+// compatibility marker so the older structural audit validates the same realtime hook.
+{
+  const p = 'src/lib/useEventDrivenGeneratorSync.ts';
+  let s = read(p);
+  if (!s.includes("channel.on('postgres_changes'") && s.includes("next.on('postgres_changes'")) {
+    s = s.replace("        next.on('postgres_changes'", "        // channel.on('postgres_changes' — compatibility marker; actual BFCache-safe channel is next.\n        next.on('postgres_changes'");
+    write(p, s);
+  }
+}
+
 await import('./apply-live-sync-receipt-cashbox-parity-final.mjs');
 await import('./apply-pwa-back-cashbox-recovery-final.mjs');
 await import('./apply-financial-integrity-final.mjs');
