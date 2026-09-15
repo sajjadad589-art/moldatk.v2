@@ -87,8 +87,11 @@ mustContain('src/utils/authoritativeAccounting.ts', "r.outstanding > 0 || r.stat
 // ---------------------------------------------------------------------------
 mustContain('src/components/POSQuickView.tsx', 'applyPaymentOldestFirst', 'Collector payment must allocate oldest debt first');
 mustContain('src/components/SubscriberModal.tsx', 'applyPaymentOldestFirst', 'Owner payment must allocate oldest debt first');
-mustContain('src/components/POSQuickView.tsx', 'COLLECTOR_LUMP_SETTLEMENT_V1', 'Collector lump settlement accounting');
+mustContain('src/utils/monthlyAccounting.ts', 'export function applyLumpSettlementAllDebt', 'Canonical all-debt lump settlement engine');
+mustContain('src/components/POSQuickView.tsx', 'COLLECTOR_LUMP_SETTLEMENT_V2_ALL_DEBT', 'Collector all-debt lump settlement accounting');
+mustContain('src/components/POSQuickView.tsx', 'applyLumpSettlementAllDebt', 'Collector must use canonical lump settlement engine');
 mustContain('src/components/SubscriberModal.tsx', 'handleLumpSettlement', 'Owner lump settlement accounting');
+mustContain('src/components/SubscriberModal.tsx', 'applyLumpSettlementAllDebt', 'Owner must use canonical lump settlement engine');
 mustContain('src/components/PaymentMethodModal.tsx', 'تسديد مخصص', 'Collector custom payment UI');
 mustContain('src/components/PaymentMethodModal.tsx', 'تسديد مقطوع', 'Collector lump payment UI');
 assert(!read('src/components/PaymentMethodModal.tsx').includes('<option value="free">'), 'Collector must not expose free/exemption settlement');
