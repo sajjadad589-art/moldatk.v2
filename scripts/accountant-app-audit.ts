@@ -28,7 +28,16 @@ const allAndroid = collectText('android/app/src/main');
 // ---------------------------------------------------------------------------
 // Monthly pricing + reports UI
 // ---------------------------------------------------------------------------
-mustContain('src/components/PricingModal.tsx', "onSaveMonthlyTariffs(updatedTariffs, monthId, true);", 'New month must activate accounts immediately');
+const pricingModalText = read('src/components/PricingModal.tsx');
+assert(
+  pricingModalText.includes("onSaveMonthlyTariffs(updatedTariffs, monthId, true);") ||
+  (
+    pricingModalText.includes('setTariffs(updatedTariffs);') &&
+    pricingModalText.includes('setSelectedMonthId(monthId);') &&
+    pricingModalText.includes('onSaveMonthlyTariffs(tariffs, selectedMonthId, true);')
+  ),
+  'New month must remain editable and activate billing only through an explicit tariff save/apply path',
+);
 mustContain('src/components/PricingModal.tsx', "case 'golden': return 'ذهبي';", 'Golden fixed tier');
 mustContain('src/components/PricingModal.tsx', "case 'commercial': return 'محلات';", 'Commercial fixed tier');
 mustContain('src/components/PricingModal.tsx', "case 'free': return 'مجاني';", 'Free fixed tier');
