@@ -46,4 +46,16 @@ const cashboxHook = read('src/lib/useCashboxBalance.ts');
 assert.ok(cashboxHook.includes('state?.balance != null && Number.isFinite(value)'), 'all cashbox surfaces must share cached server balance on first paint');
 assert.ok(cashboxHook.includes("supabase.rpc('get_generator_cashbox'"), 'cashbox hook must read the server-authoritative RPC');
 
-console.log('Live sync, agreed receipt content, and cashbox parity regression passed.');
+// Reset must remain usable even when an unrelated sync flight is temporarily failing.
+const app = read('src/App.tsx');
+assert.ok(app.includes('Cashbox reset continuing after sync flush warning'), 'cashbox reset must not be blocked by sync flush failure');
+assert.ok(app.includes("new Error('sync_flush_timeout')"), 'cashbox reset must bound the best-effort sync wait');
+assert.ok(app.includes('await resetCashbox(generatorId)'), 'cashbox reset RPC call missing');
+const cashboxCloud = read('src/lib/cashboxCloud.ts');
+assert.ok(cashboxCloud.includes('UUID_RE'), 'cashbox reset must reject malformed stale request ids');
+assert.ok(cashboxCloud.includes("typeof crypto.randomUUID === 'function'"), 'cashbox reset must support native randomUUID when available');
+assert.ok(cashboxCloud.includes('crypto.getRandomValues'), 'cashbox reset must support older PWA/WebView UUID fallback');
+assert.ok(cashboxCloud.includes('supabase.auth.refreshSession()'), 'cashbox reset must retry once after stale auth');
+assert.ok(cashboxCloud.includes("supabase.rpc('reset_generator_cashbox'"), 'cashbox reset server RPC missing');
+
+console.log('Live sync, agreed receipt content, cashbox parity, and resilient reset regression passed.');
