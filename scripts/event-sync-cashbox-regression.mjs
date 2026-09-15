@@ -32,7 +32,21 @@ function fixture(role = 'generator_admin') {
   let fail=false, pause, onWrite, cashbox={ reset_id:null,reset_at:null,balance:null };
   const client = {
     auth: { async getSession() { active++; maxActive=Math.max(maxActive,active); await sleep(1); active--; return {data:{session:{}}}; } },
-    async rpc(name) { if (name.startsWith('reconcile_generator_')) { reconciles++; onWrite?.(); return {data:{ok:true}}; } assert.equal(name, 'get_generator_cashbox'); return {data:cashbox}; },
+    async rpc(name, args = {}) {
+      if (name.startsWith('reconcile_generator_')) { reconciles++; onWrite?.(); return {data:{ok:true}}; }
+      if (name === 'delete_generator_tariff_month') {
+        writes++;
+        if (fail) return { data:null, error:new Error('simulated disconnect') };
+        if (pause) await pause();
+        const tariffId = args?.p_tariff_id;
+        db.generator_monthly_tariffs = db.generator_monthly_tariffs.filter(r => r.id !== tariffId);
+        // The production RPC also removes/neutralizes that month's ledgers and refreshes subscriber totals.
+        db.generator_invoices = db.generator_invoices.filter(r => r.month_id !== tariffId || Number(r.paid_amount || 0) > 0);
+        onWrite?.();
+        return {data:{ok:true,tariff_id:tariffId},error:null};
+      }
+      assert.equal(name, 'get_generator_cashbox'); return {data:cashbox};
+    },
     from(table) {
       let kind='select', rows, lo=0,hi=499,ids;
       const q={ select(){return q;}, eq(){return q;}, order(){return q;}, range(a,b){lo=a;hi=b;return q;}, maybeSingle(){kind='single';return q;},
@@ -123,18 +137,20 @@ await test('cloud reset survives refresh and old local timestamp without an uplo
   localStorage.setItem(`moldatk_wallet_reset_timestamp_${id}`,'2000-01-01');await f.sync.flush();
   assert.equal(JSON.parse(localStorage.getItem(`moldatk_cashbox_server_${id}`)).balance,0);await f.sync.flush();assert.equal(f.writes,0);f.close();
 });
-await test('deleting last tariff reconciles once and remote pulls remain read-only', async () => {
+await test('deleting last tariff uses accounting-safe deletion and reconciles no-tariff state once', async () => {
   const f = fixture();
   f.db.generator_monthly_tariffs = [{ id:'t1', month:9, year:2026, tiers:[], is_current_active:true }];
+  f.db.generator_invoices = [{ id:'i1', month_id:'t1', paid_amount:0, remaining_amount:5000 }];
   await f.sync.flush();
   local('deleted_tariffs', ['t1']);
   local('monthly_tariffs', []);
   f.onWrite = () => f.sync.remote();
   await f.sync.flush();
   assert.equal(f.reconciles, 1);
+  assert.equal(f.db.generator_monthly_tariffs.length, 0);
+  assert.equal(f.db.generator_invoices.length, 0, 'unpaid deleted-month liability must not survive tariff deletion');
   await f.sync.flush();
   assert.equal(f.reconciles, 1);
-  assert.equal(f.db.generator_monthly_tariffs.length, 0);
   f.close();
 });
 await test('collector pull masks stale debt without rewriting historical invoices or pushing it back', async () => {
