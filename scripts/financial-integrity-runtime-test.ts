@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import {
   activateMonthlyTariffForSubscribers,
+  applyLumpSettlementAllDebt,
   applyPaymentOldestFirst,
   calculateMonthlyCharge,
   getInvoiceRemaining,
 } from '../src/utils/monthlyAccounting.ts';
-import { removeUnpaidMonthLedger } from '../src/utils/monthlyTariffDeletion.ts';
+import { extinguishDeletedTariffLiabilities, removeUnpaidMonthLedger } from '../src/utils/monthlyTariffDeletion.ts';
 
 const tier = (price: number) => ({
   id: 'normal', nameAr: 'نهاري', nameEn: 'Normal', type: 'normal', pricePerAmpere: price,
@@ -46,7 +47,7 @@ assert.equal(getInvoiceRemaining(aug), 50_000);
 assert.equal(getInvoiceRemaining(sep), 40_000, 'new month invoice must contain current charge only');
 assert.equal(s.amountDue, 90_000, 'subscriber debt is sum of monthly balances exactly once');
 
-// 3) Partial payment allocates oldest-first and never over-applies.
+// 3) Standard partial payment remains oldest-first and DOES leave the unpaid balance.
 {
   const r = applyPaymentOldestFirst(s, [tier(8_000)], 60_000, new Date('2026-09-10T12:00:00Z'), '2026-09', '9-2026');
   const a = r.invoices.find(i => i.monthId === '2026-08')!;
@@ -58,21 +59,40 @@ assert.equal(s.amountDue, 90_000, 'subscriber debt is sum of monthly balances ex
   assert.equal(r.totalDebtAfter, 30_000);
 }
 
-// 4) Deleting an UNPAID tariff removes that month's liability instead of hiding/carrying it.
+// 4) LUMP payment is intentionally different: ANY valid agreed amount closes ALL debts.
+{
+  const r = applyLumpSettlementAllDebt(s, [tier(8_000)], 25_000, new Date('2026-09-11T12:00:00Z'), '2026-09', '9-2026');
+  assert.equal(r.totalDebtBefore, 90_000);
+  assert.equal(r.receivedAmount, 25_000);
+  assert.equal(r.waivedAmount, 65_000);
+  assert.equal(r.invoices.reduce((sum, inv) => sum + getInvoiceRemaining(inv), 0), 0);
+  assert.equal(r.invoices.filter(inv => inv.status !== 'cancelled' && inv.status !== 'free').every(inv => inv.status === 'paid'), true);
+  assert.equal(r.invoices.some(inv => String(inv.notes || '').includes('MOLDATK_LUMP_SETTLEMENT_ALL_DEBT')), true);
+}
+
+// 5) Deleting an unpaid tariff removes that month's liability immediately.
 {
   const cleaned = removeUnpaidMonthLedger([s], '2026-08', '2026-09')[0];
   assert.equal(cleaned.invoicesHistory.some((i: any) => i.monthId === '2026-08' && i.status !== 'cancelled'), false);
   assert.equal(cleaned.amountDue, 40_000);
 }
 
-// 5) A paid/partial month cannot be silently erased by the local destructive helper.
+// 6) Production tariff deletion can also remove a PARTIAL month: actual cash history survives,
+//    but that deleted month's remaining debt becomes exactly zero.
 {
-  const paid = applyPaymentOldestFirst(s, [tier(8_000)], 1_000, new Date('2026-09-10T12:00:00Z'), '2026-09', '9-2026');
-  const paidSub = { ...s, invoicesHistory: paid.invoices } as any;
-  assert.throws(() => removeUnpaidMonthLedger([paidSub], '2026-08', '2026-09'), /MONTH_HAS_PAYMENTS/);
+  const partial = applyPaymentOldestFirst(s, [tier(8_000)], 10_000, new Date('2026-09-10T12:00:00Z'), '2026-09', '9-2026');
+  const partialSub = { ...s, invoicesHistory: partial.invoices, amountDue: partial.totalDebtAfter } as any;
+  const cleaned = extinguishDeletedTariffLiabilities([partialSub], ['2026-08'], '2026-09')[0];
+  const old = cleaned.invoicesHistory.find((i: any) => i.monthId === '2026-08');
+  assert.ok(old, 'paid history for deleted tariff must remain auditable');
+  assert.equal(old!.paidAmount, 10_000);
+  assert.equal(old!.totalAmount, 10_000);
+  assert.equal(getInvoiceRemaining(old!), 0);
+  assert.equal(String(old!.notes || '').includes('MOLDATK_TARIFF_DELETED_SETTLED_HISTORY'), true);
+  assert.equal(cleaned.amountDue, 40_000, 'only surviving month debt remains');
 }
 
-// 6) Free/exempt subscribers never accumulate a monthly liability.
+// 7) Free/exempt subscribers never accumulate a monthly liability.
 {
   const free = { ...baseSubscriber(), tier: 'free', paymentStatus: 'free' } as any;
   const result = activateMonthlyTariffForSubscribers([free], undefined, {
@@ -83,4 +103,4 @@ assert.equal(s.amountDue, 90_000, 'subscriber debt is sum of monthly balances ex
   assert.equal(result.invoicesHistory[0].status, 'free');
 }
 
-console.log('Financial integrity runtime regression passed: pricing, discounts, carry, partial payment, deletion, and free-account invariants.');
+console.log('Financial integrity runtime regression passed: pricing, carry, standard partial payment, all-debt lump settlement, tariff deletion, and free-account invariants.');
