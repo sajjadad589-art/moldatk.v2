@@ -12,17 +12,33 @@ const handler = `onClearWalletLogs={async () => {
                 const generatorId = userSession?.generatorId;
                 if (!generatorId || userSession?.role !== 'generator_admin') return;
                 try {
-                  await flushGeneratorSync(generatorId);
+                  // Cashbox reset is a server-authoritative operation and must not be
+                  // blocked by an unrelated subscriber/tariff sync failure. Give pending
+                  // writes a short best-effort flush window, then reset independently.
+                  try {
+                    await Promise.race([
+                      flushGeneratorSync(generatorId),
+                      new Promise((_, reject) => window.setTimeout(() => reject(new Error('sync_flush_timeout')), 2500)),
+                    ]);
+                  } catch (syncError) {
+                    console.warn('Cashbox reset continuing after sync flush warning:', syncError);
+                  }
                   const confirmed = await resetCashbox(generatorId);
                   setWalletResetTimestamp(confirmed.reset_at || '');
                   showToast('تم تصفير القاصة وحفظه في السحابة');
                 } catch (error) {
                   console.error('Cashbox reset failed:', error);
-                  showToast('لم يتم تأكيد التصفير. تحقق من الاتصال وأعد المحاولة');
+                  const reason = String((error as any)?.message || (error as any)?.code || '');
+                  if (/jwt|auth|token|not_authorized|42501|401|403/i.test(reason)) {
+                    showToast('تعذر تأكيد التصفير بسبب الجلسة. سجل الدخول من جديد ثم أعد المحاولة');
+                  } else {
+                    showToast('تعذر تأكيد تصفير القاصة من السيرفر. أعد المحاولة');
+                  }
                 }
               }}`;
 app = app.replace(/onClearWalletLogs=\{(?:async )?\(\) => \{[\s\S]*?\n\s*\}\}/g, handler);
 must((app.match(/await resetCashbox\(generatorId\)/g)||[]).length === 2,'desktop/mobile reset handlers missing');
+must((app.match(/Cashbox reset continuing after sync flush warning/g)||[]).length === 2,'cashbox reset still blocks on sync flush');
 write('src/App.tsx',app);
 
 let accounting = read('src/utils/authoritativeAccounting.ts');
