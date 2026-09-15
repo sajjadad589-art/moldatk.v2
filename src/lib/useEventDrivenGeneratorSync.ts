@@ -4,6 +4,7 @@ import { supabase } from './supabase';
 import { createEventSyncScheduler, stableSnapshot, changedRows } from './eventSyncScheduler';
 import { cacheCashbox } from './cashboxCloud';
 import { subscriberToRow, invoiceToRow, lineToRow, tariffToRow, rowToSubscriber, rowToInvoice, rowToLine, rowToTariff, dedupeInvoicesForCloud } from './cloudSyncRows';
+import { canonicalizeSubscriberRows, remapInvoiceSubscriberIds, canonicalizeLiveInvoiceRows, canonicalizeTariffRows, isUniqueViolation } from './syncConflictResolution';
 import type { ActiveUserSession, Subscriber, SubscriberInvoice, LineDistribution, MonthlyTariffRecord, AuditLogEntry } from '../types';
 
 type Snapshot = {
@@ -39,6 +40,7 @@ export function createGeneratorSync(session: ActiveUserSession, client = supabas
   let ack: Snapshot = read(storage, ackKey, storage.getItem(pendingKey) === '1' ? empty : snapshot());
   let observed = stableSnapshot(snapshot());
   let revision = 0;
+  let blockedConflictRevision: number | null = null;
   let disposed = false;
   let remoteDuringPull = false;
   let stage: 'idle' | 'push' | 'pull' = 'idle';
@@ -50,6 +52,7 @@ export function createGeneratorSync(session: ActiveUserSession, client = supabas
     observed = stableSnapshot(next);
     saveAck();
     storage.removeItem(pendingKey);
+    blockedConflictRevision = null;
     // Consumers refresh React state; the synchronizer ignores this source explicitly.
     window.dispatchEvent(new CustomEvent('moldatk-local-sync', { detail: { source: 'cloud', generatorId: id } }));
   };
@@ -64,6 +67,17 @@ export function createGeneratorSync(session: ActiveUserSession, client = supabas
     if (!ids.length) return;
     const { error } = await client.from(table).delete().eq('generator_id', id).in('id', ids);
     if (error) throw error;
+  }
+  async function selectByValues(table: string, column: string, values: unknown[], columns = '*') {
+    const unique = [...new Set(values.filter(v => v !== null && v !== undefined && String(v) !== ''))];
+    const rows: any[] = [];
+    for (let i = 0; i < unique.length; i += 100) {
+      if (disposed) throw new Error('sync_disposed');
+      const { data, error } = await client.from(table).select(columns).eq('generator_id', id).in(column, unique.slice(i, i + 100));
+      if (error) throw error;
+      rows.push(...(data || []));
+    }
+    return rows;
   }
   async function all(table: string, order = 'id') {
     const rows: any[] = [];
@@ -82,18 +96,56 @@ export function createGeneratorSync(session: ActiveUserSession, client = supabas
     const subscribers = changedRows(sent.subscribers, ack.subscribers).filter(writable);
     const priorInvoices = ack.subscribers.flatMap(s => s.invoicesHistory || []);
     const invoices = changedRows(dedupeInvoicesForCloud(sent.subscribers.filter(writable).flatMap(s => s.invoicesHistory || [])), priorInvoices);
+
     // Explicit tombstones only. Never infer a subscriber deletion from an incomplete pull.
     await remove('generator_subscribers', sent.deletedSubscribers);
-    await upsert('generator_subscribers', subscribers.map(s => subscriberToRow(id, s)));
-    await upsert('generator_invoices', invoices.map(i => invoiceToRow(id, i)));
+
+    // Resolve the secondary UNIQUE(generator_id, code) before writing. A locally recreated/imported
+    // subscriber may carry a new UUID for an existing code; keep the cloud UUID canonical so invoices
+    // and historical foreign keys are never broken by a 23505/409 conflict.
+    const rawSubscriberRows = subscribers.map(s => subscriberToRow(id, s));
+    const cloudSubscriberIdentities = rawSubscriberRows.length
+      ? await selectByValues('generator_subscribers', 'code', rawSubscriberRows.map(r => r.code), 'id,code')
+      : [];
+    const subscriberIdentity = canonicalizeSubscriberRows(rawSubscriberRows, cloudSubscriberIdentities);
+    await upsert('generator_subscribers', subscriberIdentity.rows);
+
+    // Invoice identity is generator + subscriber + month for live invoices. The database intentionally
+    // allows cancelled history, so cancelled rows are written first, then the one live row is mapped to
+    // the already-existing cloud invoice id if that month exists under another local UUID.
+    const rawInvoiceRows = remapInvoiceSubscriberIds(invoices.map(i => invoiceToRow(id, i)), subscriberIdentity.aliases);
+    const cancelledInvoiceRows = rawInvoiceRows.filter(r => r.status === 'cancelled');
+    await upsert('generator_invoices', cancelledInvoiceRows);
+    const liveInvoiceCandidates = rawInvoiceRows.filter(r => r.status !== 'cancelled');
+    const cloudLiveIdentities = liveInvoiceCandidates.length
+      ? await selectByValues('generator_invoices', 'subscriber_id', liveInvoiceCandidates.map(r => r.subscriber_id), 'id,subscriber_id,month_id,status')
+      : [];
+    const canonicalLiveInvoices = canonicalizeLiveInvoiceRows(liveInvoiceCandidates, cloudLiveIdentities);
+    await upsert('generator_invoices', canonicalLiveInvoices);
+
     if (owner) {
       await remove('generator_lines', sent.deletedLines);
       const oldLines = ack.lines.map((line, index) => ({ ...line, sortOrder: index }));
       const lines = changedRows(sent.lines.map((line, index) => ({ ...line, sortOrder: index })), oldLines);
       await upsert('generator_lines', lines.map(l => lineToRow(id, l, l.sortOrder)));
-      await remove('generator_monthly_tariffs', sent.deletedTariffs);
+
+      // Tariff deletion is accounting-aware. Raw DELETE would leave invoice/monthly-account debt behind.
+      for (const tariffId of sent.deletedTariffs) {
+        const { error } = await client.rpc('delete_generator_tariff_month', {
+          p_generator_id: id,
+          p_tariff_id: tariffId,
+        });
+        if (error) throw error;
+      }
+
       const tariffs = changedRows(sent.tariffs, ack.tariffs);
-      await upsert('generator_monthly_tariffs', tariffs.map(t => tariffToRow(id, t)));
+      const rawTariffRows = tariffs.map(t => tariffToRow(id, t));
+      const cloudTariffIdentities = rawTariffRows.length
+        ? await selectByValues('generator_monthly_tariffs', 'year', rawTariffRows.map(r => r.year), 'id,year,month')
+        : [];
+      const tariffIdentity = canonicalizeTariffRows(rawTariffRows, cloudTariffIdentities);
+      await upsert('generator_monthly_tariffs', tariffIdentity.rows);
+
       if (['specs', 'invoice', 'invoiceCustom'].some(k => stableSnapshot(sent[k]) !== stableSnapshot(ack[k]))) {
         await upsert('generator_settings', [{ generator_id: id, specs: sent.specs || {},
           invoice_settings: { template: sent.invoice || {}, custom: sent.invoiceCustom || {} } }], 'generator_id');
@@ -101,7 +153,8 @@ export function createGeneratorSync(session: ActiveUserSession, client = supabas
       // Reconcile only a locally changed active tariff. Pull is strictly read-only.
       const active = sent.tariffs.find(t => t.isCurrentActive);
       if (active && tariffs.some(t => t.id === active.id)) {
-        const { error } = await client.rpc('reconcile_generator_monthly_cycle', { p_generator_id: id, p_tariff_id: active.id });
+        const canonicalTariffId = tariffIdentity.aliases.get(active.id) || active.id;
+        const { error } = await client.rpc('reconcile_generator_monthly_cycle', { p_generator_id: id, p_tariff_id: canonicalTariffId });
         if (error) throw error;
       } else if (sent.tariffs.length === 0 && (sent.deletedTariffs.length > 0 || ack.tariffs.length > 0)) {
         const { error } = await client.rpc('reconcile_generator_no_tariff_state', { p_generator_id: id });
@@ -116,6 +169,7 @@ export function createGeneratorSync(session: ActiveUserSession, client = supabas
     })), 'generator_id,id', true);
     if (disposed) return;
     ack = sent;
+    blockedConflictRevision = null;
     // Clear only tombstones sent by this flight; preserve edits made while awaiting I/O.
     for (const name of ['deletedSubscribers', 'deletedLines', 'deletedTariffs']) {
       const remaining = read(storage, keys[name], []).filter((v: string) => !sent[name].includes(v));
@@ -181,7 +235,13 @@ export function createGeneratorSync(session: ActiveUserSession, client = supabas
       if (!disposed && !pending()) await pull();
       if (!disposed) progress(false, pending());
     } finally { stage = 'idle'; }
-  }, { onError: error => { if (!disposed) { console.error('Generator sync failed:', error); progress(false, true); } } });
+  }, { onError: error => {
+    if (!disposed) {
+      if (isUniqueViolation(error)) blockedConflictRevision = revision;
+      console.error('Generator sync failed:', error);
+      progress(false, true);
+    }
+  } });
   function local(event?: Event) {
     if ((event as CustomEvent)?.detail?.source === 'cloud') return;
     const now = snapshot();
@@ -191,6 +251,7 @@ export function createGeneratorSync(session: ActiveUserSession, client = supabas
     if (diskAck && current === stableSnapshot(diskAck)) {
       ack = diskAck;
       observed = current;
+      blockedConflictRevision = null;
       return;
     }
     if (current === observed) return;
@@ -200,14 +261,25 @@ export function createGeneratorSync(session: ActiveUserSession, client = supabas
     if (removed.length) storage.setItem(keys.deletedLines, JSON.stringify([...new Set([...now.deletedLines, ...removed])]));
     observed = stableSnapshot(snapshot());
     revision++;
+    blockedConflictRevision = null;
     storage.setItem(pendingKey, '1');
     scheduler.request();
   }
   return {
     local,
-    remote() { if (stage === 'pull') remoteDuringPull = true; else if (!scheduler.running) scheduler.request(); },
-    request() { scheduler.request(); },
-    async flush() { local(); scheduler.request(); await scheduler.flush(); if (pending()) throw new Error('unsynced_local_changes'); },
+    remote() {
+      if (blockedConflictRevision === revision) return;
+      if (stage === 'pull') remoteDuringPull = true;
+      else if (!scheduler.running) scheduler.request();
+    },
+    request() { if (blockedConflictRevision !== revision) scheduler.request(); },
+    async flush() {
+      local();
+      if (blockedConflictRevision === revision) throw new Error('sync_conflict_blocked_until_local_change');
+      scheduler.request();
+      await scheduler.flush();
+      if (pending()) throw new Error('unsynced_local_changes');
+    },
     dispose() { disposed = true; scheduler.dispose(); },
   };
 }
@@ -225,23 +297,52 @@ export function useEventDrivenGeneratorSync(session: ActiveUserSession | null) {
     const id = session.generatorId;
     const sync = createGeneratorSync(session);
     activeSync.set(id, sync);
-    const channel = supabase.channel(`event-generator-sync-${id}`);
-    for (const table of ['generator_subscribers', 'generator_invoices', 'generator_lines', 'generator_monthly_tariffs',
-      'generator_settings', 'generator_audit_logs', 'generator_cashbox_resets']) {
-      channel.on('postgres_changes', { event: '*', schema: 'public', table, filter: `generator_id=eq.${id}` }, sync.remote);
-    }
-    channel.subscribe(status => { if (status === 'SUBSCRIBED') sync.request(); });
+
+    let closed = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let channelSerial = 0;
+    const openRealtimeChannel = () => {
+      if (closed) return;
+      const previous = channel;
+      channel = null;
+      if (previous) void supabase.removeChannel(previous);
+      const next = supabase.channel(`event-generator-sync-${id}-${++channelSerial}`);
+      channel = next;
+      for (const table of ['generator_subscribers', 'generator_invoices', 'generator_lines', 'generator_monthly_tariffs',
+        'generator_settings', 'generator_audit_logs', 'generator_cashbox_resets']) {
+        next.on('postgres_changes', { event: '*', schema: 'public', table, filter: `generator_id=eq.${id}` }, sync.remote);
+      }
+      next.subscribe(status => {
+        if (!closed && channel === next && status === 'SUBSCRIBED') sync.request();
+      });
+    };
+    openRealtimeChannel();
+
     const visibility = () => { if (document.visibilityState === 'visible') sync.request(); };
     const storage = (event: StorageEvent) => { if (event.key?.endsWith(`_${id}`)) sync.local(event); };
     const cashbox = () => sync.request();
+    const pagehide = (event: PageTransitionEvent) => {
+      if (!event.persisted || !channel) return;
+      const stale = channel;
+      channel = null;
+      void supabase.removeChannel(stale);
+    };
+    const pageshow = (event: PageTransitionEvent) => {
+      if (event.persisted) openRealtimeChannel();
+      sync.request();
+    };
+
     window.addEventListener('moldatk-local-sync', sync.local);
     window.addEventListener('moldatk-cashbox-changed', cashbox);
     window.addEventListener('moldatk-sync-now', sync.request);
     window.addEventListener('online', sync.request);
     window.addEventListener('storage', storage);
+    window.addEventListener('pagehide', pagehide);
+    window.addEventListener('pageshow', pageshow);
     document.addEventListener('visibilitychange', visibility);
     sync.request();
     return () => {
+      closed = true;
       sync.dispose();
       if (activeSync.get(id) === sync) activeSync.delete(id);
       window.removeEventListener('moldatk-local-sync', sync.local);
@@ -249,8 +350,12 @@ export function useEventDrivenGeneratorSync(session: ActiveUserSession | null) {
       window.removeEventListener('moldatk-sync-now', sync.request);
       window.removeEventListener('online', sync.request);
       window.removeEventListener('storage', storage);
+      window.removeEventListener('pagehide', pagehide);
+      window.removeEventListener('pageshow', pageshow);
       document.removeEventListener('visibilitychange', visibility);
-      void supabase.removeChannel(channel);
+      const stale = channel;
+      channel = null;
+      if (stale) void supabase.removeChannel(stale);
     };
   }, [session?.generatorId, session?.role]);
 }
