@@ -25,7 +25,7 @@ assert.ok(pos.includes("paymentStatus: 'paid'"), 'collector lump does not force 
 const owner = read('src/components/SubscriberModal.tsx');
 assert.ok(owner.includes('applyLumpSettlementAllDebt'), 'owner does not use canonical lump settlement');
 assert.ok(owner.includes('totalOutstandingAfter: 0'), 'owner lump receipt can still expose debt');
-assert.ok(owner.includes("max={outstanding}"), 'owner lump amount is not bounded by total debt');
+assert.ok(owner.includes('const maxAmount = outstanding;'), 'owner lump validation is not bounded by total debt');
 
 const app = read('src/App.tsx');
 assert.ok(app.includes('FINANCIAL_DELETE_LOCAL_CLEANUP_V2'), 'local tariff deletion debt cleanup missing');
