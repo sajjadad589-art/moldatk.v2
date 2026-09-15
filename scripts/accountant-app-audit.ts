@@ -29,15 +29,16 @@ const allAndroid = collectText('android/app/src/main');
 // Monthly pricing + reports UI
 // ---------------------------------------------------------------------------
 const pricingModalText = read('src/components/PricingModal.tsx');
-assert(
-  pricingModalText.includes("onSaveMonthlyTariffs(updatedTariffs, monthId, true);") ||
-  (
-    pricingModalText.includes('setTariffs(updatedTariffs);') &&
-    pricingModalText.includes('setSelectedMonthId(monthId);') &&
-    pricingModalText.includes('onSaveMonthlyTariffs(tariffs, selectedMonthId, true);')
-  ),
-  'New month must remain editable and activate billing only through an explicit tariff save/apply path',
-);
+const createStart = pricingModalText.indexOf('  const handleCreateNewMonthTariff = () => {');
+const createEnd = createStart >= 0 ? pricingModalText.indexOf('\n\n  const handleDeleteMonth =', createStart) : -1;
+assert(createStart >= 0 && createEnd > createStart, 'Create-month handler must exist');
+const createBlock = pricingModalText.slice(createStart, createEnd);
+assert(!createBlock.includes('onSaveMonthlyTariffs('), 'Creating a tariff draft must not activate billing before prices are saved');
+const saveStart = pricingModalText.indexOf('  const handleSave = () => {');
+const saveEnd = saveStart >= 0 ? pricingModalText.indexOf('\n\n  const getTierIcon', saveStart) : -1;
+assert(saveStart >= 0 && saveEnd > saveStart, 'Explicit Save/Apply handler must exist');
+const saveBlock = pricingModalText.slice(saveStart, saveEnd);
+assert(/onSaveMonthlyTariffs\([\s\S]*?selectedMonthId[\s\S]*?,\s*true\s*\);/.test(saveBlock), 'Explicit Save/Apply must activate the monthly cycle');
 mustContain('src/components/PricingModal.tsx', "case 'golden': return 'ذهبي';", 'Golden fixed tier');
 mustContain('src/components/PricingModal.tsx', "case 'commercial': return 'محلات';", 'Commercial fixed tier');
 mustContain('src/components/PricingModal.tsx', "case 'free': return 'مجاني';", 'Free fixed tier');
