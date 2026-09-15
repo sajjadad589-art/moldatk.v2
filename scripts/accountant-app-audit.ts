@@ -23,7 +23,6 @@ function collectText(dir: string): string {
 }
 
 const allSrc = collectText('src');
-const allAndroid = collectText('android/app/src/main');
 
 // ---------------------------------------------------------------------------
 // Monthly pricing + reports UI
@@ -105,8 +104,10 @@ const savePos = pos.indexOf('onSaveSubscriber(updated);');
 const autoPrintPos = pos.indexOf('onOpenReceiptModal(updated, receiptInvoice, true)');
 assert(savePos >= 0 && autoPrintPos > savePos, 'Receipt must open/print only after the payment save call');
 
-assert(allAndroid.includes('previousDebt') && allAndroid.includes('appliedToPreviousDebt') && allAndroid.includes('totalOutstandingAfter'),
-  'SUNMI native receipt must include debt-aware fields');
+const sunmiReceipt = 'android/app/src/main/java/com/mwaldatk/app/SunmiPrinterPlugin.java';
+mustContain(sunmiReceipt, 'previousDebt', 'SUNMI receipt previous debt');
+mustContain(sunmiReceipt, 'appliedToPreviousDebt', 'SUNMI receipt old-debt allocation');
+mustContain(sunmiReceipt, 'totalOutstandingAfter', 'SUNMI receipt remaining debt after payment');
 
 // ---------------------------------------------------------------------------
 // Isolation, offline/sync, deletion recovery, cashbox and notifications
