@@ -7,6 +7,7 @@ const reports = read('src/components/mobile/MobileMonthlyReports.tsx');
 const pricing = read('src/components/PricingModal.tsx');
 const reset = read('src/components/SecureSystemReset.tsx');
 const sync = read('src/lib/useGeneratorCloudSync.ts');
+const eventSync = read('src/lib/useEventDrivenGeneratorSync.ts');
 const superAdmin = read('src/components/SuperAdminDashboard.tsx');
 
 // Owner factory reset must not be exposed anywhere in the product UI.
@@ -34,15 +35,20 @@ assert(reports.includes('تصفير حسابات سنة'), 'Annual reset control
 assert(app.includes("title: 'تصفير تقارير السنة'"), 'Annual reset must be persisted in audit history');
 assert(app.includes('بدون حذف الديون أو الفواتير الأصلية'), 'Annual reset must explicitly preserve source debts/invoices');
 
-// Any tariff may be removed, including the active and final tariff. Removing tariff metadata
-// must preserve historical invoices/debts, while an empty list zeros only the live collection state.
+// Any tariff may be removed, including the active and final tariff. This is now an
+// accounting deletion: unpaid liability created by that month is extinguished, while
+// money actually received remains as settled historical evidence.
 assert(pricing.includes('title="حذف تسعيرة هذا الشهر"'), 'Every tariff must expose a delete control');
 assert(pricing.includes("onSaveMonthlyTariffs([], '', false);"), 'The final tariff must be deletable');
-assert(pricing.includes('الفواتير والتسديدات والديون السابقة سيبقى محفوظاً'), 'Tariff delete warning must preserve accounting history');
+assert(pricing.includes('حذفها يلغي كل مبلغ غير مسدد ناتج عن هذا الشهر ولا يتم ترحيله لاحقاً'), 'Active tariff delete warning must explain debt extinguishment');
+assert(pricing.includes('المبالغ المستلمة فعلياً تبقى في السجل'), 'Tariff delete warning must preserve actual payment history');
+assert(pricing.includes('سيتم إلغاء الدين غير المسدد الخاص بهذا الشهر'), 'Historical tariff delete warning must explain debt extinguishment');
 assert(!pricing.includes('لا يمكن حذف آخر تسعيرة موجودة'), 'No last-tariff deletion guard may remain');
 assert(!pricing.includes("onSaveMonthlyTariffs(updated, nextActive.id, true);"), 'Deleting a tariff must never regenerate subscriber bills');
 assert(app.includes("getStorageKey('moldatk_deleted_tariffs')"), 'Tariff deletion must create durable tombstones');
 assert(app.includes('normalized.length === 0'), 'Empty tariff list must have an explicit live-zero path');
-assert(sync.includes('.filter(t => !deletedTariffSet.has(t.id))'), 'Deleted tariffs must not resurrect from cloud pull');
+assert(eventSync.includes("client.rpc('delete_generator_tariff_month'"), 'Tariff deletion must use the accounting-safe server RPC');
+assert(!eventSync.includes("remove('generator_monthly_tariffs', sent.deletedTariffs)"), 'Raw cloud tariff deletion must not remain');
+assert(eventSync.includes('if (pending()) await push(snapshot());'), 'Pending local tariff deletion must be pushed before cloud pull');
 
-console.log('Secure destructive controls audit passed: owner factory reset UI is absent, subscriber/generator purge wiring remains protected, annual report reset remains non-destructive, and tariff history safeguards are intact.');
+console.log('Secure destructive controls audit passed: owner factory reset UI is absent, subscriber/generator purge wiring remains protected, annual report reset is non-destructive, and tariff deletion extinguishes only deleted-month unpaid liability while preserving real payment history.');
