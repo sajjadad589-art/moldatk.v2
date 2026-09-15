@@ -100,6 +100,7 @@ const tombstoneStorageIsExplicit = sync.includes("deletedTariffs: key('moldatk_d
 assert(tombstoneStorageIsMapped || tombstoneStorageIsExplicit, 'Event sync must persist tariff deletion tombstones');
 assert(sync.includes("client.rpc('delete_generator_tariff_month'"), 'Cloud tariff deletion must use the accounting-safe RPC');
 assert(!sync.includes("remove('generator_monthly_tariffs', sent.deletedTariffs)"), 'Cloud sync must never raw-delete a tariff and strand debt');
-assert(sync.includes('.filter(t => !deletedTariffSet.has(t.id))'), 'Cloud pull must never resurrect a deleted tariff');
+assert(sync.includes('if (pending()) await push(snapshot());'), 'Pending local tariff deletion must be pushed before any cloud pull');
+assert(sync.includes('if (!disposed && !pending()) await pull();'), 'Cloud pull must not run while a local tariff deletion is still unsynced');
 
 console.log('Monthly cycle lifecycle suite passed: explicit-save activation, carried debt, accounting-safe tariff deletion, zero live state, dashboard zero state and sync tombstones.');
