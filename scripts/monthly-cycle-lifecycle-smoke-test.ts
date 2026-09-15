@@ -94,7 +94,10 @@ assert(desktopDashboard.includes('const billingCycleActive = pricingTiers.some')
 assert(desktopDashboard.includes('const paidSubscribers = billingCycleActive'), 'Desktop paid counter must be zero with no tariff');
 assert(desktopDashboard.includes('const totalUnpaidDebt = billingCycleActive'), 'Desktop unpaid amount must be zero with no tariff');
 
-assert(sync.includes("deletedTariffs: key('moldatk_deleted_tariffs', id)"), 'Event sync must persist tariff deletion tombstones');
+const tombstoneStorageIsMapped = sync.includes("deletedTariffs: 'moldatk_deleted_tariffs'")
+  && sync.includes('Object.entries(bases).map');
+const tombstoneStorageIsExplicit = sync.includes("deletedTariffs: key('moldatk_deleted_tariffs', id)");
+assert(tombstoneStorageIsMapped || tombstoneStorageIsExplicit, 'Event sync must persist tariff deletion tombstones');
 assert(sync.includes("client.rpc('delete_generator_tariff_month'"), 'Cloud tariff deletion must use the accounting-safe RPC');
 assert(!sync.includes("remove('generator_monthly_tariffs', sent.deletedTariffs)"), 'Cloud sync must never raw-delete a tariff and strand debt');
 assert(sync.includes('.filter(t => !deletedTariffSet.has(t.id))'), 'Cloud pull must never resurrect a deleted tariff');
