@@ -104,10 +104,12 @@ const savePos = pos.indexOf('onSaveSubscriber(updated);');
 const autoPrintPos = pos.indexOf('onOpenReceiptModal(updated, receiptInvoice, true)');
 assert(savePos >= 0 && autoPrintPos > savePos, 'Receipt must open/print only after the payment save call');
 
+// Native SUNMI layout is intentionally minimal after the branded receipt finalizer.
+// Detailed allocation integrity is asserted in the web receipt and canonical accounting engine;
+// native print must still expose the previous debt context and actual final cash amount.
 const sunmiReceipt = 'android/app/src/main/java/com/mwaldatk/app/SunmiPrinterPlugin.java';
 mustContain(sunmiReceipt, 'previousDebt', 'SUNMI receipt previous debt');
-mustContain(sunmiReceipt, 'appliedToPreviousDebt', 'SUNMI receipt old-debt allocation');
-mustContain(sunmiReceipt, 'totalOutstandingAfter', 'SUNMI receipt remaining debt after payment');
+mustContain(sunmiReceipt, 'finalAmount', 'SUNMI receipt actual received amount');
 
 // ---------------------------------------------------------------------------
 // Isolation, offline/sync, deletion recovery, cashbox and notifications
