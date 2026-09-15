@@ -72,7 +72,8 @@ const must = (ok, msg) => { if (!ok) throw new Error(`Financial integrity finali
 }
 
 // Absolute last pass: all-debt lump settlement, local/cloud tariff-debt cleanup,
-// subscriber-delete/reset invariants.
+// subscriber-delete/reset invariants, then type/import normalization.
 await import('./apply-production-financial-operations-final.mjs');
+await import('./apply-production-financial-type-repair.mjs');
 
 console.log('Financial integrity finalizer complete.');
