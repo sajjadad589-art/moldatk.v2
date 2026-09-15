@@ -58,26 +58,40 @@ ${deriveMarker}`);
   save(p, s);
 }
 
-// Absolute final UI guard: this dashboard finance/discount row is injected by legacy
-// build patchers. Keep exactly one rendered copy without touching any accounting values.
+// Absolute final UI guard. Some legacy build patchers can inject the same three-card
+// dashboard row more than once. Remove only duplicate JSX presentation blocks; do not
+// touch the shared financial summary or any accounting calculation.
 {
   const p = 'src/components/DashboardView.tsx';
   let s = text(p);
-  const phraseCount = () => (s.match(/ديون الشهر السابق/g) || []).length;
+  const debtCardCount = () => (s.match(/ديون الشهر السابق/g) || []).length;
+  const debtModalCount = () => (s.match(/مدينو الشهر السابق/g) || []).length;
 
-  if (phraseCount() > 1 && s.includes('data-ampere-discount-dashboard-desktop-v1')) {
-    const markerAt = s.indexOf('data-ampere-discount-dashboard-desktop-v1');
-    const sectionStart = s.lastIndexOf('<section', markerAt);
-    const walletMarker = '      {/* 2. بطاقة القاصة (المحفظة) */}';
-    const blockEnd = s.indexOf(walletMarker, markerAt);
-    if (sectionStart >= 0 && blockEnd > sectionStart) {
-      s = s.slice(0, sectionStart) + s.slice(blockEnd);
+  while (debtCardCount() > 1) {
+    const phraseAt = s.lastIndexOf('ديون الشهر السابق');
+    const sectionStart = s.lastIndexOf('<section', phraseAt);
+    const sectionEnd = s.indexOf('</section>', phraseAt);
+    if (sectionStart < 0 || sectionEnd < 0) {
+      throw new Error('Dashboard duplicate guard: duplicate finance card block could not be isolated');
     }
+    s = s.slice(0, sectionStart) + s.slice(sectionEnd + '</section>'.length);
   }
 
-  const finalCount = phraseCount();
-  if (finalCount !== 1) {
-    throw new Error(`Dashboard duplicate guard: expected exactly one previous-debt finance row, found ${finalCount}`);
+  // Each injected card group owns one previous-debt modal. If a duplicate group was
+  // removed, remove only the trailing duplicate modal and preserve the canonical one.
+  while (debtModalCount() > 1) {
+    const phraseAt = s.lastIndexOf('مدينو الشهر السابق');
+    const modalStart = s.lastIndexOf('      {showPreviousDebtList && (', phraseAt);
+    const walletMarker = '      {/* 2. بطاقة القاصة (المحفظة) */}';
+    const modalEnd = s.indexOf(walletMarker, phraseAt);
+    if (modalStart < 0 || modalEnd < 0) {
+      throw new Error('Dashboard duplicate guard: duplicate previous-debt modal could not be isolated');
+    }
+    s = s.slice(0, modalStart) + s.slice(modalEnd);
+  }
+
+  if (debtCardCount() !== 1 || debtModalCount() !== 1) {
+    throw new Error(`Dashboard duplicate guard: expected one finance row/modal, found ${debtCardCount()}/${debtModalCount()}`);
   }
   save(p, s);
 }
