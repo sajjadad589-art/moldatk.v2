@@ -22,80 +22,35 @@ const must = (ok,msg) => { if (!ok) throw new Error('Sync speed/progress finaliz
   let s = read(p);
 
   s = s.replace(
-/const progress = \(active: boolean, pending = false\) => window\.dispatchEvent\(new CustomEvent\('moldatk-sync-progress', \{[\s\S]*?\n\}\)\);/,
+/const progress = \\(active: boolean, pending = false\\) => window\\.dispatchEvent\\(new CustomEvent\\('moldatk-sync-progress', \\{[\\s\\S]*?\\n\\}\\)\\);/,
 `const progress = (value: number, active = true, pending = false, message = 'جاري المزامنة') =>
   window.dispatchEvent(new CustomEvent('moldatk-sync-progress', {
     detail: { active, pending, progress: Math.max(0, Math.min(100, Math.round(value))), message },
   }));`
   );
 
-  // Patch the scheduler's visible stages only. Data operations remain exactly the same.
-  s = s.replace(
-`    progress(true);
-    try {
-      if (pending()) await push(snapshot());
-      // A newer user edit is already queued by its event; never overwrite it with a pull.
-      if (!disposed && !pending()) await pull();
-      if (!disposed) { lastCompletedSyncAt = Date.now(); progress(false, pending()); }
-    } finally { stage = 'idle'; }`,
-`    progress(5, true, false, 'بدء المزامنة');
-    try {
-      const hadPending = pending();
-      if (hadPending) {
-        progress(15, true, false, 'رفع التغييرات');
-        await push(snapshot());
-        progress(55, true, false, 'تم رفع التغييرات');
-      } else {
-        progress(35, true, false, 'قراءة التحديثات');
-      }
-      // A newer user edit is already queued by its event; never overwrite it with a pull.
-      if (!disposed && !pending()) {
-        progress(hadPending ? 65 : 45, true, false, 'تحديث البيانات');
-        await pull();
-        progress(95, true, false, 'إنهاء المزامنة');
-      }
-      if (!disposed) {
-        lastCompletedSyncAt = Date.now();
-        const stillPending = pending();
-        progress(stillPending ? 0 : 100, false, stillPending,
-          stillPending ? 'تعديلات بانتظار المزامنة' : 'اكتملت المزامنة');
-      }
-    } finally { stage = 'idle'; }`
-  );
+  // Make the generated scheduler stage-aware regardless of whether the performance
+  // finalizer has already added lastCompletedSyncAt.
+  if (!s.includes("progress(5, true, false, 'بدء المزامنة')")) {
+    s = s.replace(
+      '    progress(true);\\n    try {\\n      if (pending()) await push(snapshot());',
+      "    progress(5, true, false, 'بدء المزامنة');\\n    try {\\n      const hadPending = pending();\\n      if (hadPending) {\\n        progress(15, true, false, 'رفع التغييرات');\\n        await push(snapshot());\\n        progress(55, true, false, 'تم رفع التغييرات');\\n      } else {\\n        progress(35, true, false, 'قراءة التحديثات');\\n      }"
+    );
+    s = s.replace(
+      '      if (!disposed && !pending()) await pull();',
+      "      if (!disposed && !pending()) {\\n        progress(hadPending ? 65 : 45, true, false, 'تحديث البيانات');\\n        await pull();\\n        progress(95, true, false, 'إنهاء المزامنة');\\n      }"
+    );
+    s = s.replace(
+      '      if (!disposed) { lastCompletedSyncAt = Date.now(); progress(false, pending()); }',
+      "      if (!disposed) {\\n        lastCompletedSyncAt = Date.now();\\n        const stillPending = pending();\\n        progress(stillPending ? 0 : 100, false, stillPending, stillPending ? 'تعديلات بانتظار المزامنة' : 'اكتملت المزامنة');\\n      }"
+    );
+    s = s.replace(
+      '      if (!disposed) progress(false, pending());',
+      "      if (!disposed) {\\n        const stillPending = pending();\\n        progress(stillPending ? 0 : 100, false, stillPending, stillPending ? 'تعديلات بانتظار المزامنة' : 'اكتملت المزامنة');\\n      }"
+    );
+  }
 
-  // Compatibility with variants generated before the performance finalizer.
-  s = s.replace(
-`    progress(true);
-    try {
-      if (pending()) await push(snapshot());
-      // A newer user edit is already queued by its event; never overwrite it with a pull.
-      if (!disposed && !pending()) await pull();
-      if (!disposed) progress(false, pending());
-    } finally { stage = 'idle'; }`,
-`    progress(5, true, false, 'بدء المزامنة');
-    try {
-      const hadPending = pending();
-      if (hadPending) {
-        progress(15, true, false, 'رفع التغييرات');
-        await push(snapshot());
-        progress(55, true, false, 'تم رفع التغييرات');
-      } else {
-        progress(35, true, false, 'قراءة التحديثات');
-      }
-      if (!disposed && !pending()) {
-        progress(hadPending ? 65 : 45, true, false, 'تحديث البيانات');
-        await pull();
-        progress(95, true, false, 'إنهاء المزامنة');
-      }
-      if (!disposed) {
-        const stillPending = pending();
-        progress(stillPending ? 0 : 100, false, stillPending,
-          stillPending ? 'تعديلات بانتظار المزامنة' : 'اكتملت المزامنة');
-      }
-    } finally { stage = 'idle'; }`
-  );
-
-  s = s.replace(/progress\(false, true\);/g, "progress(0, false, true, 'تعذر إكمال المزامنة');");
+  s = s.replace(/progress\\(false, true\\);/g, "progress(0, false, true, 'تعذر إكمال المزامنة');");
 
   must(s.includes("progress(5, true, false, 'بدء المزامنة')"), 'staged progress start missing');
   must(s.includes("progress(95, true, false, 'إنهاء المزامنة')"), 'staged progress finish missing');
