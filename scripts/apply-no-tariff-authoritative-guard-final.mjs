@@ -5,9 +5,7 @@ let s = fs.readFileSync(p, 'utf8').replaceAll('\r\n','\n');
 const must=(ok,msg)=>{if(!ok) throw new Error('No-tariff authoritative guard: '+msg);};
 
 if (!s.includes("import { hasMonthlyPricing } from './pricingAvailability';")) {
-  const anchor = "import { getInvoiceRemaining, getMonthId } from './monthlyAccounting';";
-  must(s.includes(anchor), 'monthlyAccounting import missing');
-  s = s.replace(anchor, anchor + "\nimport { hasMonthlyPricing } from './pricingAvailability';");
+  s = "import { hasMonthlyPricing } from './pricingAvailability';\n" + s;
 }
 
 if (!s.includes('hasMonthlyPricing(tiers)')) {
