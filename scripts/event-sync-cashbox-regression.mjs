@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
 fs.mkdirSync('.test-output', { recursive: true });
-for (const name of ['useEventDrivenGeneratorSync','eventSyncScheduler','cashboxCloud','cloudSyncRows']) {
+for (const name of ['useEventDrivenGeneratorSync','eventSyncScheduler','cashboxCloud','cloudSyncRows','syncConflictResolution']) {
   const source=fs.readFileSync(`src/lib/${name}.ts`,'utf8');
   const result=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
   fs.writeFileSync(`.test-output/${name}.mjs`,result.replace(/from '(\.\/[^']+)'/g,"from '$1.mjs'"));
@@ -48,9 +48,9 @@ function fixture(role = 'generator_admin') {
       assert.equal(name, 'get_generator_cashbox'); return {data:cashbox};
     },
     from(table) {
-      let kind='select', rows, lo=0,hi=499,ids;
+      let kind='select', rows, lo=0,hi=499,ids,filterColumn;
       const q={ select(){return q;}, eq(){return q;}, order(){return q;}, range(a,b){lo=a;hi=b;return q;}, maybeSingle(){kind='single';return q;},
-        upsert(r){kind='upsert';rows=r;return q;}, delete(){kind='delete';return q;}, in(_k,v){ids=v;return q;},
+        upsert(r){kind='upsert';rows=r;return q;}, delete(){kind='delete';return q;}, in(k,v){filterColumn=k;ids=v;return q;},
         async then(resolve,reject) {
           try {
             if (kind==='upsert'||kind==='delete') {
@@ -60,7 +60,8 @@ function fixture(role = 'generator_admin') {
               else for(const row of rows) { const n=db[table].findIndex(r=>r.id===row.id); if(n>=0) db[table][n]={...db[table][n],...row}; else db[table].push(row); }
               onWrite?.();
             } else { reads++; if (pause) await pause(); }
-            resolve({data:kind==='single'?db[table][0]||null:db[table].slice(lo,hi+1),error:null});
+            const selected = filterColumn && kind==='select' ? db[table].filter(row=>ids.includes(row[filterColumn])) : db[table];
+            resolve({data:kind==='single'?db[table][0]||null:selected.slice(lo,hi+1),error:null});
           } catch(error){reject(error);}
         },
       }; return q;
@@ -94,6 +95,15 @@ await test('bootstrap and remote pulls do not push or reconcile, including cloud
   const f=fixture();f.db.generator_subscribers=[{id:'s1',full_name:'Server',tier:'normal',amperes:5,payment_status:'unpaid'}];
   await f.sync.flush();for(let i=0;i<25;i++)f.sync.remote();await f.sync.flush();
   assert.equal(f.writes,0);assert.equal(f.reconciles,0);assert.equal(JSON.parse(localStorage.getItem(`moldatk_subscribers_${id}`))[0].fullName,'Server');f.close();
+});
+await test('subscriber realtime change reads only its row and invoices after bootstrap',async()=>{
+  const f=fixture();f.db.generator_subscribers=[{id:'s1',full_name:'First',tier:'normal',amperes:5,payment_status:'unpaid'}];
+  await f.sync.flush();const before=f.reads;
+  f.db.generator_subscribers[0].full_name='Updated';
+  f.sync.remote({table:'generator_subscribers',eventType:'UPDATE',new:{id:'s1'}});
+  await sleep(450);
+  assert.equal(JSON.parse(localStorage.getItem(`moldatk_subscribers_${id}`))[0].fullName,'Updated');
+  assert.equal(f.reads-before,2);assert.equal(f.writes,0);f.close();
 });
 await test('one local write + own realtime echo settles with no re-push',async()=>{
   const f=fixture();await f.sync.flush();f.onWrite=()=>f.sync.remote();local('subscribers',[sub]);await f.sync.flush();

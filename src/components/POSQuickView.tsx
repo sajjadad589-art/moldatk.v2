@@ -311,6 +311,9 @@ export const POSQuickView: React.FC<POSQuickViewProps> = ({
     if (assignedLineId && sub.lineId !== assignedLineId) return false;
     if (assignedLineId && sub.lineId !== assignedLineId) return false;
     if (assignedLineId && sub.lineId !== assignedLineId) return false;
+    if (assignedLineId && sub.lineId !== assignedLineId) return false;
+    if (assignedLineId && sub.lineId !== assignedLineId) return false;
+    if (assignedLineId && sub.lineId !== assignedLineId) return false;
     if (selectedLineFilter !== 'all' && sub.lineId !== selectedLineFilter) return false;
     if (searchTerm.trim()) {
       const query = searchTerm.toLowerCase();
@@ -648,6 +651,7 @@ export const POSQuickView: React.FC<POSQuickViewProps> = ({
           onClose={() => setPaymentSubscriber(null)}
           subscriber={paymentSubscriber}
           pricingTiers={pricingTiers}
+          activeMonthId={activeMonthId}
           collectors={effectiveCollectors}
           currency={generatorSpecs.currency || 'د.ع'}
           onConfirmPayment={handleConfirmPayment}

@@ -4,11 +4,9 @@ const path = 'src/components/SuperAdminDashboard.tsx';
 if (!fs.existsSync(path)) process.exit(0);
 const src = fs.readFileSync(path, 'utf8');
 
-// Keep the static XLSX import because SuperAdminDashboard uses XLSX both as a
-// runtime value and as a TypeScript namespace/type. Removing only the import
-// caused release typecheck failures after the build-time transforms ran.
-if (!src.includes("import * as XLSX from 'xlsx';")) {
-  throw new Error('Stable XLSX import missing from SuperAdminDashboard');
+// The import action loads XLSX only when the operator selects a spreadsheet.
+if (!src.includes("await import('xlsx')") || src.includes("import * as XLSX from 'xlsx'")) {
+  throw new Error('SuperAdminDashboard must load XLSX only during import');
 }
 
-console.log('Stable XLSX import preserved for release builds.');
+console.log('Dynamic XLSX import verified.');

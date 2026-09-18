@@ -62,6 +62,7 @@ export interface SubscriberInvoice {
   totalAmount: number;
   paidAmount?: number;
   remainingAmount?: number;
+  remainingAfterPayment?: number;
   status: 'paid' | 'partial' | 'unpaid' | 'cancelled' | 'free';
   cancellationReason?: string;
   cancelledAt?: string;

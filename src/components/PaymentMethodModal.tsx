@@ -33,6 +33,7 @@ interface PaymentMethodModalProps {
   onClose: () => void;
   subscriber: Subscriber | null;
   pricingTiers: SubscriptionTierPricing[];
+  activeMonthId?: string;
   collectors: Collector[];
   onConfirmPayment: (data: PaymentExecutionData) => void;
   currency?: string;
@@ -45,6 +46,7 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
   onClose,
   subscriber,
   pricingTiers,
+  activeMonthId,
   collectors,
   onConfirmPayment,
   currency = 'د.ع',
@@ -79,6 +81,7 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
 
   const calc = calculateSubscriberBill(subscriber.amperes, subscriber.tier, pricingTiers);
   const totalAmountDue = subscriber.amountDue > 0 ? subscriber.amountDue : calc.total;
+  const lumpMaximum = Math.max(0, totalAmountDue);
   const currentTier = pricingTiers.find(p => p.type === subscriber.tier);
 
   let computedAmountPaid = 0;
@@ -91,7 +94,7 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
     computedAmountPaid = Math.min(totalAmountDue, Math.max(0, Number(partialAmount) || 0));
     computedRemaining = Math.max(0, totalAmountDue - computedAmountPaid);
   } else if (selectedMethod === 'lump') {
-    computedAmountPaid = Math.min(totalAmountDue, Math.max(0, Number(partialAmount) || 0));
+    computedAmountPaid = Math.min(lumpMaximum, Math.max(0, Math.round(Number(partialAmount) || 0)));
     computedRemaining = 0;
   } else if (selectedMethod === 'free') {
     computedAmountPaid = 0;
@@ -138,7 +141,14 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
     e.preventDefault();
     if (!hasMonthlyPricing(pricingTiers)) return;
 
-    if ((selectedMethod === 'partial' || selectedMethod === 'lump') && computedAmountPaid <= 0) return;
+    if (selectedMethod === 'partial' || selectedMethod === 'lump') {
+      const requested = Math.round(Number(partialAmount) || 0);
+      const maxAllowed = selectedMethod === 'lump' ? lumpMaximum : totalAmountDue;
+      if (!Number.isFinite(requested) || requested < 1 || requested > maxAllowed) {
+        window.alert('أدخل مبلغاً صحيحاً بين 1 و ' + Math.max(0, maxAllowed).toLocaleString('en-US') + ' ' + currency);
+        return;
+      }
+    }
 
     onConfirmPayment({
       subscriberId: subscriber.id,
@@ -193,7 +203,7 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleApplyPayment} className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1">
+        <form noValidate onSubmit={handleApplyPayment} className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1">
           <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-50/90 to-indigo-50/90 dark:from-blue-950/40 dark:to-indigo-950/40 border border-blue-200/80 dark:border-blue-900/50 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-11 h-11 rounded-2xl bg-[#1E3A8A] text-white flex items-center justify-center font-black text-sm shrink-0 shadow-xs">
@@ -264,7 +274,7 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
                 </div>
                 <div>
                   <div className="text-sm font-black text-slate-900 dark:text-white">تسديد مخصص</div>
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400">مخصص: يبقى المتبقي ديناً • مقطوع: يغلق الشهر بالمبلغ المتفق عليه</div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400">مخصص: يبقى المتبقي ديناً • مقطوع: يغلق كامل ذمة المشترك بالمبلغ المتفق عليه</div>
                 </div>
               </div>
               <ChevronDown className={`w-5 h-5 text-slate-500 transition-transform ${customPaymentOpen ? 'rotate-180' : ''}`} />
@@ -281,7 +291,7 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
                 >
                   <option value="">اختر طريقة التسديد</option>
                   <option value="partial">تسديد مخصص — دفعة جزئية</option>
-                  <option value="lump">تسديد مقطوع — إغلاق الاشتراك بالمبلغ المتفق عليه</option>
+                  <option value="lump">تسديد مقطوع — تصفية كامل الذمة بالمبلغ المتفق عليه</option>
                 </select>
               </div>
             )}
@@ -301,10 +311,10 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
                 <input
                   type="number"
                   min={1}
-                  max={totalAmountDue}
-                  step={1000}
+                  max={selectedMethod === 'lump' ? lumpMaximum : totalAmountDue}
+                  step={1}
                   value={partialAmount}
-                  onChange={e => setPartialAmount(Number(e.target.value))}
+                  onChange={e => setPartialAmount(Math.max(0, Math.round(Number(e.target.value) || 0)))}
                   className="w-full px-4 py-3 rounded-xl border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-black text-sm outline-none focus:ring-2 focus:ring-amber-500"
                   placeholder="أدخل المبلغ"
                   required

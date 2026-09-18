@@ -1,9 +1,9 @@
-import { hasMonthlyPricing, NO_TARIFF_LABEL } from '../../utils/pricingAvailability';
 import React, { useMemo, useState } from 'react';
 import { Search, Plus, Users, X , Trash2} from 'lucide-react';
 import { Subscriber, SubscriptionTierPricing, LineDistribution } from '../../types';
 import { formatCurrency, formatNumberArabic } from '../../utils/formatters';
 import { getSubscriberStyleByStatus } from '../SubscribersView';
+import { hasMonthlyPricing, NO_TARIFF_LABEL } from '../../utils/pricingAvailability';
 
 interface MobileSubscribersProps {
   subscribers: Subscriber[];
@@ -23,8 +23,8 @@ export const MobileSubscribers: React.FC<MobileSubscribersProps> = ({
   onOpenReceiptModal,
   onDeleteSubscriber,
 }) => {
+  const noTariff = !hasMonthlyPricing(pricingTiers);
 
-  const hasPricing = hasMonthlyPricing(pricingTiers);
   const readInitialStatusFilter = (): 'all' | 'unpaid' | 'paid' | 'partial' | 'free' => {
     try {
       const saved = localStorage.getItem('moldatk_mobile_subscribers_filter');
@@ -40,9 +40,9 @@ const [searchTerm, setSearchTerm] = useState('');
   const selectedLine = useMemo(() => lines.find(line => line.id === lineFilter), [lines, lineFilter]);
 
   const getRemainingAmount = (sub: Subscriber) => Math.max(0, Number(sub.amountDue || 0) - Number(sub.amountPaid || 0));
-  const isFreeSubscriber = (sub: Subscriber) => hasPricing && (sub.paymentStatus === 'free' || sub.tier === 'free');
-  const isPaidSubscriber = (sub: Subscriber) => hasPricing && (!isFreeSubscriber(sub) && (sub.paymentStatus === 'paid' || getRemainingAmount(sub) === 0));
-  const isUnpaidSubscriber = (sub: Subscriber) => hasPricing && (!isFreeSubscriber(sub) && (sub.paymentStatus === 'unpaid' || sub.paymentStatus === 'partial' || getRemainingAmount(sub) > 0));
+  const isFreeSubscriber = (sub: Subscriber) => sub.paymentStatus === 'free' || sub.tier === 'free';
+  const isPaidSubscriber = (sub: Subscriber) => !isFreeSubscriber(sub) && (sub.paymentStatus === 'paid' || getRemainingAmount(sub) === 0);
+  const isUnpaidSubscriber = (sub: Subscriber) => !isFreeSubscriber(sub) && (sub.paymentStatus === 'unpaid' || sub.paymentStatus === 'partial' || getRemainingAmount(sub) > 0);
 
   const filteredSubscribers = subscribers.filter(sub => {
     const needle = searchTerm.trim().toLowerCase();
@@ -54,7 +54,7 @@ const [searchTerm, setSearchTerm] = useState('');
       (sub.boxNumber || '').toLowerCase().includes(needle) ||
       (sub.lineName || sub.line || '').toLowerCase().includes(needle);
 
-    const matchesStatus = !hasPricing || statusFilter === 'all'
+    const matchesStatus = statusFilter === 'all'
       ? true
       : statusFilter === 'free'
       ? isFreeSubscriber(sub)
@@ -73,7 +73,7 @@ const [searchTerm, setSearchTerm] = useState('');
   });
 
   const paidCount = subscribers.filter(isPaidSubscriber).length;
-  const partialCount = hasPricing ? subscribers.filter(s => s.paymentStatus === 'partial').length : 0;
+  const partialCount = subscribers.filter(s => s.paymentStatus === 'partial').length;
   const unpaidCount = subscribers.filter(isUnpaidSubscriber).length;
   const freeCount = subscribers.filter(isFreeSubscriber).length;
 
@@ -159,7 +159,7 @@ const [searchTerm, setSearchTerm] = useState('');
             const isPartial = sub.paymentStatus === 'partial';
             const isPaid = sub.paymentStatus === 'paid';
             const isFree = sub.paymentStatus === 'free' || sub.tier === 'free';
-            const styles = getSubscriberStyleByStatus(!hasPricing ? 'no_tariff' : isFree ? 'free' : sub.paymentStatus);
+            const styles = getSubscriberStyleByStatus(isFree ? 'free' : sub.paymentStatus);
 
             // amountDue يمثل المتبقي بعد التسديد، لذلك يصبح صفراً عند السداد الكامل.
             // في بطاقة المشترك نعرض قيمة العملية/الاشتراك للمسدد، والمتبقي لغير المسدد والجزئي.
@@ -173,7 +173,7 @@ const [searchTerm, setSearchTerm] = useState('');
               latestInvoice?.status === 'paid' ? Number(latestInvoice?.totalAmount || 0) : 0
             );
             const remainingDisplayAmount = Math.max(0, Number(sub.amountDue || 0));
-            const visibleAmount = !hasPricing ? formatCurrency(0) : isFree
+            const visibleAmount = noTariff ? NO_TARIFF_LABEL : isFree
               ? 'إعفاء'
               : isPaid
               ? formatCurrency(paidDisplayAmount)
@@ -183,31 +183,30 @@ const [searchTerm, setSearchTerm] = useState('');
               <button
                 type="button"
                 key={sub.id}
+                data-billing-state={noTariff ? 'no_tariff' : sub.paymentStatus}
                 onClick={() => onOpenSubscriberModal(sub)}
-                data-billing-state={hasPricing ? sub.paymentStatus : 'no_tariff'}
-                className={`w-full rounded-xl px-3 py-2.5 transition-all text-right active:scale-[0.99] ${styles.cardBg} ${styles.cardBorderAccent}`}
+                className={`w-full rounded-xl px-3 py-2.5 transition-all text-right active:scale-[0.99] ${noTariff ? 'bg-white dark:bg-white text-slate-900' : `${styles.cardBg} ${styles.cardBorderAccent}`}`}
               >
                 <div className="grid grid-cols-[1.35fr_.7fr_1fr] gap-2 items-center" dir="rtl">
                   <div className="min-w-0 text-right">
-                    <span className={`block text-[9px] font-bold leading-3 ${hasPricing ? 'text-white/75' : 'text-slate-600'}`}>اسم المشترك</span>
+                    <span className="block text-[9px] font-bold text-white/75 leading-3">اسم المشترك</span>
                     <span className={`block text-[15px] font-black truncate leading-6 ${styles.nameText}`}>
                       {sub.fullName}
                     </span>
                   </div>
 
                   <div className="text-center min-w-0">
-                    <span className={`block text-[9px] font-bold leading-3 ${hasPricing ? 'text-white/75' : 'text-slate-600'}`}>الأمبير</span>
-                    <span className={`block text-[15px] font-black tabular-nums leading-6 whitespace-nowrap ${hasPricing ? 'text-cyan-300' : 'text-slate-900'}`}>
+                    <span className="block text-[9px] font-bold text-white/75 leading-3">الأمبير</span>
+                    <span className="block text-[15px] font-black text-cyan-300 tabular-nums leading-6 whitespace-nowrap">
                       A {formatNumberArabic(sub.amperes)}
                     </span>
                   </div>
 
                   <div className="text-left min-w-0" dir="rtl">
-                    <span className={`block text-[9px] font-bold leading-3 ${hasPricing ? 'text-white/75' : 'text-slate-600'}`}>المبلغ</span>
-                    <span className={`block text-[15px] font-black tabular-nums truncate leading-6 ${styles.nameText}`}>
+                    <span className="block text-[9px] font-bold text-white/75 leading-3">المبلغ</span>
+                    <span className="block text-[15px] font-black text-white tabular-nums truncate leading-6">
                       {visibleAmount}
                     </span>
-                    {!hasPricing && <span className="block text-[10px] text-slate-600 font-bold">{NO_TARIFF_LABEL}</span>}
                   </div>
                 </div>
               </button>

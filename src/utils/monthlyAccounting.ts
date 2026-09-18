@@ -541,3 +541,83 @@ export function buildMonthlyReports(subscribers: Subscriber[]): MonthlyReport[] 
 
   return reports.sort((a, b) => b.monthId.localeCompare(a.monthId));
 }
+
+
+export interface LumpSettlementAllDebtResult {
+  invoices: SubscriberInvoice[];
+  totalDebtBefore: number;
+  receivedAmount: number;
+  waivedAmount: number;
+  allocations: PaymentAllocationEntry[];
+}
+
+export function applyLumpSettlementAllDebt(
+  subscriber: Subscriber,
+  pricingTiers: SubscriptionTierPricing[],
+  paymentAmount: number,
+  date = new Date(),
+  activeMonthId = getMonthId(date),
+  activeMonthNameAr = getMonthNameAr(monthIdToDate(activeMonthId)),
+): LumpSettlementAllDebtResult {
+  if (!hasMonthlyPricing(pricingTiers)) throw new Error('NO_MONTHLY_TARIFF');
+  const ensured = ensureMonthInvoice(subscriber, pricingTiers, activeMonthId, activeMonthNameAr, date.toISOString().slice(0, 10));
+  const invoices = ensured.invoices.map(inv => ({ ...inv }));
+  const payable = invoices
+    .filter(inv => inv.status !== 'cancelled' && inv.status !== 'free' && getInvoiceRemaining(inv) > 0)
+    .sort((a, b) => (a.monthId + '-' + a.issueDate + '-' + a.id).localeCompare(b.monthId + '-' + b.issueDate + '-' + b.id));
+  const ledgerDebt = payable.reduce((sum, inv) => sum + getInvoiceRemaining(inv), 0);
+  const totalDebtBefore = Math.max(ledgerDebt, Math.max(0, Number(subscriber.amountDue || 0)));
+  const requested = Math.max(0, Math.round(Number(paymentAmount) || 0));
+  if (totalDebtBefore <= 0) throw new Error('NO_OUTSTANDING_DEBT');
+  if (requested < 1 || requested > totalDebtBefore) throw new Error('INVALID_LUMP_AMOUNT');
+
+  let cashLeft = requested;
+  const allocations: PaymentAllocationEntry[] = [];
+  for (const invoice of payable) {
+    const due = getInvoiceRemaining(invoice);
+    if (due <= 0) continue;
+    const cashApplied = Math.min(due, cashLeft);
+    const paidBefore = Math.max(0, Number(invoice.paidAmount || 0));
+    const paidAfter = paidBefore + cashApplied;
+    const waivedHere = Math.max(0, due - cashApplied);
+    const originalTotal = Math.max(0, Number(invoice.totalAmount || 0));
+    const cleanNotes = String(invoice.notes || '').split(' | ').filter(x => x && !x.includes('MOLDATK_LUMP_SETTLEMENT_ALL_DEBT')).join(' | ');
+    const marker = 'MOLDATK_LUMP_SETTLEMENT_ALL_DEBT|original=' + originalTotal + '|paidBefore=' + paidBefore + '|received=' + cashApplied + '|waived=' + waivedHere + '|settlementCash=' + requested + '|totalDebtBefore=' + totalDebtBefore;
+    invoice.totalAmount = paidAfter;
+    invoice.paidAmount = paidAfter;
+    invoice.remainingAmount = 0;
+    invoice.remainingAfterPayment = 0;
+    invoice.status = 'paid';
+    if (cashApplied > 0) invoice.paymentDate = date.toISOString();
+    invoice.notes = [cleanNotes, marker].filter(Boolean).join(' | ');
+    if (cashApplied > 0) {
+      allocations.push({ monthId: invoice.monthId, monthNameAr: invoice.monthNameAr, amount: cashApplied });
+      cashLeft -= cashApplied;
+    }
+  }
+
+  // Legacy summary-only debt: keep actual received cash auditable on the active invoice,
+  // while the negotiated settlement still closes the stale summary balance.
+  if (cashLeft > 0) {
+    const current = invoices.find(inv => inv.monthId === activeMonthId && inv.status !== 'cancelled' && inv.status !== 'free');
+    if (current) {
+      current.totalAmount = Math.max(0, Number(current.totalAmount || 0)) + cashLeft;
+      current.paidAmount = Math.max(0, Number(current.paidAmount || 0)) + cashLeft;
+      current.remainingAmount = 0;
+      current.remainingAfterPayment = 0;
+      current.status = 'paid';
+      current.paymentDate = date.toISOString();
+      current.notes = [String(current.notes || ''), 'MOLDATK_LUMP_SETTLEMENT_ALL_DEBT|legacyCash=' + cashLeft].filter(Boolean).join(' | ');
+      allocations.push({ monthId: current.monthId, monthNameAr: current.monthNameAr, amount: cashLeft });
+      cashLeft = 0;
+    }
+  }
+
+  return {
+    invoices,
+    totalDebtBefore,
+    receivedAmount: requested,
+    waivedAmount: Math.max(0, totalDebtBefore - requested),
+    allocations,
+  };
+}

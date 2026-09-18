@@ -6,7 +6,7 @@ import { hasMonthlyPricing, suspendSubscriberBilling } from './utils/pricingAvai
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import {
   INITIAL_PRICING_TIERS,
   INITIAL_MONTHLY_TARIFFS,
@@ -47,8 +47,8 @@ import { Sparkles } from 'lucide-react';
 import { calculateSubscriberBill } from './utils/formatters';
 import { activateMonthlyTariffForSubscribers, calculateMonthlyCharge, getInvoiceRemaining } from './utils/monthlyAccounting';
 import { normalizeMonthlyTariffs, startFreshMonthlyCycle, repriceActiveMonthlyCycle, summarizeExistingMonthlyCycle, zeroLiveMonthlyCycle } from './utils/monthlyCycleEngine';
-import { hasPaymentsInMonth, removeUnpaidMonthLedger } from './utils/monthlyTariffDeletion';
-import { SuperAdminDashboard } from './components/SuperAdminDashboard';
+import { hasPaymentsInMonth, removeUnpaidMonthLedger, extinguishDeletedTariffLiabilities } from './utils/monthlyTariffDeletion';
+const SuperAdminDashboard = lazy(() => import('./components/SuperAdminDashboard').then(module => ({ default: module.SuperAdminDashboard })));
 import { supabase } from './lib/supabase';
 import { loadCloudCollectors, syncCloudCollectorRoster } from './lib/collectorCloud';
 import { persistCollectorSubscriber } from './lib/subscriberCloud';
@@ -419,51 +419,118 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
   };
 
   const lastBackPressRef = useRef(0);
+  const pwaBackLockRef = useRef(0);
 
   useEffect(() => {
-    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') return;
-
-    const handleAndroidBack = () => {
-      // ضغطة واحدة تغلق النافذة/القائمة الحالية أولاً.
+    const performLogicalBack = () => {
       if (isReceiptModalOpen) {
         setIsReceiptModalOpen(false);
         setSelectedReceiptSubscriber(null);
         setSelectedReceiptInvoice(null);
-        return;
+        return true;
       }
       if (isSubscriberModalOpen) {
         setIsSubscriberModalOpen(false);
         setSubscriberToEdit(null);
-        return;
+        return true;
       }
       if (pricingModalOpen) {
         setPricingModalOpen(false);
-        return;
+        return true;
       }
       if (activeSettingsFolderKey) {
         setActiveSettingsFolderKey(null);
-        return;
+        return true;
       }
       if (activeTab !== 'dashboard') {
         setActiveTab('dashboard');
-        return;
+        return true;
       }
+      return false;
+    };
 
-      // إذا نحن بالواجهة الرئيسية: أول ضغطة تنبه، والثانية خلال ثانيتين تغلق التطبيق.
+    const handleAndroidBack = () => {
+      if (performLogicalBack()) return;
       const now = Date.now();
       if (now - lastBackPressRef.current <= 2000) {
         lastBackPressRef.current = 0;
         void BackNavigation.exitApp();
         return;
       }
-
       lastBackPressRef.current = now;
       showToast('اضغط رجوع مرة ثانية للخروج من التطبيق');
     };
 
-    window.addEventListener('moldatk-android-back', handleAndroidBack);
-    return () => window.removeEventListener('moldatk-android-back', handleAndroidBack);
-  }, [isReceiptModalOpen, isSubscriberModalOpen, pricingModalOpen, activeSettingsFolderKey, activeTab]);
+    const nativeAndroid = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
+    if (nativeAndroid) window.addEventListener('moldatk-android-back', handleAndroidBack);
+
+    const browserMobile = !Capacitor.isNativePlatform() && isMobileViewport;
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchStartAt = 0;
+    let touchEdge: 'left' | 'right' | null = null;
+
+    const handlePwaBack = () => {
+      const now = Date.now();
+      if (now - pwaBackLockRef.current < 450) return false;
+      const handled = performLogicalBack();
+      if (handled) pwaBackLockRef.current = now;
+      return handled;
+    };
+
+    const onTouchStart = (event: TouchEvent) => {
+      if (event.touches.length !== 1) { touchEdge = null; return; }
+      const touch = event.touches[0];
+      const edgeWidth = Math.min(34, Math.max(24, window.innerWidth * 0.07));
+      touchStartX = touch.clientX;
+      touchStartY = touch.clientY;
+      touchStartAt = Date.now();
+      touchEdge = touchStartX <= edgeWidth ? 'left' : touchStartX >= window.innerWidth - edgeWidth ? 'right' : null;
+    };
+
+    const onTouchEnd = (event: TouchEvent) => {
+      if (!touchEdge || event.changedTouches.length !== 1) { touchEdge = null; return; }
+      const touch = event.changedTouches[0];
+      const dx = touch.clientX - touchStartX;
+      const dy = touch.clientY - touchStartY;
+      const duration = Date.now() - touchStartAt;
+      const inwardSwipe = touchEdge === 'left' ? dx >= 68 : dx <= -68;
+      const mostlyHorizontal = Math.abs(dx) >= Math.max(68, Math.abs(dy) * 1.25);
+      if (duration <= 800 && inwardSwipe && mostlyHorizontal) handlePwaBack();
+      touchEdge = null;
+    };
+
+    const pushPwaGuard = () => {
+      const current = window.history.state && typeof window.history.state === 'object' ? window.history.state : {};
+      if (!(current as any).moldatkPwaBackGuard) {
+        window.history.pushState({ ...current, moldatkPwaBackGuard: true }, document.title, window.location.href);
+      }
+    };
+
+    const onPopState = () => {
+      if (handlePwaBack()) {
+        const current = window.history.state && typeof window.history.state === 'object' ? window.history.state : {};
+        window.history.pushState({ ...current, moldatkPwaBackGuard: true }, document.title, window.location.href);
+      }
+      // On dashboard, do not trap the browser/system back action.
+    };
+
+    if (browserMobile) {
+      pushPwaGuard();
+      window.addEventListener('touchstart', onTouchStart, { passive: true });
+      window.addEventListener('touchend', onTouchEnd, { passive: true });
+      window.addEventListener('popstate', onPopState);
+    }
+
+    return () => {
+      if (nativeAndroid) window.removeEventListener('moldatk-android-back', handleAndroidBack);
+      if (browserMobile) {
+        window.removeEventListener('touchstart', onTouchStart);
+        window.removeEventListener('touchend', onTouchEnd);
+        window.removeEventListener('popstate', onPopState);
+      }
+    };
+  }, [isReceiptModalOpen, isSubscriberModalOpen, pricingModalOpen, activeSettingsFolderKey, activeTab, isMobileViewport]);
 
   // تسجيل جهاز صاحب المولدة في Firebase Cloud Messaging وحفظ Token في Supabase.
   // يعمل فقط داخل تطبيق Android الحقيقي، ولا يشتغل عند فتح النسخة من المتصفح.
@@ -942,7 +1009,7 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
     const matchedLine = lines.find(l => l.id === newSub.lineId || l.name === newSub.lineName || l.name === newSub.line);
     const rawTier = String(newSub.tier || 'normal').replace(/^tier-/, '');
     const normalizedTier = (matchedTier?.type || (['normal', 'commercial', 'golden', 'free', 'custom'].includes(rawTier) ? rawTier : 'normal')) as Subscriber['tier'];
-    let normalizedSub: Subscriber = {
+    const normalizedSub: Subscriber = {
       ...newSub,
       code: newSub.code || newSub.subscriberCode || generateUniqueSubscriberCode(subscribers),
       subscriberCode: newSub.subscriberCode || newSub.code || generateUniqueSubscriberCode(subscribers),
@@ -951,17 +1018,6 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
       line: matchedLine?.name || newSub.line || newSub.lineName,
       lineName: matchedLine?.name || newSub.lineName || newSub.line,
     };
-
-    // No active tariff: profile edits preserve the historical ledger, including
-    // when an old payment dialog was open while pricing was removed remotely.
-    if (!hasMonthlyPricing(pricingTiers)) {
-      const previous = subscribers.find(s => s.id === normalizedSub.id);
-      normalizedSub = suspendSubscriberBilling({ ...normalizedSub,
-        invoicesHistory: previous?.invoicesHistory || [],
-        paymentStatus: previous?.paymentStatus || normalizedSub.paymentStatus,
-        lastPaymentDate: previous?.lastPaymentDate,
-      });
-    }
 
     // Local-first: payment/status changes become visible immediately and never wait for network.
     setSubscribers(prev => {
@@ -1026,13 +1082,11 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
       showToast('تعذر حذف المشترك نهائياً: ' + (data?.error || error?.message || 'خطأ غير معروف'));
       return;
     }
-
-    const { data: extraDeleteData, error: extraDeleteError } = await supabase.functions.invoke('generator-data-cleanup', {
+    const { data: cleanupData, error: cleanupError } = await supabase.functions.invoke('generator-data-cleanup', {
       body: { action: 'delete_subscriber_extras', subscriber_id: subId },
     });
-    if (extraDeleteError || !extraDeleteData?.ok) {
-      showToast('تم حذف البيانات المالية للمشترك لكن تعذر تنظيف سجلات AI المرتبطة. أعد المحاولة لإكمال الحذف.');
-      return;
+    if (cleanupError || !cleanupData?.ok) {
+      console.error('Subscriber extra-data cleanup failed:', cleanupError || cleanupData?.error);
     }
 
     setSubscribers(prev => {
@@ -1048,7 +1102,7 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
     try {
       const tombstoneKey = getStorageKey('moldatk_deleted_subscribers');
       const deleted = JSON.parse(localStorage.getItem(tombstoneKey) || '[]') as string[];
-      localStorage.setItem(tombstoneKey, JSON.stringify(deleted.filter(id => id !== subId)));
+      localStorage.setItem(tombstoneKey, JSON.stringify([...new Set([...deleted, subId])]));
     } catch (e) {}
 
     if (subscriberToEdit?.id === subId) setSubscriberToEdit(null);
@@ -1089,7 +1143,7 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
   }
 
   if (userSession.role === 'super_admin' || userSession.role === 'super_admin_manager') {
-    return <SuperAdminDashboard onLogout={handleLogout} />;
+    return <Suspense fallback={<div role="status">جاري التحميل...</div>}><SuperAdminDashboard onLogout={handleLogout} /></Suspense>;
   }
 
   const subscriptionAccessControlled = userSession.role === 'generator_admin' || userSession.role === 'collector';
@@ -1196,19 +1250,16 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
       // removed only after the local scoped cache is empty as well.
       localStorage.setItem(markerKey, '1');
 
-      const { data: extraResetData, error: extraResetError } = await supabase.functions.invoke('generator-data-cleanup', {
-        body: { action: 'reset_extras' },
-      });
-      if (extraResetError || !extraResetData?.ok) {
-        throw new Error(extraResetData?.error || extraResetError?.message || 'تعذر تنظيف البيانات التشغيلية الإضافية');
-      }
-
       const { data: resetData, error: resetError } = await supabase.functions.invoke('generator-data-admin', {
         body: { action: 'reset_generator_data' },
       });
       if (resetError || !resetData?.ok) {
         throw new Error(resetData?.error || resetError?.message || 'تعذر تصفير البيانات السحابية');
       }
+      const { data: cleanupData, error: cleanupError } = await supabase.functions.invoke('generator-data-cleanup', {
+        body: { action: 'reset_extras' },
+      });
+      if (cleanupError || !cleanupData?.ok) throw new Error(cleanupData?.error || cleanupError?.message || 'تعذر تنظيف البيانات الملحقة');
 
       const scopedSuffix = '_' + generatorId;
       const keysToRemove: string[] = [];
@@ -1385,13 +1436,28 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
                 const generatorId = userSession?.generatorId;
                 if (!generatorId || userSession?.role !== 'generator_admin') return;
                 try {
-                  await flushGeneratorSync(generatorId);
+                  // Cashbox reset is a server-authoritative operation and must not be
+                  // blocked by an unrelated subscriber/tariff sync failure. Give pending
+                  // writes a short best-effort flush window, then reset independently.
+                  try {
+                    await Promise.race([
+                      flushGeneratorSync(generatorId),
+                      new Promise((_, reject) => window.setTimeout(() => reject(new Error('sync_flush_timeout')), 2500)),
+                    ]);
+                  } catch (syncError) {
+                    console.warn('Cashbox reset continuing after sync flush warning:', syncError);
+                  }
                   const confirmed = await resetCashbox(generatorId);
                   setWalletResetTimestamp(confirmed.reset_at || '');
                   showToast('تم تصفير القاصة وحفظه في السحابة');
                 } catch (error) {
                   console.error('Cashbox reset failed:', error);
-                  showToast('لم يتم تأكيد التصفير. تحقق من الاتصال وأعد المحاولة');
+                  const reason = String((error as any)?.message || (error as any)?.code || '');
+                  if (/jwt|auth|token|not_authorized|42501|401|403/i.test(reason)) {
+                    showToast('تعذر تأكيد التصفير بسبب الجلسة. سجل الدخول من جديد ثم أعد المحاولة');
+                  } else {
+                    showToast('تعذر تأكيد تصفير القاصة من السيرفر. أعد المحاولة');
+                  }
                 }
               }}
           monthlyTariffs={monthlyTariffs}
@@ -1593,13 +1659,28 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
                 const generatorId = userSession?.generatorId;
                 if (!generatorId || userSession?.role !== 'generator_admin') return;
                 try {
-                  await flushGeneratorSync(generatorId);
+                  // Cashbox reset is a server-authoritative operation and must not be
+                  // blocked by an unrelated subscriber/tariff sync failure. Give pending
+                  // writes a short best-effort flush window, then reset independently.
+                  try {
+                    await Promise.race([
+                      flushGeneratorSync(generatorId),
+                      new Promise((_, reject) => window.setTimeout(() => reject(new Error('sync_flush_timeout')), 2500)),
+                    ]);
+                  } catch (syncError) {
+                    console.warn('Cashbox reset continuing after sync flush warning:', syncError);
+                  }
                   const confirmed = await resetCashbox(generatorId);
                   setWalletResetTimestamp(confirmed.reset_at || '');
                   showToast('تم تصفير القاصة وحفظه في السحابة');
                 } catch (error) {
                   console.error('Cashbox reset failed:', error);
-                  showToast('لم يتم تأكيد التصفير. تحقق من الاتصال وأعد المحاولة');
+                  const reason = String((error as any)?.message || (error as any)?.code || '');
+                  if (/jwt|auth|token|not_authorized|42501|401|403/i.test(reason)) {
+                    showToast('تعذر تأكيد التصفير بسبب الجلسة. سجل الدخول من جديد ثم أعد المحاولة');
+                  } else {
+                    showToast('تعذر تأكيد تصفير القاصة من السيرفر. أعد المحاولة');
+                  }
                 }
               }}
             />
@@ -1673,7 +1754,17 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
           const target = subscribers.find(s => s.id === subId);
           if (target) {
             const calc = calculateSubscriberBill(target.amperes, target.tier, pricingTiers);
-            handleSaveSubscriber({ ...target, paymentStatus: 'paid', amountPaid: calc.total });
+            const collectedNow = Math.max(0, Number(target.amountDue) || Math.max(0, calc.total - Number(target.amountPaid || 0)));
+            handleSaveSubscriber({ ...target, paymentStatus: 'paid', amountDue: 0, amountPaid: Math.max(Number(target.amountPaid || 0), calc.total), lastPaymentDate: new Date().toISOString() });
+            if (collectedNow > 0) addAuditLog({
+              category: 'payment',
+              title: 'تسديد المشترك',
+              details: 'تم تسجيل التسديد من الإيصال وإضافته إلى القاصة',
+              entityId: target.id,
+              entityName: target.fullName + ' (' + (target.code || target.subscriberCode || '') + ')',
+              actorName: userSession?.collectorName || userSession?.username || 'الإدارة العامة',
+              amount: collectedNow,
+            });
           }
         }}
       />

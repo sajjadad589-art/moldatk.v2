@@ -3,8 +3,8 @@ export function createEventSyncScheduler(run: () => Promise<void>, options: {
   debounceMs?: number; cooldownMs?: number; errorCooldownMs?: number;
   onError?: (error: unknown) => void;
 } = {}) {
-  const debounce = options.debounceMs ?? 350;
-  const cooldown = options.cooldownMs ?? 1500;
+  const debounce = options.debounceMs ?? 120;
+  const cooldown = options.cooldownMs ?? 300;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let active: Promise<void> | undefined;
   let requested = false;
@@ -23,7 +23,7 @@ export function createEventSyncScheduler(run: () => Promise<void>, options: {
     active = Promise.resolve().then(run).then(() => {
       after = Date.now() + cooldown;
     }, error => {
-      after = Date.now() + (options.errorCooldownMs ?? 15000);
+      after = Date.now() + (options.errorCooldownMs ?? 8000);
       requested = false; // No automatic retry loop. A new local/online/manual event retries.
       options.onError?.(error);
       throw error;

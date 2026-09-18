@@ -39,6 +39,8 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
   cashboxAmount = 0,
   activeMonthId = getMonthId(),
 }) => {
+  const [showPreviousDebtList, setShowPreviousDebtList] = useState(false);
+  const ampereDiscountSummary = getAmpereDiscountDashboardSummary(subscribers, pricingTiers, activeMonthId);
   // AUTHORITATIVE_FINANCE_V2
   const billingCycleActive = pricingTiers.some(t =>
     t.type !== 'free' && (Number(t.pricePerAmpere || 0) > 0 || Number(t.fixedFee || 0) > 0)
@@ -59,9 +61,6 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
   const totalCollectedRevenue = billingCycleActive ? dashboardSummary.collected : 0;
   const totalUnpaidDebt = billingCycleActive ? dashboardSummary.outstanding : 0;
   const currentMonthTotal = billingCycleActive ? dashboardSummary.monthTotal : 0;
-  // AMPERE_DISCOUNT_DASHBOARD_MOBILE_V1
-  const ampereDiscountSummary = getAmpereDiscountDashboardSummary(subscribers, pricingTiers, activeMonthId);
-  const [showPreviousDebtList, setShowPreviousDebtList] = useState(false);
 
   const circleLength = 251.2;
   const paidOffset = circleLength - (circleLength * Math.min(paidSubs.length, totalSubscribers)) / (totalSubscribers || 1);
@@ -223,38 +222,7 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
           </div>
         </div>
       )}
-
-      {/* Ampere discount and previous-month debt controls */}
-      
-
-      
-
-      {/* Ampere discount and previous-month debt controls */}
-      
-
-      
-
-      {/* Ampere discount and previous-month debt controls */}
-      
-
-      
-
-      {/* Ampere discount and previous-month debt controls */}
-      
-
-      
-
-      {/* Ampere discount and previous-month debt controls */}
-      
-
-      
-
-      {/* Ampere discount and previous-month debt controls */}
-      
-
-      
-
-      {/* 3. Cashbox */}
+{/* 3. Cashbox */}
       <button
         type="button"
         onClick={() => onNavigateToTab('wallet')}
@@ -273,7 +241,7 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
 
           <div className="text-left shrink-0">
             <span className="block text-lg font-black text-white tabular-nums" dir="ltr">
-              {formatCurrency(cashboxAmount, generatorSpecs.currency)}
+              {formatCurrency(totalCollectedRevenue, generatorSpecs.currency)}
             </span>
             <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-black text-emerald-200">
               فتح القاصة

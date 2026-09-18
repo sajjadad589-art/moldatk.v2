@@ -13,8 +13,7 @@ import {
 } from 'lucide-react';
 import { Subscriber, SubscriptionTierPricing, LineDistribution, SubscriberInvoice } from '../types';
 
-export const getSubscriberStyleByStatus = (status: Subscriber['paymentStatus'] | 'no_tariff') => {
-  if (status === 'no_tariff') return { cardBg: 'bg-white dark:bg-white', cardBorderAccent: 'border border-slate-300', avatarBg: 'bg-slate-100 text-slate-700', nameText: 'text-slate-900', badgeBg: 'bg-slate-100 text-slate-700', innerSubBox: 'bg-slate-50' };
+export const getSubscriberStyleByStatus = (status: Subscriber['paymentStatus']) => {
   if (status === 'paid') return { cardBg: 'bg-[#176B45] dark:bg-[#14583A]', cardBorderAccent: 'border border-[#2F8E65] dark:border-[#287A57]', avatarBg: 'bg-white/14 text-white', nameText: 'text-white', badgeBg: 'bg-black/15 text-white', innerSubBox: 'bg-[#105238]/55 dark:bg-[#0F472F]/65' };
   if (status === 'partial') return { cardBg: 'bg-[#9A741B] dark:bg-[#7D5E16]', cardBorderAccent: 'border border-[#C49A32] dark:border-[#A47F28]', avatarBg: 'bg-white/14 text-white', nameText: 'text-white', badgeBg: 'bg-black/15 text-white', innerSubBox: 'bg-[#765710]/55 dark:bg-[#654A0E]/65' };
   if (status === 'free') return { cardBg: 'bg-[#46515F] dark:bg-[#394451]', cardBorderAccent: 'border border-[#657180] dark:border-[#586474]', avatarBg: 'bg-white/12 text-white', nameText: 'text-white', badgeBg: 'bg-black/15 text-white', innerSubBox: 'bg-[#303A46]/60 dark:bg-[#2B3540]/70' };

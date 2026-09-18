@@ -63,3 +63,37 @@ export function removeUnpaidMonthLedger(
     };
   });
 }
+
+
+export function extinguishDeletedTariffLiabilities(
+  subscribers: Subscriber[],
+  deletedMonthIds: string[],
+  activeMonthId = '',
+): Subscriber[] {
+  const deleted = new Set(deletedMonthIds.map(String));
+  if (!deleted.size) return subscribers;
+  return subscribers.map(sub => {
+    const history: SubscriberInvoice[] = [];
+    for (const source of sub.invoicesHistory || []) {
+      const inv = { ...source };
+      if (!deleted.has(inv.monthId) || inv.status === 'cancelled') { history.push(inv); continue; }
+      const paid = Math.max(0, Number(inv.paidAmount || 0));
+      if (paid > 0) {
+        inv.totalAmount = paid;
+        inv.paidAmount = paid;
+        inv.remainingAmount = 0;
+        inv.remainingAfterPayment = 0;
+        inv.status = 'paid';
+        inv.notes = [String(inv.notes || ''), 'MOLDATK_TARIFF_DELETED_SETTLED_HISTORY'].filter(Boolean).join(' | ');
+        history.push(inv);
+      }
+    }
+    const totalOutstanding = history.reduce((sum, inv) => sum + getInvoiceRemaining(inv), 0);
+    const current = activeMonthId ? canonicalForMonth(history, activeMonthId) : null;
+    const currentPaid = Math.max(0, Number(current?.paidAmount || 0));
+    const currentRemaining = current ? getInvoiceRemaining(current) : 0;
+    const isFree = sub.tier === 'free' || Boolean(sub.isExempted) || current?.status === 'free';
+    const paymentStatus: Subscriber['paymentStatus'] = isFree ? 'free' : current ? (currentRemaining === 0 ? 'paid' : currentPaid > 0 ? 'partial' : 'unpaid') : totalOutstanding === 0 ? 'paid' : 'unpaid';
+    return { ...sub, invoicesHistory: history.sort((a, b) => b.monthId.localeCompare(a.monthId)), amountDue: totalOutstanding, amountPaid: currentPaid, paymentStatus };
+  });
+}

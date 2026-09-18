@@ -99,7 +99,7 @@ export const InvoiceReceiptModal: React.FC<InvoiceReceiptModalProps> = ({
           phone,
           lineName,
           amperes: amperes > 0 ? `${formatNumberArabic(amperes)} أمبير` : '',
-          pricePerAmp: '',
+          pricePerAmp: pricePerAmp > 0 ? formatCurrency(pricePerAmp) : '',
           month: displayPaymentMonth,
           status: statusText,
           totalAmount: isFree ? 'مجاني' : formatCurrency(paymentAmount),
@@ -108,7 +108,7 @@ export const InvoiceReceiptModal: React.FC<InvoiceReceiptModalProps> = ({
           previousDebt: previousDebtBefore > 0 ? formatCurrency(previousDebtBefore) : '',
           currentCharge: formatCurrency(currentCharge),
           totalBeforePayment: formatCurrency(totalBeforePayment),
-          appliedToPreviousDebt: appliedToPreviousDebt > 0 ? formatCurrency(appliedToPreviousDebt) : '',
+          appliedToPreviousDebt: '',
           appliedToCurrentMonth: appliedToCurrentMonth > 0 ? formatCurrency(appliedToCurrentMonth) : '',
           totalOutstandingAfter: totalOutstandingAfter > 0 ? formatCurrency(totalOutstandingAfter) : '0 د.ع',
           note: '',
@@ -142,7 +142,7 @@ export const InvoiceReceiptModal: React.FC<InvoiceReceiptModalProps> = ({
       frameDocument.open();
       frameDocument.write(`<!doctype html><html dir="rtl"><head><meta charset="utf-8" />
 <style>
-@page{size:58mm auto;margin:0!important}html,body{width:58mm!important;margin:0!important;padding:0!important;background:#fff!important;color:#000!important}body{font-family:Arial,Tahoma,sans-serif!important;direction:rtl!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}#thermal-receipt-printable{width:56mm!important;margin:4mm 1mm 1.5mm!important;padding:4.5mm 1.7mm 3mm!important;box-sizing:border-box!important;background:#fff!important;color:#000!important;border:2px solid #000!important;border-radius:7px!important;box-shadow:none!important;font-size:12px!important;line-height:1.42!important}#thermal-receipt-printable *{box-sizing:border-box!important;color:#000!important;font-weight:900!important;text-shadow:none!important;filter:none!important;-webkit-font-smoothing:none!important}#thermal-receipt-printable .receipt-generator{font-size:20px!important;font-weight:900!important;border:2px solid #000!important;padding:7px 4px!important;border-radius:8px!important}#thermal-receipt-printable .receipt-title{font-size:15px!important;font-weight:900!important}#thermal-receipt-printable .receipt-name{font-size:17px!important;font-weight:900!important}#thermal-receipt-printable .receipt-payment{font-size:16px!important;font-weight:900!important}#thermal-receipt-printable .receipt-total{font-size:26px!important;font-weight:900!important;border:2px solid #000!important;padding:8px 4px!important}#thermal-receipt-printable .receipt-brand{font-size:20px!important;font-weight:900!important}.receipt-logo{width:12mm!important;height:12mm!important;object-fit:contain!important;display:block!important;margin:0 auto!important}.receipt-system-name{font-size:20px!important;font-weight:900!important}#thermal-receipt-printable svg{display:none!important}.receipt-row{display:flex!important;justify-content:space-between!important;gap:8px!important;padding:4px 0!important;border-bottom:1px dotted #777!important}.receipt-label{font-weight:900!important;color:#000!important}.receipt-value{font-weight:900!important;color:#000!important;text-align:left!important}.receipt-divider{border-top:1px dashed #000!important;margin:7px 0!important}.receipt-hide-print{display:none!important}
+@page{size:58mm auto;margin:0!important}html,body{width:58mm!important;margin:0!important;padding:0!important;background:#fff!important;color:#000!important}body{font-family:Arial,Tahoma,sans-serif!important;direction:rtl!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}#thermal-receipt-printable{width:56mm!important;margin:4mm 1mm 1.5mm!important;padding:4.5mm 1.7mm 3mm!important;box-sizing:border-box!important;background:#fff!important;color:#000!important;border:2px solid #000!important;border-radius:7px!important;box-shadow:none!important;font-size:12px!important;line-height:1.42!important}#thermal-receipt-printable *{box-sizing:border-box!important;color:#000!important;font-weight:900!important;text-shadow:none!important;filter:none!important;-webkit-font-smoothing:none!important}#thermal-receipt-printable .receipt-generator{font-size:20px!important;font-weight:900!important;border:2px solid #000!important;padding:7px 4px!important;border-radius:8px!important}#thermal-receipt-printable .receipt-title{font-size:15px!important;font-weight:900!important}#thermal-receipt-printable .receipt-name{font-size:17px!important;font-weight:900!important}#thermal-receipt-printable .receipt-payment{font-size:16px!important;font-weight:900!important}#thermal-receipt-printable .receipt-total{font-size:14px!important;font-weight:900!important;border:2px solid #000!important;padding:6px 4px!important}#thermal-receipt-printable .receipt-total .receipt-amount{font-size:22px!important;line-height:1.15!important}#thermal-receipt-printable .receipt-brand{font-size:20px!important;font-weight:900!important}.receipt-logo{width:12mm!important;height:12mm!important;object-fit:contain!important;display:block!important;margin:0 auto!important}.receipt-system-name{font-size:20px!important;font-weight:900!important}#thermal-receipt-printable svg{display:none!important}.receipt-row{display:flex!important;justify-content:space-between!important;gap:8px!important;padding:4px 0!important;border-bottom:1px dotted #777!important}.receipt-label{font-weight:900!important;color:#000!important}.receipt-value{font-weight:900!important;color:#000!important;text-align:left!important}.receipt-divider{border-top:1px dashed #000!important;margin:7px 0!important}.receipt-hide-print{display:none!important}
 </style></head><body>${receipt.outerHTML}</body></html>`);
       frameDocument.close();
 
@@ -187,7 +187,6 @@ export const InvoiceReceiptModal: React.FC<InvoiceReceiptModalProps> = ({
       `استحقاق الشهر الحالي: ${formatCurrency(currentCharge)}`,
       `الإجمالي قبل التسديد: ${formatCurrency(totalBeforePayment)}`,
       `المبلغ المستلم: ${formatCurrency(paymentAmount)}`,
-      appliedToPreviousDebt > 0 ? `تسديد الدين السابق: ${formatCurrency(appliedToPreviousDebt)}` : '',
       appliedToCurrentMonth > 0 ? `تسديد الشهر الحالي: ${formatCurrency(appliedToCurrentMonth)}` : '',
       `المتبقي بعد التسديد: ${formatCurrency(totalOutstandingAfter)}` ,
       `التاريخ: ${displayIssueDate}`,
@@ -241,6 +240,7 @@ export const InvoiceReceiptModal: React.FC<InvoiceReceiptModalProps> = ({
             {phone && <Row label="رقم الهاتف" value={<span dir="ltr">{phone}</span>} />}
             {lineName && <Row label="الكابينة" value={lineName} />}
             {amperes > 0 && <Row label="عدد الأمبيرات" value={`${formatNumberArabic(amperes)} أمبير`} />}
+            {pricePerAmp > 0 && <Row label="سعر الأمبير الشهري" value={formatCurrency(pricePerAmp)} strong />}
             {displayPaymentMonth && <Row label="شهر التسديد" value={displayPaymentMonth} strong />}
             <Row label="حالة التسديد" value={statusText} />
 
@@ -250,14 +250,13 @@ export const InvoiceReceiptModal: React.FC<InvoiceReceiptModalProps> = ({
             <Row label="الإجمالي قبل التسديد" value={formatCurrency(totalBeforePayment)} strong />
 
             <div className="receipt-divider border-t border-dashed border-slate-500 my-2" />
-            {appliedToPreviousDebt > 0 && <Row label="تسديد الدين السابق" value={formatCurrency(appliedToPreviousDebt)} />}
             {appliedToCurrentMonth > 0 && <Row label="تسديد الشهر الحالي" value={formatCurrency(appliedToCurrentMonth)} />}
             <Row label="المتبقي بعد التسديد" value={formatCurrency(totalOutstandingAfter)} strong />
 
             <div className="receipt-divider border-t border-dashed border-slate-500 my-2" />
             <div className="receipt-total text-center border-2 border-slate-950 rounded-lg py-2 px-1">
               <div className="text-[10px] font-black mb-0.5">المبلغ المستلم</div>
-              <div className="text-2xl font-black tracking-tight">{formatCurrency(paymentAmount)}</div>
+              <div className="receipt-amount text-xl font-black tracking-tight leading-tight">{formatCurrency(paymentAmount)}</div>
             </div>
 
             <div className="text-center text-[10px] font-black py-3">شكراً لتسديدكم</div>

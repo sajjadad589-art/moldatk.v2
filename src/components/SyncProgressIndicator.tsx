@@ -26,10 +26,14 @@ export const SyncProgressIndicator: React.FC = () => {
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
-    const resolveTarget = () => setPortalTarget(document.getElementById('moldatk-sync-status-slot'));
-    resolveTarget();
-    const timer = window.setInterval(resolveTarget, 400);
-    return () => window.clearInterval(timer);
+    const existing = document.getElementById('moldatk-sync-status-slot');
+    if (existing) { setPortalTarget(existing); return; }
+    const observer = new MutationObserver(() => {
+      const target = document.getElementById('moldatk-sync-status-slot');
+      if (target) { setPortalTarget(target); observer.disconnect(); }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
   }, []);
 
   useEffect(() => {
@@ -65,7 +69,7 @@ export const SyncProgressIndicator: React.FC = () => {
       if (online && !pending && progress >= 100) {
         settleTimer = window.setTimeout(() => {
           setState({ online: true, syncing: false, progress: 0, pending: false });
-        }, 900);
+        }, 450);
       }
     };
 
@@ -85,7 +89,7 @@ export const SyncProgressIndicator: React.FC = () => {
   const label = !state.online
     ? 'غير متصل بالإنترنت'
     : state.syncing || completed
-      ? `جاري المزامنة ${Math.max(1, state.progress)}%`
+      ? `المزامنة ${Math.max(1, state.progress)}%`
       : state.pending
         ? 'بانتظار المزامنة'
         : 'متصل بالإنترنت';

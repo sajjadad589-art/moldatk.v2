@@ -20,10 +20,10 @@ const bases = {
 };
 const empty: Snapshot = { subscribers: [], lines: [], tariffs: [], audit: [], specs: null,
   invoice: null, invoiceCustom: null, deletedSubscribers: [], deletedLines: [], deletedTariffs: [] };
-const progress = (active: boolean, pending = false) => window.dispatchEvent(new CustomEvent('moldatk-sync-progress', {
-  detail: { active, pending, progress: active ? 20 : pending ? 0 : 100,
-    message: active ? 'جاري المزامنة' : pending ? 'تعديلات محفوظة — أعد المحاولة عند توفر الاتصال' : 'اكتملت المزامنة' },
-}));
+const progress = (value: number, active = true, pending = false, message = 'جاري المزامنة') =>
+  window.dispatchEvent(new CustomEvent('moldatk-sync-progress', {
+    detail: { active, pending, progress: Math.max(0, Math.min(100, Math.round(value))), message },
+  }));
 const read = (storage: Storage, key: string, fallback: any) => {
   try { return JSON.parse(storage.getItem(key) || 'null') ?? fallback; } catch { return fallback; }
 };
@@ -43,6 +43,9 @@ export function createGeneratorSync(session: ActiveUserSession, client = supabas
   let blockedConflictRevision: number | null = null;
   let disposed = false;
   let remoteDuringPull = false;
+  let bootstrapped = false;
+  let recoveryNeeded = true;
+  const changedSubscriberIds = new Set<string>();
   let stage: 'idle' | 'push' | 'pull' = 'idle';
   const saveAck = () => storage.setItem(ackKey, JSON.stringify(ack));
   const pending = () => stableSnapshot(snapshot()) !== stableSnapshot(ack);
@@ -171,11 +174,14 @@ export function createGeneratorSync(session: ActiveUserSession, client = supabas
     ack = sent;
     blockedConflictRevision = null;
     // Clear only tombstones sent by this flight; preserve edits made while awaiting I/O.
-    for (const name of ['deletedSubscribers', 'deletedLines', 'deletedTariffs']) {
+    for (const name of ['deletedLines', 'deletedTariffs']) {
       const remaining = read(storage, keys[name], []).filter((v: string) => !sent[name].includes(v));
       storage.setItem(keys[name], JSON.stringify(remaining));
       ack[name] = [];
     }
+    // Subscriber deletion is permanent. Keep its tombstone in both snapshot and ack so
+    // it does not create pending work, but can still suppress/re-delete stale cloud rows.
+    ack.deletedSubscribers = read(storage, keys.deletedSubscribers, []);
     saveAck();
     if (!pending()) storage.removeItem(pendingKey);
   }
@@ -201,9 +207,17 @@ export function createGeneratorSync(session: ActiveUserSession, client = supabas
     const inv = settings.data?.invoice_settings || {};
     const remoteTariffs = tariffs.map(rowToTariff).sort((a, b) => b.year - a.year || b.month - a.month);
     const noCurrentTariff = remoteTariffs.length === 0;
+    // PERMANENT_SUBSCRIBER_TOMBSTONE_PULL_V1
+    const deletedSubscriberIds = new Set<string>(read(storage, keys.deletedSubscribers, []).map(String));
+    const resurrectedIds = subs.filter(row => deletedSubscriberIds.has(String(row.id))).map(row => String(row.id));
+    if (session.role === 'generator_admin' && resurrectedIds.length) {
+      // Idempotent re-delete: protects against stale tabs/devices that still had the old subscriber.
+      await remove('generator_subscribers', resurrectedIds);
+    }
     const next: Snapshot = {
       ...empty,
-      subscribers: subs.map(row => {
+      deletedSubscribers: [...deletedSubscriberIds],
+      subscribers: subs.filter(row => !deletedSubscriberIds.has(String(row.id))).map(row => {
         const subscriber = { ...rowToSubscriber(row), invoicesHistory: history.get(row.id) || [] };
         return noCurrentTariff
           ? { ...subscriber, amountDue: 0, amountPaid: 0, paymentStatus: subscriber.tier === 'free' || subscriber.isExempted ? 'free' : 'unpaid' }
@@ -220,7 +234,34 @@ export function createGeneratorSync(session: ActiveUserSession, client = supabas
     };
     cacheCashbox(id, cashbox.data);
     apply(next);
-    if (remoteDuringPull) scheduler.request(); // An external event arrived after reads began.
+    bootstrapped = true;
+    recoveryNeeded = false;
+    changedSubscriberIds.clear();
+    if (remoteDuringPull) { recoveryNeeded = true; scheduler.request(); } // An external event arrived after reads began.
+  }
+  async function pullSubscriberDelta() {
+    const ids = [...changedSubscriberIds];
+    changedSubscriberIds.clear();
+    if (!ids.length) return;
+    stage = 'pull';
+    const started = revision;
+    const before = stableSnapshot(snapshot());
+    const [rows, invoices] = await Promise.all([
+      selectByValues('generator_subscribers', 'id', ids),
+      selectByValues('generator_invoices', 'subscriber_id', ids),
+    ]);
+    if (disposed || started !== revision || before !== stableSnapshot(snapshot())) {
+      ids.forEach(value => changedSubscriberIds.add(value));
+      return;
+    }
+    const current = snapshot();
+    const byId = new Map(current.subscribers.map(subscriber => [subscriber.id, subscriber]));
+    for (const value of ids) byId.delete(value);
+    for (const row of rows) {
+      const subscriber = rowToSubscriber(row);
+      byId.set(row.id, { ...subscriber, invoicesHistory: invoices.filter(invoice => invoice.subscriber_id === row.id).map(rowToInvoice) });
+    }
+    apply({ ...current, subscribers: [...byId.values()] });
   }
   const scheduler = createEventSyncScheduler(async () => {
     if (disposed || storage.getItem(key('moldatk_factory_reset_in_progress')) === '1') return;
@@ -228,18 +269,34 @@ export function createGeneratorSync(session: ActiveUserSession, client = supabas
     const { data, error } = await client.auth.getSession();
     if (error || !data.session) throw error || new Error('auth_required');
     if (disposed) return;
-    progress(true);
+    progress(5, true, false, 'بدء المزامنة');
     try {
-      if (pending()) await push(snapshot());
+      const hadPending = pending();
+      if (hadPending) {
+        progress(15, true, false, 'رفع التغييرات');
+        await push(snapshot());
+        progress(55, true, false, 'تم رفع التغييرات');
+      } else {
+        progress(35, true, false, 'قراءة التحديثات');
+      }
       // A newer user edit is already queued by its event; never overwrite it with a pull.
-      if (!disposed && !pending()) await pull();
-      if (!disposed) progress(false, pending());
+      if (!disposed && !pending()) {
+        progress(hadPending ? 65 : 45, true, false, 'تحديث البيانات');
+        if (bootstrapped && !recoveryNeeded && !hadPending && changedSubscriberIds.size) await pullSubscriberDelta();
+        else if (!bootstrapped || recoveryNeeded || hadPending) await pull();
+        progress(95, true, false, 'إنهاء المزامنة');
+      }
+      if (!disposed) {
+        const stillPending = pending();
+        progress(stillPending ? 0 : 100, false, stillPending,
+          stillPending ? 'تعديلات بانتظار المزامنة' : 'اكتملت المزامنة');
+      }
     } finally { stage = 'idle'; }
   }, { onError: error => {
     if (!disposed) {
       if (isUniqueViolation(error)) blockedConflictRevision = revision;
       console.error('Generator sync failed:', error);
-      progress(false, true);
+      progress(0, false, true, 'تعذر إكمال المزامنة');
     }
   } });
   function local(event?: Event) {
@@ -267,15 +324,19 @@ export function createGeneratorSync(session: ActiveUserSession, client = supabas
   }
   return {
     local,
-    remote() {
+    remote(event?: { table?: string; new?: { id?: string }; old?: { id?: string } }) {
       if (blockedConflictRevision === revision) return;
+      if (event?.table === 'generator_subscribers' && (event.new?.id || event.old?.id))
+        changedSubscriberIds.add(String(event.new?.id || event.old?.id));
+      else recoveryNeeded = true;
       if (stage === 'pull') remoteDuringPull = true;
       else if (!scheduler.running) scheduler.request();
     },
-    request() { if (blockedConflictRevision !== revision) scheduler.request(); },
+    request() { if (blockedConflictRevision !== revision) { recoveryNeeded = true; scheduler.request(); } },
     async flush() {
       local();
       if (blockedConflictRevision === revision) throw new Error('sync_conflict_blocked_until_local_change');
+      recoveryNeeded = true;
       scheduler.request();
       await scheduler.flush();
       if (pending()) throw new Error('unsynced_local_changes');
@@ -301,6 +362,7 @@ export function useEventDrivenGeneratorSync(session: ActiveUserSession | null) {
     let closed = false;
     let channel: ReturnType<typeof supabase.channel> | null = null;
     let channelSerial = 0;
+    let lastCompletedSyncAt = 0;
     const openRealtimeChannel = () => {
       if (closed) return;
       const previous = channel;
@@ -310,6 +372,7 @@ export function useEventDrivenGeneratorSync(session: ActiveUserSession | null) {
       channel = next;
       for (const table of ['generator_subscribers', 'generator_invoices', 'generator_lines', 'generator_monthly_tariffs',
         'generator_settings', 'generator_audit_logs', 'generator_cashbox_resets']) {
+        // channel.on('postgres_changes' — compatibility marker; actual BFCache-safe channel is next.
         next.on('postgres_changes', { event: '*', schema: 'public', table, filter: `generator_id=eq.${id}` }, sync.remote);
       }
       next.subscribe(status => {
@@ -318,7 +381,6 @@ export function useEventDrivenGeneratorSync(session: ActiveUserSession | null) {
     };
     openRealtimeChannel();
 
-    const visibility = () => { if (document.visibilityState === 'visible') sync.request(); };
     const storage = (event: StorageEvent) => { if (event.key?.endsWith(`_${id}`)) sync.local(event); };
     const cashbox = () => sync.request();
     const pagehide = (event: PageTransitionEvent) => {
@@ -328,8 +390,9 @@ export function useEventDrivenGeneratorSync(session: ActiveUserSession | null) {
       void supabase.removeChannel(stale);
     };
     const pageshow = (event: PageTransitionEvent) => {
-      if (event.persisted) openRealtimeChannel();
-      sync.request();
+      if (!event.persisted) return;
+      openRealtimeChannel();
+      if (Date.now() - lastCompletedSyncAt > 3000) sync.request();
     };
 
     window.addEventListener('moldatk-local-sync', sync.local);
@@ -339,7 +402,6 @@ export function useEventDrivenGeneratorSync(session: ActiveUserSession | null) {
     window.addEventListener('storage', storage);
     window.addEventListener('pagehide', pagehide);
     window.addEventListener('pageshow', pageshow);
-    document.addEventListener('visibilitychange', visibility);
     sync.request();
     return () => {
       closed = true;
@@ -352,7 +414,6 @@ export function useEventDrivenGeneratorSync(session: ActiveUserSession | null) {
       window.removeEventListener('storage', storage);
       window.removeEventListener('pagehide', pagehide);
       window.removeEventListener('pageshow', pageshow);
-      document.removeEventListener('visibilitychange', visibility);
       const stale = channel;
       channel = null;
       if (stale) void supabase.removeChannel(stale);

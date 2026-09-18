@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { SubscriptionTierPricing, MonthlyTariffRecord } from '../types';
 import { formatCurrency, formatNumberArabic } from '../utils/formatters';
+import { buildCanonicalMonthlyTiers } from '../utils/monthlyTariffTierTemplate';
 
 interface PricingModalProps {
   isOpen: boolean;
@@ -70,7 +71,16 @@ export const PricingModal: React.FC<PricingModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       if (monthlyTariffs && monthlyTariffs.length > 0) {
-        setTariffs(monthlyTariffs.map(month => ({ ...month, monthNameAr: numericMonthLabel(month.month, month.year), tiers: normalizeTierNames(month.tiers || []).map(t => month.isCurrentActive ? ({ ...t, fixedFee: 0 }) : t) })));
+        setTariffs(monthlyTariffs.map(month => {
+          const normalizedMonthTiers = normalizeTierNames(month.tiers || []);
+          return {
+            ...month,
+            monthNameAr: numericMonthLabel(month.month, month.year),
+            tiers: month.isCurrentActive
+              ? buildCanonicalMonthlyTiers(normalizedMonthTiers, pricingTiers)
+              : normalizedMonthTiers,
+          };
+        }));
         const active = monthlyTariffs.find(m => m.isCurrentActive) || monthlyTariffs[0];
         setSelectedMonthId(active.id);
       } else {
@@ -85,7 +95,11 @@ export const PricingModal: React.FC<PricingModalProps> = ({
   if (!isOpen) return null;
 
   const currentMonthRecord = tariffs.find(m => m.id === selectedMonthId) || tariffs[0];
-  const currentTiers = currentMonthRecord?.tiers || [];
+  const currentTiers = currentMonthRecord
+    ? (currentMonthRecord.isCurrentActive
+        ? buildCanonicalMonthlyTiers(currentMonthRecord.tiers || [], pricingTiers)
+        : (currentMonthRecord.tiers || []))
+    : [];
   const isEditable = currentMonthRecord?.isCurrentActive === true;
 
   // إدخال الرقم البسيط (مثلاً 12 ليصبح 12000)
@@ -97,7 +111,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
         if (month.id !== selectedMonthId) return month;
         return {
           ...month,
-          tiers: month.tiers.map(t =>
+          tiers: buildCanonicalMonthlyTiers(month.tiers || [], pricingTiers).map(t =>
             t.id === tierId ? { ...t, pricePerAmpere: Math.max(0, fullValue), fixedFee: 0 } : t
           ),
         };
@@ -125,7 +139,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
         if (month.id !== selectedMonthId) return month;
         return {
           ...month,
-          tiers: month.tiers.map(t =>
+          tiers: buildCanonicalMonthlyTiers(month.tiers || [], pricingTiers).map(t =>
             t.id === tierId ? { ...t, is24Hours: !t.is24Hours } : t
           ),
         };
@@ -183,7 +197,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
 
     const monthLabel = numericMonthLabel(newMonthNumber, newYearNumber);
     const sourceTiers = currentTiers.length > 0 ? currentTiers : pricingTiers;
-    const baseTiers = normalizeTierNames(sourceTiers).map(t => ({ ...t, fixedFee: 0, description: '' }));
+    const baseTiers = buildCanonicalMonthlyTiers(normalizeTierNames(sourceTiers), pricingTiers).map(t => ({ ...t, fixedFee: 0, description: '' }));
 
     const newRecord: MonthlyTariffRecord = {
       id: monthId,
@@ -202,46 +216,45 @@ export const PricingModal: React.FC<PricingModalProps> = ({
 
     setTariffs(updatedTariffs);
     setSelectedMonthId(monthId);
-    // ثبّت الشهر الجديد فوراً حتى لا يختفي مع أي Pull، لكن لا تحسب المشتركين قبل حفظ الأسعار النهائية.
-    onSaveMonthlyTariffs(updatedTariffs, monthId, true);
+    // مسودة محلية فقط: لا تُرسل للسحابة ولا تُصدر فواتير قبل إدخال الأسعار والضغط على حفظ وتطبيق.
     setIsAddingNewMonth(false);
   };
 
   const handleDeleteMonth = (monthId: string) => {
+    if (tariffs.length <= 1) {
+      window.alert('لا يمكن حذف آخر تسعيرة موجودة. أضف تسعيرة أخرى أولاً.');
+      return;
+    }
     const target = tariffs.find(m => m.id === monthId);
     if (!target) return;
-
     const warning = target.isCurrentActive
-      ? 'تحذير: هذه هي التسعيرة النشطة. سيتم إيقاف هذه الدورة الشهرية. سجل الفواتير والتسديدات والديون السابقة سيبقى محفوظاً. هل تريد المتابعة؟'
-      : 'هل تريد حذف تسعيرة ' + (target.monthNameAr || target.id) + '؟ سجل الفواتير والتسديدات والديون السابقة سيبقى محفوظاً.';
+      ? 'تحذير: هذه هي التسعيرة النشطة. حذفها سيجعل أحدث تسعيرة متبقية هي النشطة. الفواتير والتسديدات والديون المحاسبية المحفوظة لن تُحذف. هل تريد المتابعة؟'
+      : 'هل تريد حذف تسعيرة ' + (target.monthNameAr || target.id) + ' من سجل التسعيرات؟ الفواتير والتسديدات والديون التاريخية ستبقى محفوظة.';
     if (!window.confirm(warning)) return;
 
     const remaining = tariffs.filter(m => m.id !== monthId);
-    if (remaining.length === 0) {
-      setTariffs([]);
-      setSelectedMonthId('');
-      onSaveMonthlyTariffs([], '', false);
-      return;
-    }
-
-    const existingActive = remaining.find(m => m.isCurrentActive);
     const nextActive = target.isCurrentActive
       ? [...remaining].sort((a, b) => b.id.localeCompare(a.id))[0]
-      : (existingActive || [...remaining].sort((a, b) => b.id.localeCompare(a.id))[0]);
+      : (remaining.find(m => m.isCurrentActive) || [...remaining].sort((a, b) => b.id.localeCompare(a.id))[0]);
     const updated = remaining.map(m => ({ ...m, isCurrentActive: m.id === nextActive.id }));
     setTariffs(updated);
     setSelectedMonthId(nextActive.id);
     onSaveMonthlyTariffs(updated, nextActive.id, false);
   };
 
-
   const handleSave = () => {
     if (!isEditable) {
       onClose();
       return;
     }
+    const completeTariffs = tariffs.map(month =>
+      month.id === selectedMonthId && month.isCurrentActive
+        ? { ...month, tiers: buildCanonicalMonthlyTiers(month.tiers || [], pricingTiers) }
+        : month
+    );
+    setTariffs(completeTariffs);
     // تفعيل الحماية تلقائياً (true)
-    onSaveMonthlyTariffs(tariffs, selectedMonthId, true);
+    onSaveMonthlyTariffs(completeTariffs, selectedMonthId, true);
     setSavedSuccess(true);
     setTimeout(() => {
       setSavedSuccess(false);
@@ -386,7 +399,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
                     onClick={handleCreateNewMonthTariff}
                     className="px-3.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all cursor-pointer"
                   >
-                    اعتماد وإضافة كشهر نشط جديد
+                    إنشاء ملف الشهر وإدخال الأسعار
                   </button>
                   <button
                     onClick={() => setIsAddingNewMonth(false)}
@@ -424,7 +437,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
                   {!currentMonthRecord
                     ? 'لا توجد دورة شهرية نشطة حالياً. مبالغ المشتركين الحالية تكون صفراً لحين اعتماد شهر جديد.'
                     : isEditable
-                    ? 'هذا هو الشهر النشط حالياً لإصدار فواتير المشتركين وقابل للتعديل'
+                    ? 'أدخل أسعار فئات هذا الشهر ثم اضغط حفظ وتطبيق لاعتمادها وإصدار الاستحقاقات'
                     : 'هذا الشهر يعتبر أرشيفاً سابقاً، الأسعار هنا للقراءة فقط ولا يمكن تعديلها.'}
                 </span>
               </div>

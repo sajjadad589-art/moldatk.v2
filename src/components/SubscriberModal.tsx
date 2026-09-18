@@ -176,6 +176,7 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!hasMonthlyPricing(pricingTiers)) return;
     if (!fullName.trim()) return;
 
     const monthId = activeMonthId || getMonthId();
@@ -222,11 +223,6 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
         joiningDate: nowIso.slice(0, 10),
       };
 
-      if (!hasPricing) {
-        onSaveSubscriber(suspendSubscriberBilling(base));
-        onClose();
-        return;
-      }
       if (isPermanentFree) {
         const freeInvoice: SubscriberInvoice = {
           id: 'inv-' + monthId + '-' + id,
@@ -372,11 +368,6 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
       lineName: line || subscriberToEdit.lineName,
       line: line || subscriberToEdit.line,
     };
-    if (!hasPricing) {
-      onSaveSubscriber(suspendSubscriberBilling(draft));
-      setIsEditing(false);
-      return;
-    }
     const ensured = ensureMonthInvoice(draft, pricingTiers, monthId, monthName);
     const invoices = ensured.invoices.map(inv => ({ ...inv }));
     const current = invoices.find(inv => inv.monthId === monthId && inv.status !== 'cancelled');
@@ -423,7 +414,6 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
   };
 
   const executeUnpaidAction = () => {
-    if (!hasMonthlyPricing(pricingTiers)) return;
     if (!subscriberToEdit) return;
     const monthId = activeMonthId || getMonthId();
     const monthName = activeMonthNameAr || getMonthNameAr(monthIdToDate(monthId));
@@ -450,7 +440,6 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
   };
 
   const handleQuickPayment = () => {
-    if (!hasMonthlyPricing(pricingTiers)) return;
     if (!subscriberToEdit) return;
 
     const monthId = activeMonthId || getMonthId();
@@ -526,7 +515,6 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
   };
 
   const handleCustomPayment = (status: 'paid' | 'partial' | 'free', paidAmount: number = 0) => {
-    if (!hasMonthlyPricing(pricingTiers)) return;
     if (!subscriberToEdit) return;
     const monthId = activeMonthId || getMonthId();
     const monthName = activeMonthNameAr || getMonthNameAr(monthIdToDate(monthId));
@@ -593,7 +581,6 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
   };
 
   const handleLumpSettlement = (paidAmount: number) => {
-    if (!hasMonthlyPricing(pricingTiers)) return;
     if (!subscriberToEdit) return;
     const finalPaid = Math.max(0, Number(paidAmount || 0));
     if (finalPaid <= 0) return;
@@ -733,7 +720,7 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
                 <div className="min-w-0 flex-1">
                   <div className="text-xl font-black text-slate-950 dark:text-white truncate">{subscriberToEdit.fullName}</div>
                   <div className="text-[11px] font-mono text-slate-400 mt-0.5" dir="ltr">{subscriberToEdit.code || subscriberToEdit.subscriberCode}</div>
-                  <span className={`inline-flex mt-2 px-3 py-1 rounded-full border text-[10px] font-black ${hasPricing ? paymentStatusClass(subscriberToEdit.paymentStatus) : 'bg-white text-slate-700 border-slate-300'}`}>{hasPricing ? paymentStatusLabel(subscriberToEdit.paymentStatus) : NO_TARIFF_LABEL}</span>
+                  <span className={`inline-flex mt-2 px-3 py-1 rounded-full border text-[10px] font-black ${paymentStatusClass(subscriberToEdit.paymentStatus)}`}>{paymentStatusLabel(subscriberToEdit.paymentStatus)}</span>
                 </div>
               </div>
             </div>
@@ -766,7 +753,7 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
 
 
             {/* PAYMENT_BUTTON_BELOW_DETAILS_V1 */}
-            {!hasPricing && <button type="button" disabled className="w-full py-4 my-3 rounded-2xl bg-white border border-slate-300 text-slate-600 font-bold">لا يوجد مبلغ مطلوب — {NO_TARIFF_LABEL}</button>}
+            {!hasPricing && <div className="mb-3 rounded-xl bg-slate-100 p-3 text-center text-sm font-bold text-slate-700">لا يوجد مبلغ مطلوب — لا توجد تسعيرة</div>}
             {hasPricing && !isPaid && !isFree && (
               <button
                 type="button"
@@ -901,7 +888,7 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
           </form>
         )}
 
-        {hasPricing && isAdvancedOpen && subscriberToEdit && (
+        {isAdvancedOpen && subscriberToEdit && (
           <div className="fixed inset-0 z-[60] bg-slate-950/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-3" dir="rtl">
             <div className="w-full max-w-md bg-white dark:bg-[#101a33] rounded-t-3xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 p-5 shadow-2xl">
               <div className="flex items-center justify-between mb-4"><div><h3 className="text-sm font-black text-slate-950 dark:text-white">التسديد المخصص</h3><p className="text-[10px] text-slate-400 mt-1">إجمالي المتبقي حالياً: {formatCurrency(outstanding)}</p></div><button type="button" onClick={() => setIsAdvancedOpen(false)} className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500"><X className="w-4 h-4" /></button></div>

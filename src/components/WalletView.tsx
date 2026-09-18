@@ -239,7 +239,7 @@ return () => clearInterval(timer);
           <div>
             <span className="text-xs font-bold text-emerald-400 block mb-1">{isWalletFilterActive ? 'قيمة النتائج حسب الفلتر' : 'الرصيد الحالي في القاصة'}</span>
             <span className="text-3xl font-black tabular-nums text-white">
-              {totalCollected.toLocaleString('en-US')} {currency}
+              {(isWalletFilterActive ? totalCollected : authoritativeCashbox).toLocaleString('en-US')} {currency}
             </span>
           </div>
         </div>

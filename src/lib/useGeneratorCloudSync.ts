@@ -326,7 +326,7 @@ export function useGeneratorCloudSync(session: ActiveUserSession | null) {
       if (!ready.current || disposed) return;
       if (pushing.current) { pendingPush.current = true; return; }
       if (!(await ensureValidAuth())) return;
-      if (!Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && typeof navigator !== 'undefined' && !navigator.onLine) {
+      if (!Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && typeof navigator !== 'undefined' && !navigator.onLine) {
         emitSyncProgress({ active: false, progress: 0, pending: true, message: 'بانتظار رجوع الإنترنت للمزامنة' });
         return;
       }
@@ -456,7 +456,7 @@ export function useGeneratorCloudSync(session: ActiveUserSession | null) {
     const pull = async (bootstrap = false) => {
       if (refreshing.current || authBlocked.current) return;
       if (!(await ensureValidAuth())) return;
-      if (!Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && typeof navigator !== 'undefined' && !navigator.onLine) {
+      if (!Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && typeof navigator !== 'undefined' && !navigator.onLine) {
         ready.current = true;
         emitSyncProgress({ active: false, progress: 0, pending: true, message: 'وضع بدون إنترنت — التغييرات محفوظة للمزامنة' });
         return;
@@ -610,6 +610,9 @@ export function useGeneratorCloudSync(session: ActiveUserSession | null) {
 
     const onLocalChange = () => {
       if (!ready.current || refreshing.current) return;
+      if (Date.now() < retryAfter.current) return;
+      if (Date.now() < retryAfter.current) return;
+      if (Date.now() < retryAfter.current) return;
       if (Date.now() < retryAfter.current) return;
       if (Date.now() < retryAfter.current) return;
       if (Date.now() < retryAfter.current) return;

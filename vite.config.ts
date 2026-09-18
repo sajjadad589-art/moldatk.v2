@@ -11,6 +11,12 @@ export default defineConfig(() => {
       },
     },
     build: {
+      rollupOptions: { output: { manualChunks(id) {
+        if (!id.includes('node_modules')) return;
+        if (id.includes('/xlsx/') || id.includes('\\xlsx\\')) return 'xlsx';
+        if (id.includes('/recharts/') || id.includes('\\recharts\\')) return 'charts';
+        if (id.includes('/lucide-react/') || id.includes('\\lucide-react\\')) return 'icons';
+      } } },
       // بعض أجهزة SUNMI V2 تعمل بنظام Android قديم ومعه WebView قديم لا يدعم
       // صيغ الجافاسكربت الحديثة (مثل ?. و ??) بشكل أصلي. استهداف es2015 يجعل Vite
       // يحوّل هذه الصيغ لكود متوافق بدل الاعتماد على دعم المتصفح المباشر.

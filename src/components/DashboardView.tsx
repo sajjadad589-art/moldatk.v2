@@ -39,21 +39,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onNavigateToSubscribersTab,
   onNavigateToWalletTab,
 }) => {
+  const [showPreviousDebtList, setShowPreviousDebtList] = useState(false);
+  const ampereDiscountSummary = getAmpereDiscountDashboardSummary(subscribers, pricingTiers, activeMonthId);
   // AUTHORITATIVE_FINANCE_V2
   const billingCycleActive = pricingTiers.some(t =>
     t.type !== 'free' && (Number(t.pricePerAmpere || 0) > 0 || Number(t.fixedFee || 0) > 0)
   );
   const dashboardSummary = summarizeSubscribers(subscribers, pricingTiers, activeMonthId);
+  const totalCount = subscribers.length;
   const paidSubscribers = billingCycleActive ? dashboardSummary.paidSubscribers : [];
   const unpaidSubscribers = billingCycleActive ? dashboardSummary.unpaidSubscribers : [];
-  const totalCount = paidSubscribers.length + unpaidSubscribers.length;
   const totalUnpaidDebt = billingCycleActive ? dashboardSummary.outstanding : 0;
-  const totalCollectedRevenue = useCashboxBalance(billingCycleActive
+  const totalCollectedRevenue = billingCycleActive
     ? reconciledCashbox(dashboardSummary.collected, auditLogs, walletResetTimestamp, activeMonthId)
-    : 0);
-  // AMPERE_DISCOUNT_DASHBOARD_DESKTOP_V1
-  const ampereDiscountSummary = getAmpereDiscountDashboardSummary(subscribers, pricingTiers, activeMonthId);
-  const [showPreviousDebtList, setShowPreviousDebtList] = useState(false);
+    : 0;
 
   return (
     <div className="space-y-6 font-['Cairo']" dir="rtl">
@@ -165,6 +164,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
       )}
+
+
 
       
 

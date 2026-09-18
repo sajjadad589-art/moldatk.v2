@@ -138,15 +138,6 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
     return Math.max(0, payments - cancellations);
   })();
 
-  // MOBILE_CASHBOX_SINGLE_SOURCE_V3
-  const mobileCashboxSummary = summarizeSubscribers(subscribers, pricingTiers, activeMonthId);
-  const mobileCashboxAmount = useCashboxBalance(reconciledCashbox(
-    mobileCashboxSummary.collected,
-    auditLogs,
-    walletResetTimestamp,
-    activeMonthId,
-  ));
-
   return (
     <div data-moldatk-theme={__moldatkTheme} className="moldatk-mobile-shell min-h-screen bg-[#F7F9FC] dark:bg-[#081521] text-slate-900 dark:text-slate-100 flex flex-col font-['Cairo',sans-serif] selection:bg-[#F2B544] selection:text-[#0B1F3B] pb-16">
       <MobileHeader
@@ -169,7 +160,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
             onOpenNewSubscriberModal={onOpenNewSubscriberModal}
             onNavigateToTab={onTabChange}
             activeMonthId={activeMonthId}
-            cashboxAmount={mobileCashboxAmount}
+            cashboxAmount={dashboardCashboxAmount}
           />
         )}
 

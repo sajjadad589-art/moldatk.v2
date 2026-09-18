@@ -10,10 +10,6 @@ self.addEventListener('activate', event => {
     const keys = await caches.keys();
     await Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key)));
     await self.clients.claim();
-    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    for (const client of windows) {
-      try { await client.navigate(client.url); } catch (_) {}
-    }
   })());
 });
 
@@ -23,7 +19,15 @@ self.addEventListener('fetch', event => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  if (request.mode === 'navigate' || url.pathname === '/app-version.json' || url.pathname === '/sw.js' || url.pathname.endsWith('.js') || url.pathname.endsWith('.css')) {
+  if (url.pathname.startsWith('/assets/')) {
+    event.respondWith(caches.match(request).then(cached => cached || fetch(request).then(response => {
+      if (response.ok) { const copy = response.clone(); event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.put(request, copy))); }
+      return response;
+    })));
+    return;
+  }
+
+  if (request.mode === 'navigate' || url.pathname === '/app-version.json' || url.pathname === '/sw.js') {
     event.respondWith(fetch(request, { cache: 'no-store' }).then(response => {
       if (response.ok && request.mode === 'navigate') {
         const copy = response.clone();
@@ -35,7 +39,7 @@ self.addEventListener('fetch', event => {
   }
 
   event.respondWith(caches.match(request).then(cached => cached || fetch(request).then(response => {
-    if (response.ok) { const copy = response.clone(); event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.put(request, copy))); }
+    if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
     return response;
   })));
 });

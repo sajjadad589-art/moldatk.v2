@@ -59,8 +59,17 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 if ('serviceWorker' in navigator && !window.location.protocol.startsWith('file')) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js?v=1.3.28', { updateViaCache: 'none' }).then(registration => {
-      void registration.update();
-      window.setInterval(() => void registration.update(), 60 * 1000);
+      const UPDATE_INTERVAL_MS = 6 * 60 * 60 * 1000;
+      let lastUpdateCheck = 0;
+      const checkForUpdate = () => {
+        if (document.visibilityState !== 'visible') return;
+        const now = Date.now();
+        if (now - lastUpdateCheck < UPDATE_INTERVAL_MS) return;
+        lastUpdateCheck = now;
+        void registration.update();
+      };
+      checkForUpdate();
+      document.addEventListener('visibilitychange', checkForUpdate);
     }).catch(error => {
       console.warn('PWA service worker registration failed:', error);
     });

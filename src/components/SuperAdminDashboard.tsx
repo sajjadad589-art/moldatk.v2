@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import * as XLSX from 'xlsx';
+import type * as XLSXTypes from 'xlsx';
 import {
   Bell, Building2, CalendarClock, CircleDollarSign, LogOut, Megaphone,
   Plus, RefreshCw, ShieldCheck, Users, WalletCards, Wrench, X, UserPlus, Eye, CreditCard, Power, Pencil, KeyRound, PauseCircle, Save, Clock3, Trash2, FileSpreadsheet, UploadCloud
@@ -9,9 +9,9 @@ import { SuperAdminStorageCard } from './SuperAdminStorageCard';
 import { Subscriber, SubscriptionTierType, PaymentStatus, MonthlyTariffRecord, LineDistribution } from '../types';
 import { INITIAL_MONTHLY_TARIFFS } from '../data/initialData';
 import { calculateSubscriberBill } from '../utils/formatters';
-import { SeasonalCampaignsPanel } from './SeasonalCampaignsPanel';
 import { AdminAdSlidesPanel } from './AdminAdSlidesPanel';
 import { CustomerOrdersPanel } from './CustomerOrdersPanel';
+import { SeasonalCampaignsPanel } from './SeasonalCampaignsPanel';
 import { WebsiteReleaseManager } from './WebsiteReleaseManager';
 
 type Generator = {
@@ -237,6 +237,9 @@ export const SuperAdminDashboard: React.FC<Props> = ({ onLogout }) => {
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [transactions, setTransactions] = useState<AdminTransaction[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  // SUPERADMIN_AD_UPLOAD_UI_FINAL_V2
+  // SUPERADMIN_AD_UPLOAD_UI_FINAL_V2
+  // SUPERADMIN_AD_UPLOAD_UI_FINAL_V2
   // SUPERADMIN_AD_UPLOAD_UI_FINAL_V2
   // SUPERADMIN_AD_UPLOAD_UI_FINAL_V2
   // SUPERADMIN_AD_UPLOAD_UI_FINAL_V2
@@ -685,8 +688,10 @@ export const SuperAdminDashboard: React.FC<Props> = ({ onLogout }) => {
     if (!excelImportForm.generator_id) return setMessage('اختر حساب صاحب المولدة قبل الرفع');
     if (!excelImportForm.file) return setMessage('اختر ملف Excel أولاً');
 
+    const XLSX = await import('xlsx');
+
     const idle = () => new Promise<void>(resolve => setTimeout(resolve, 0));
-    const cellValue = (sheet: XLSX.WorkSheet, rowIndex: number, colIndex: number) => {
+    const cellValue = (sheet: XLSXTypes.WorkSheet, rowIndex: number, colIndex: number) => {
       const cell = sheet[XLSX.utils.encode_cell({ r: rowIndex, c: colIndex })];
       return cell?.w ?? cell?.v ?? '';
     };
@@ -1069,6 +1074,10 @@ export const SuperAdminDashboard: React.FC<Props> = ({ onLogout }) => {
 
           
 
+          {tab === 'website' && isOwnerSuperAdmin && <WebsiteReleaseManager />}
+
+          {tab === 'website' && <WebsiteReleaseManager />}
+
           {tab === 'overview' && <>
             <SuperAdminStorageCard />
             <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 mb-4">
@@ -1097,19 +1106,57 @@ export const SuperAdminDashboard: React.FC<Props> = ({ onLogout }) => {
           {/* SUPER_ADMIN_SUBSCRIPTION_STATUS_V2 */}
           {/* SUPER_ADMIN_SUBSCRIPTION_STATUS_V2 */}
           {/* SUPER_ADMIN_SUBSCRIPTION_STATUS_V2 */}
+          {/* SUPER_ADMIN_SUBSCRIPTION_STATUS_V2 */}
+          {/* SUPER_ADMIN_SUBSCRIPTION_STATUS_V2 */}
           {tab === 'orders' && <CustomerOrdersPanel />}
 
-          {/* SUPER_ADMIN_SUBSCRIPTION_STATUS_V2 */}
           {tab === 'generators' && <section className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden min-w-0">
             <div className="px-4 sm:px-6 py-5 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div><h2 className="text-lg font-black flex items-center gap-2"><Users className="w-5 h-5" />أصحاب المولدات</h2><p className="text-xs text-slate-500 mt-1">الحالة تعتمد على وقت انتهاء الاشتراك الفعلي أو الإيقاف الإداري.</p></div>
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3"><span className="text-xs text-slate-500">{subscriptions.length} اشتراك مسجل</span><button onClick={() => { setExcelImportProgress(0); setExcelImportReport(EMPTY_EXCEL_REPORT); setExcelImportOpen(true); }} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 sm:px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm flex items-center gap-2"><FileSpreadsheet className="w-4 h-4" />رفع Excel</button><button onClick={() => setGeneratorOpen(true)} className="bg-blue-700 hover:bg-blue-800 text-white px-3 sm:px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm flex items-center gap-2"><UserPlus className="w-4 h-4" />إضافة صاحب مولدة</button></div>
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3"><span className="text-xs text-slate-500">{subscriptions.length} اشتراك مسجل</span><button onClick={() => { setExcelImportProgress(0); setExcelImportReport(EMPTY_EXCEL_REPORT); setExcelImportOpen(true); }} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 sm:px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm flex items-center gap-2"><FileSpreadsheet className="w-4 h-4" />رفع Excel</button><button onClick={() => { setGeneratorFormError(null); setGeneratorOpen(true); }} className="bg-[#0B1F3B] hover:bg-[#142A45] text-white px-3 sm:px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm flex items-center gap-2"><UserPlus className="w-4 h-4" />إضافة صاحب مولدة</button></div>
             </div>
             {loading ? <div className="p-10 text-center font-bold text-slate-500">جاري تحميل البيانات...</div> : generators.length === 0 ? <div className="p-14 text-center text-slate-500 font-bold">لا يوجد أصحاب مولدات بعد</div> : <>
               <div className="hidden lg:block overflow-x-auto">
-                <table className="w-full min-w-[980px] text-sm"><thead className="bg-slate-50 text-slate-500"><tr><th className="p-4 text-right">اسم المولدة</th><th className="p-4 text-right">صاحب الحساب</th><th className="p-4 text-right">الهاتف</th><th className="p-4 text-right">المنطقة</th><th className="p-4 text-right">عدد المشتركين</th><th className="p-4 text-right">ينتهي الاشتراك</th><th className="p-4 text-right">الوقت المتبقي</th><th className="p-4 text-right">الحالة</th><th className="p-4 text-right">الإجراءات</th></tr></thead>
+                <>
+                {/* super-admin-mobile-generator-cards-v5 */}
+                <div className="md:hidden space-y-3 p-3 bg-slate-50">
+                  {generators.map(g => {
+                    const sub = latestSubscriptionFor(g.id);
+                    const statusLabel = g.status === 'active' ? 'فعال' : g.status === 'suspended' ? 'موقوف' : 'منتهي';
+                    return (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => setSelectedGeneratorId(g.id)}
+                        className="w-full text-right bg-white border border-slate-200 rounded-2xl p-4 shadow-sm active:scale-[0.99] transition"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-black text-[15px] text-slate-900 truncate max-w-[170px]">{g.name}</h3>
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${g.status === 'active' ? 'bg-emerald-100 text-emerald-700' : g.status === 'suspended' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>{statusLabel}</span>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1 truncate">{g.owner_name}</p>
+                          </div>
+                          <span className="shrink-0 px-2.5 py-1.5 rounded-lg bg-[#0B1F3B] text-white text-[11px] font-black">تفاصيل</span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
+                          <div className="rounded-xl bg-slate-50 p-2.5 min-w-0"><span className="text-[10px] text-slate-400">الهاتف</span><p className="font-bold text-slate-700 truncate mt-0.5" dir="ltr">{g.phone || '—'}</p></div>
+                          <div className="rounded-xl bg-slate-50 p-2.5"><span className="text-[10px] text-slate-400">المشتركين</span><p className="font-black text-slate-800 mt-0.5">{subscriberCounts[g.id] || 0}</p></div>
+                          <div className="rounded-xl bg-slate-50 p-2.5 min-w-0"><span className="text-[10px] text-slate-400">المنطقة</span><p className="font-bold text-slate-700 truncate mt-0.5">{g.area || '—'}</p></div>
+                          <div className="rounded-xl bg-slate-50 p-2.5 min-w-0"><span className="text-[10px] text-slate-400">انتهاء الاشتراك</span><p className="font-bold text-slate-700 truncate mt-0.5">{sub ? new Intl.DateTimeFormat('ar-IQ', { dateStyle: 'short' }).format(new Date(sub.ends_at)) : '—'}</p></div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full min-w-[980px] text-sm"><thead className="bg-slate-50 text-slate-500"><tr><th className="p-4 text-right">اسم المولدة</th><th className="p-4 text-right">صاحب الحساب</th><th className="p-4 text-right">الهاتف</th><th className="p-4 text-right">رمز الحساب الحالي</th><th className="p-4 text-right">عدد المشتركين</th><th className="p-4 text-right">ينتهي الاشتراك</th><th className="p-4 text-right">الوقت المتبقي</th><th className="p-4 text-right">الحالة</th><th className="p-4 text-right">الإجراءات</th></tr></thead>
                   <tbody>{generators.map(g => { const sub = latestSubscriptionFor(g.id); const effectiveStatus = effectiveGeneratorStatus(g, sub); const remaining = subscriptionRemainingText(sub); return <tr key={g.id} className="border-t border-slate-100 hover:bg-slate-50/70"><td className="p-4 font-black">{g.name}</td><td className="p-4">{g.owner_name}</td><td className="p-4">{g.phone || '—'}</td><td className="p-4">{g.area || '—'}</td><td className="p-4 font-black">{subscriberCounts[g.id] || 0}</td><td className="p-4 font-bold whitespace-nowrap">{sub ? dateText(sub.ends_at) : '—'}</td><td className={`p-4 font-black whitespace-nowrap ${effectiveStatus === 'expired' ? 'text-rose-700' : effectiveStatus === 'suspended' ? 'text-amber-700' : 'text-blue-700'}`}>{remaining}</td><td className="p-4"><span className={`px-3 py-1.5 rounded-full font-black whitespace-nowrap ${effectiveStatus === 'active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : effectiveStatus === 'suspended' ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>{effectiveStatus === 'active' ? 'فعال' : effectiveStatus === 'suspended' ? 'اشتراك متوقف' : 'اشتراك منتهي'}</span></td><td className="p-4"><button onClick={() => setSelectedGeneratorId(g.id)} className="px-3 py-2 rounded-lg bg-slate-900 text-white font-black text-xs inline-flex items-center gap-2"><Eye className="w-4 h-4" />تفاصيل</button></td></tr>})}</tbody>
                 </table>
+                </div>
+              </>
               </div>
               <div className="lg:hidden p-3 sm:p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {generators.map(g => { const sub = latestSubscriptionFor(g.id); const effectiveStatus = effectiveGeneratorStatus(g, sub); const remaining = subscriptionRemainingText(sub); return <article key={g.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm min-w-0">
@@ -1164,36 +1211,26 @@ export const SuperAdminDashboard: React.FC<Props> = ({ onLogout }) => {
           {/* SUPER_ADMIN_RESPONSIVE_NOTIFICATION_CENTER_V2 */}
           {/* SUPER_ADMIN_RESPONSIVE_NOTIFICATION_CENTER_V2 */}
           {/* SUPER_ADMIN_RESPONSIVE_NOTIFICATION_CENTER_V2 */}
-          {/* SUPER_ADMIN_RESPONSIVE_NOTIFICATION_CENTER_V2 */}
-          {/* SUPER_ADMIN_RESPONSIVE_NOTIFICATION_CENTER_V2 */}
-          {/* SUPER_ADMIN_RESPONSIVE_NOTIFICATION_CENTER_V2 */}
-          {/* SUPER_ADMIN_RESPONSIVE_NOTIFICATION_CENTER_V2 */}
-          {tab === 'notifications' && isOwnerSuperAdmin && <div className="space-y-5 min-w-0">
-            <section className="rounded-3xl bg-gradient-to-l from-[#0b1530] via-blue-950 to-slate-900 text-white p-4 sm:p-6 shadow-lg overflow-hidden">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3"><div><h2 className="text-xl sm:text-2xl font-black flex items-center gap-2"><Bell className="w-6 h-6 text-blue-300" />مركز الإشعارات والمناسبات</h2><p className="text-xs sm:text-sm text-slate-300 mt-1">إدارة المواسم، الإعلانات وإشعارات أصحاب المولدات من صفحة واحدة.</p></div><div className="rounded-2xl bg-white/10 border border-white/10 px-4 py-2 text-xs font-black">{notifications.length} إشعار منشور</div></div>
-            </section>
-
+          {tab === 'notifications' && isOwnerSuperAdmin && <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
+            <div data-layout="SUPER_ADMIN_NOTIFICATIONS_LAYOUT_V2"><AdminAdSlidesPanel /></div>
             <SeasonalCampaignsPanel />
+            <form onSubmit={sendNotification} className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 h-fit text-slate-900">
+              <h2 className="text-lg font-black flex items-center gap-2 text-slate-900"><Megaphone className="w-5 h-5" />اشعارات التطبيق</h2>
+              <p className="text-xs text-slate-500 mt-1 mb-5">أرسل إشعار منبثق لأصحاب المولدات</p>
+              <label className="text-xs font-black text-slate-700">نوع الإشعار</label>
+              <select value={notificationForm.category} onChange={e => setNotificationForm(f => ({...f, category:e.target.value}))} className="w-full border border-slate-300 rounded-xl px-3 py-3 mt-1 mb-3 bg-white text-slate-900"><option value="maintenance">صيانة</option><option value="offer">عرض</option><option value="update">تحديث</option><option value="general">عام</option></select>
+              <label className="text-xs font-black text-slate-700">المستلمين</label>
+              <select value={notificationForm.target_type} onChange={e => setNotificationForm(f => ({...f, target_type:e.target.value, generator_id:''}))} className="w-full border border-slate-300 rounded-xl px-3 py-3 mt-1 mb-3 bg-white text-slate-900"><option value="all_generators">كل أصحاب المولدات</option><option value="single_generator">مولدة محددة</option></select>
+              {notificationForm.target_type === 'single_generator' && <select value={notificationForm.generator_id} onChange={e => setNotificationForm(f => ({...f, generator_id:e.target.value}))} className="w-full border border-slate-300 rounded-xl px-3 py-3 mb-3 bg-white text-slate-900"><option value="">اختر المولدة</option>{generators.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select>}
+              <input placeholder="عنوان الإشعار" value={notificationForm.title} onChange={e => setNotificationForm(f => ({...f, title:e.target.value}))} className="w-full border border-slate-300 rounded-xl px-3 py-3 mb-3 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <textarea rows={5} placeholder="نص الإشعار" value={notificationForm.body} onChange={e => setNotificationForm(f => ({...f, body:e.target.value}))} className="w-full border border-slate-300 rounded-xl px-3 py-3 mb-3 bg-white text-slate-900 placeholder:text-slate-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <button className="w-full bg-[#0B1F3B] hover:bg-[#142A45] text-white rounded-xl py-3 font-black flex items-center justify-center gap-2"><Bell className="w-4 h-4" />إرسال اشعار منبثق</button>
+            </form>
 
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start min-w-0">
-              <AdminAdSlidesPanel />
-
-              <form onSubmit={sendNotification} className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 h-fit min-w-0">
-                <div className="flex items-start gap-3 mb-5"><div className="w-11 h-11 rounded-2xl bg-blue-50 text-blue-700 flex items-center justify-center shrink-0"><Megaphone className="w-5 h-5" /></div><div><h2 className="text-lg font-black">إرسال إشعار</h2><p className="text-xs text-slate-500 mt-1">صيانة، عروض، تحديثات أو إشعار عام</p></div></div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <label className="text-xs font-black text-slate-600">نوع الإشعار<select value={notificationForm.category} onChange={e => setNotificationForm(f => ({...f, category:e.target.value}))} className="w-full border border-slate-200 rounded-xl px-3 py-3 mt-1 bg-white"><option value="maintenance">صيانة</option><option value="offer">عرض</option><option value="update">تحديث</option><option value="general">عام</option></select></label>
-                  <label className="text-xs font-black text-slate-600">المستلمين<select value={notificationForm.target_type} onChange={e => setNotificationForm(f => ({...f, target_type:e.target.value, generator_id:''}))} className="w-full border border-slate-200 rounded-xl px-3 py-3 mt-1 bg-white"><option value="all_generators">كل أصحاب المولدات</option><option value="single_generator">مولدة محددة</option></select></label>
-                </div>
-                {notificationForm.target_type === 'single_generator' && <label className="block text-xs font-black text-slate-600 mt-3">المولدة المستهدفة<select value={notificationForm.generator_id} onChange={e => setNotificationForm(f => ({...f, generator_id:e.target.value}))} className="w-full border border-slate-200 rounded-xl px-3 py-3 mt-1 bg-white"><option value="">اختر المولدة</option>{generators.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></label>}
-                <label className="block text-xs font-black text-slate-600 mt-3">عنوان الإشعار<input placeholder="مثال: صيانة مجدولة الليلة" value={notificationForm.title} onChange={e => setNotificationForm(f => ({...f, title:e.target.value}))} className="w-full border border-slate-200 rounded-xl px-3 py-3 mt-1" /></label>
-                <label className="block text-xs font-black text-slate-600 mt-3">نص الإشعار<textarea rows={5} placeholder="اكتب الرسالة التي ستظهر للمستخدم" value={notificationForm.body} onChange={e => setNotificationForm(f => ({...f, body:e.target.value}))} className="w-full border border-slate-200 rounded-xl px-3 py-3 mt-1 resize-y min-h-32" /></label>
-                <button className="mt-4 w-full bg-blue-700 hover:bg-blue-800 text-white rounded-xl py-3 font-black flex items-center justify-center gap-2"><Bell className="w-4 h-4" />نشر الإشعار</button>
-              </form>
-            </div>
-
-            <section className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden min-w-0">
-              <div className="p-4 sm:p-5 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2"><div><h2 className="text-lg font-black">سجل الإشعارات</h2><p className="text-xs text-slate-500 mt-1">الإشعارات المنشورة من الإدارة</p></div><span className="text-xs font-black text-slate-400">الأحدث أولاً</span></div>
-              {notifications.length === 0 ? <div className="p-10 text-center text-slate-500 font-bold">لا توجد إشعارات بعد</div> : <div className="p-3 sm:p-4 grid grid-cols-1 lg:grid-cols-2 gap-3">{notifications.map(n => <article key={n.id} className="rounded-2xl border border-slate-200 p-4 flex gap-3 min-w-0"><div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">{n.category === 'maintenance' ? <Wrench className="w-5 h-5" /> : <Bell className="w-5 h-5" />}</div><div className="flex-1 min-w-0"><div className="flex flex-col sm:flex-row sm:items-start justify-between gap-1"><h3 className="font-black break-words">{n.title}</h3><span className="text-[10px] text-slate-400 whitespace-nowrap">{dateText(n.created_at)}</span></div><p className="text-sm text-slate-600 mt-1 leading-6 break-words">{n.body}</p><p className="text-xs text-slate-400 mt-2">إلى: {n.target_type === 'all_generators' ? 'كل أصحاب المولدات' : generatorName(n.generator_id)}</p></div></article>)}</div>}
+            <section className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden text-slate-900">
+              <div className="p-5 border-b"><h2 className="text-lg font-black">سجل اشعارات التطبيق</h2><p className="text-xs text-slate-500 mt-1">الإشعارات المنشورة من الإدارة</p></div>
+              <div className="divide-y">{notifications.map(n => <div key={n.id} className="p-5 flex gap-4"><div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">{n.category === 'maintenance' ? <Wrench className="w-5 h-5" /> : <Bell className="w-5 h-5" />}</div><div className="flex-1"><div className="flex items-center justify-between"><h3 className="font-black text-slate-900">{n.title}</h3><span className="text-xs text-slate-400">{dateText(n.created_at)}</span></div><p className="text-sm text-slate-600 mt-1 leading-6">{n.body}</p><p className="text-xs text-slate-400 mt-2">إلى: {n.target_type === 'all_generators' ? 'كل أصحاب المولدات' : generatorName(n.generator_id)}</p></div></div>)}</div>
+              {notifications.length === 0 && <div className="p-10 text-center text-slate-500 font-bold">لا توجد إشعارات بعد</div>}
             </section>
           </div>}
         </main>
