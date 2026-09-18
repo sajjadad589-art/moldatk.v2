@@ -117,5 +117,6 @@ const must = (ok, message) => { if (!ok) throw new Error(`Performance/mobile fin
 }
 
 await import('./apply-permanent-subscriber-delete-tombstone-final.mjs');
+await import('./apply-sync-speed-progress-final.mjs');
 
-console.log('Performance finalizer applied: lighter PWA updates/sync triggers, one mobile finance row, and durable subscriber deletion.');
+console.log('Performance finalizer applied: lighter PWA updates/sync triggers, one mobile finance row, durable subscriber deletion, and faster sync progress.');
