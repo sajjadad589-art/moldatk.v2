@@ -221,18 +221,20 @@ export const PricingModal: React.FC<PricingModalProps> = ({
   };
 
   const handleDeleteMonth = (monthId: string) => {
-    if (tariffs.length <= 1) {
-      window.alert('لا يمكن حذف آخر تسعيرة موجودة. أضف تسعيرة أخرى أولاً.');
-      return;
-    }
     const target = tariffs.find(m => m.id === monthId);
     if (!target) return;
     const warning = target.isCurrentActive
-      ? 'تحذير: هذه هي التسعيرة النشطة. حذفها سيجعل أحدث تسعيرة متبقية هي النشطة. الفواتير والتسديدات والديون المحاسبية المحفوظة لن تُحذف. هل تريد المتابعة؟'
-      : 'هل تريد حذف تسعيرة ' + (target.monthNameAr || target.id) + ' من سجل التسعيرات؟ الفواتير والتسديدات والديون التاريخية ستبقى محفوظة.';
+      ? 'تحذير: هذه هي التسعيرة النشطة. حذفها يلغي كل مبلغ غير مسدد ناتج عن هذا الشهر ولا يتم ترحيله لاحقاً. المبالغ المستلمة فعلياً تبقى في السجل. هل تريد المتابعة؟'
+      : 'هل تريد حذف تسعيرة ' + (target.monthNameAr || target.id) + '؟ سيتم إلغاء الدين غير المسدد الخاص بهذا الشهر. المبالغ المستلمة فعلياً تبقى في السجل.';
     if (!window.confirm(warning)) return;
 
     const remaining = tariffs.filter(m => m.id !== monthId);
+    if (remaining.length === 0) {
+      setTariffs([]);
+      setSelectedMonthId('');
+      onSaveMonthlyTariffs([], '', false);
+      return;
+    }
     const nextActive = target.isCurrentActive
       ? [...remaining].sort((a, b) => b.id.localeCompare(a.id))[0]
       : (remaining.find(m => m.isCurrentActive) || [...remaining].sort((a, b) => b.id.localeCompare(a.id))[0]);

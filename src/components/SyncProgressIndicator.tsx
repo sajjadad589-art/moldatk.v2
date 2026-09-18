@@ -87,12 +87,12 @@ export const SyncProgressIndicator: React.FC = () => {
 
   const completed = state.online && !state.pending && state.progress >= 100;
   const label = !state.online
-    ? 'غير متصل بالإنترنت'
+    ? 'غير متصل — محفوظ محلياً'
     : state.syncing || completed
       ? `المزامنة ${Math.max(1, state.progress)}%`
       : state.pending
         ? 'بانتظار المزامنة'
-        : 'متصل بالإنترنت';
+        : 'مزامنة حية';
 
   const tone = !state.online
     ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-950/80 dark:text-red-300'

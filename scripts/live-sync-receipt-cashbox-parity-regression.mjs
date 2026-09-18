@@ -8,7 +8,7 @@ assert.ok(sync.includes("channel.on('postgres_changes'"), 'online sync must use 
 assert.ok(sync.includes("window.addEventListener('online', sync.request);"), 'reconnect must trigger one queued sync flight');
 assert.ok(!sync.includes('setInterval('), 'generator sync must not poll on an interval');
 assert.ok(!sync.includes("document.addEventListener('visibilitychange', visibility)"), 'visibility changes must not cause recurring full pulls');
-assert.ok(sync.includes("message: active ? 'مزامنة التغييرات المحفوظة'"), 'live/offline sync states must be explicit');
+assert.ok(sync.includes("'تعديلات بانتظار المزامنة'") && sync.includes("'تعذر إكمال المزامنة'"), 'live/offline sync states must be explicit');
 assert.ok(!sync.includes("progress: active ? 20 : pending ? 0 : 100"), 'normal live sync must not emit repeating 100% loading states');
 
 const indicator = read('src/components/SyncProgressIndicator.tsx');

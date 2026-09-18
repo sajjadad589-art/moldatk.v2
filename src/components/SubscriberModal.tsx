@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { Subscriber, SubscriptionTierPricing, LineDistribution, AuditLogEntry, SubscriberInvoice, MonthlyTariffRecord } from '../types';
 import { formatCurrency } from '../utils/formatters';
-import { applyPaymentOldestFirst, ensureMonthInvoice, getInvoiceRemaining, getMonthId, getMonthNameAr, monthIdToDate } from '../utils/monthlyAccounting';
+import { applyLumpSettlementAllDebt, applyPaymentOldestFirst, ensureMonthInvoice, getInvoiceRemaining, getMonthId, getMonthNameAr, monthIdToDate } from '../utils/monthlyAccounting';
 
 interface SubscriberModalProps {
   isOpen: boolean;
@@ -582,84 +582,42 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
 
   const handleLumpSettlement = (paidAmount: number) => {
     if (!subscriberToEdit) return;
-    const finalPaid = Math.max(0, Number(paidAmount || 0));
+    const finalPaid = Math.max(0, Math.round(Number(paidAmount || 0)));
     if (finalPaid <= 0) return;
-
     const monthId = activeMonthId || getMonthId();
     const monthName = activeMonthNameAr || getMonthNameAr(monthIdToDate(monthId));
     const now = new Date();
-    const ensured = ensureMonthInvoice(subscriberToEdit, pricingTiers, monthId, monthName);
-    const current = ensured.invoices.find(inv => inv.monthId === monthId && inv.status !== 'cancelled' && inv.status !== 'free');
-    if (!current || String(current.notes || '').includes('MOLDATK_ONBOARDING_NO_CURRENT_CHARGE')) {
-      setCustomError('لا يوجد استحقاق للشهر الحالي يمكن إغلاقه بتسديد مقطوع.');
-      return;
+    try {
+      const ensured = ensureMonthInvoice(subscriberToEdit, pricingTiers, monthId, monthName);
+      const currentBefore = ensured.invoices.find(inv => inv.monthId === monthId && inv.status !== 'cancelled' && inv.status !== 'free');
+      const settlement = applyLumpSettlementAllDebt(subscriberToEdit, pricingTiers, finalPaid, now, monthId, monthName);
+      const receiptBase = settlement.invoices.find(inv => inv.monthId === monthId && inv.status !== 'cancelled' && inv.status !== 'free') || settlement.invoices.find(inv => inv.status === 'paid') || ensured.currentInvoice;
+      const updated: Subscriber = { ...subscriberToEdit, invoicesHistory: settlement.invoices.sort((a, b) => b.monthId.localeCompare(a.monthId)), amountDue: 0, amountPaid: settlement.receivedAmount, paymentStatus: 'paid', lastPaymentDate: now.toISOString() };
+      const receipt: SubscriberInvoice = {
+        ...receiptBase,
+        id: 'receipt-lump-' + subscriberToEdit.id + '-' + Date.now(),
+        receiptNumber: 'REC-' + (subscriberToEdit.code || subscriberToEdit.subscriberCode || subscriberToEdit.id) + '-' + Date.now().toString().slice(-6),
+        totalAmount: settlement.receivedAmount,
+        paidAmount: settlement.receivedAmount,
+        remainingAmount: 0,
+        status: 'paid',
+        previousDebtBefore: Math.max(0, settlement.totalDebtBefore - getInvoiceRemaining(currentBefore || ensured.currentInvoice)),
+        currentCharge: Math.max(0, Number(currentBefore?.totalAmount || 0)),
+        totalBeforePayment: settlement.totalDebtBefore,
+        appliedToPreviousDebt: settlement.allocations.filter(x => x.monthId < monthId).reduce((sum, x) => sum + x.amount, 0),
+        appliedToCurrentMonth: settlement.allocations.filter(x => x.monthId === monthId).reduce((sum, x) => sum + x.amount, 0),
+        totalOutstandingAfter: 0,
+        paymentDate: now.toISOString(),
+        notes: 'MOLDATK_LUMP_SETTLEMENT_ALL_DEBT_RECEIPT|received=' + settlement.receivedAmount + '|waived=' + settlement.waivedAmount,
+      };
+      onSaveSubscriber(updated);
+      if (onAddAuditLog) onAddAuditLog({ category: 'payment', title: 'تسديد مقطوع — تصفية كاملة', details: 'إجمالي الذمة قبل التسوية ' + settlement.totalDebtBefore.toLocaleString('en-US') + ' | المستلم فعلياً ' + settlement.receivedAmount.toLocaleString('en-US') + ' | فرق التسوية ' + settlement.waivedAmount.toLocaleString('en-US') + ' | الرصيد المتبقي 0', entityId: subscriberToEdit.id, entityName: subscriberToEdit.fullName + ' (' + (subscriberToEdit.code || subscriberToEdit.subscriberCode || '') + ')', actorName: 'الإدارة العامة', amount: settlement.receivedAmount });
+      setIsAdvancedOpen(false);
+      if (onOpenReceiptModal) window.setTimeout(() => onOpenReceiptModal(updated, receipt, true), 120); else onClose();
+    } catch (error) {
+      const reason = String((error as any)?.message || error || '');
+      setCustomError(reason.includes('INVALID_LUMP_AMOUNT') ? 'المبلغ يجب أن يكون بين 1 وإجمالي ذمة المشترك.' : reason.includes('NO_OUTSTANDING_DEBT') ? 'لا يوجد دين مستحق على المشترك.' : 'تعذر تنفيذ التسديد المقطوع. أعد المحاولة.');
     }
-
-    const originalTotal = Math.max(0, Number(current.totalAmount || 0));
-    const alreadyPaid = Math.max(0, Number(current.paidAmount || 0));
-    const remainingBefore = getInvoiceRemaining(current);
-    if (remainingBefore <= 0) {
-      setCustomError('اشتراك الشهر الحالي مسدد بالكامل مسبقاً.');
-      return;
-    }
-    if (finalPaid > remainingBefore) {
-      setCustomError('مبلغ التسديد المقطوع لا يمكن أن يتجاوز المتبقي للشهر الحالي: ' + formatNum(remainingBefore) + ' د.ع');
-      return;
-    }
-
-    const effectiveTotal = alreadyPaid + finalPaid;
-    const discount = Math.max(0, originalTotal - effectiveTotal);
-    const marker = 'MOLDATK_LUMP_SETTLEMENT|original=' + originalTotal + '|settled=' + effectiveTotal + '|discount=' + discount + '|received=' + finalPaid;
-    const preservedNotes = String(current.notes || '').split(' | ').filter(x => x && !x.includes('MOLDATK_LUMP_SETTLEMENT')).join(' | ');
-    const settledCurrent: SubscriberInvoice = {
-      ...current,
-      totalAmount: effectiveTotal,
-      paidAmount: effectiveTotal,
-      remainingAmount: 0,
-      status: 'paid',
-      paymentDate: now.toISOString(),
-      notes: [preservedNotes, marker].filter(Boolean).join(' | '),
-    };
-    const invoices = ensured.invoices.map(inv => inv.id === current.id ? settledCurrent : inv);
-    const totalOutstandingAfter = invoices.reduce((sum, inv) => sum + getInvoiceRemaining(inv), 0);
-    const updated: Subscriber = {
-      ...subscriberToEdit,
-      invoicesHistory: invoices.sort((a, b) => b.monthId.localeCompare(a.monthId)),
-      amountDue: totalOutstandingAfter,
-      amountPaid: effectiveTotal,
-      paymentStatus: totalOutstandingAfter === 0 ? 'paid' : 'partial',
-      lastPaymentDate: now.toISOString(),
-    };
-    const receipt: SubscriberInvoice = {
-      ...settledCurrent,
-      id: 'receipt-lump-' + subscriberToEdit.id + '-' + Date.now(),
-      receiptNumber: 'REC-' + (subscriberToEdit.code || subscriberToEdit.subscriberCode || subscriberToEdit.id) + '-' + Date.now().toString().slice(-6),
-      totalAmount: finalPaid,
-      paidAmount: finalPaid,
-      remainingAmount: totalOutstandingAfter,
-      status: totalOutstandingAfter === 0 ? 'paid' : 'partial',
-      previousDebtBefore: Math.max(0, Number(subscriberToEdit.amountDue || 0) - remainingBefore),
-      currentCharge: effectiveTotal,
-      totalBeforePayment: originalTotal,
-      appliedToPreviousDebt: 0,
-      appliedToCurrentMonth: finalPaid,
-      totalOutstandingAfter,
-      paymentDate: now.toISOString(),
-      notes: marker,
-    };
-
-    onSaveSubscriber(updated);
-    if (onAddAuditLog) onAddAuditLog({
-      category: 'payment',
-      title: 'تسديد مقطوع',
-      details: 'الاستحقاق الأصلي ' + originalTotal.toLocaleString('en-US') + ' | المستلم فعلياً ' + finalPaid.toLocaleString('en-US') + ' | فرق التسوية ' + discount.toLocaleString('en-US') + ' | تم إغلاق اشتراك الشهر الحالي بالكامل',
-      entityId: subscriberToEdit.id,
-      entityName: subscriberToEdit.fullName + ' (' + (subscriberToEdit.code || subscriberToEdit.subscriberCode || '') + ')',
-      actorName: 'الإدارة العامة',
-      amount: finalPaid,
-    });
-    setIsAdvancedOpen(false);
-    if (onOpenReceiptModal) window.setTimeout(() => onOpenReceiptModal(updated, receipt, true), 120); else onClose();
   };
 
   const formatNum = (num: number | string | undefined | null): string => {
@@ -898,14 +856,14 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
                 <button type="button" onClick={() => { setCustomPaymentMode('lump'); setCustomAmount(String(settlementCurrentRemaining || '')); setCustomError(''); }} className={`py-3 rounded-2xl border text-xs font-black ${customPaymentMode === 'lump' ? 'bg-amber-500 border-amber-500 text-white' : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200'}`}>تسديد مقطوع</button>
               </div>
 
-              {customPaymentMode === 'lump' && <div className="mb-3 rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 p-3 text-[10px] leading-5 font-bold text-amber-800 dark:text-amber-300">يغلق اشتراك الشهر الحالي بالكامل بالمبلغ الذي تحدده. فرق التسوية لا يبقى ديناً، والقاصة والداشبورد يحتسبان المبلغ المستلم فعلياً فقط. أي دين من شهر أقدم يبقى محفوظاً.</div>}
+              {customPaymentMode === 'lump' && <div className="mb-3 rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 p-3 text-[10px] leading-5 font-bold text-amber-800 dark:text-amber-300">يغلق كامل ذمة المشترك بجميع الأشهر بالمبلغ الذي تحدده. فرق التسوية لا يبقى ديناً، والقاصة تحتسب المبلغ المستلم فعلياً فقط، ويصبح الرصيد المتبقي 0.</div>}
               <label className="text-xs font-bold text-slate-600 dark:text-slate-300">{customPaymentMode === 'lump' ? 'المبلغ المتفق على استلامه' : 'مبلغ الدفعة'}</label>
               <input type="number" min="1" value={customAmount} onChange={e => { setCustomAmount(e.target.value); setCustomError(''); }} className="mt-1.5 w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 text-lg font-black text-slate-950 dark:text-white outline-none focus:border-blue-500" dir="ltr" />
-              {customPaymentMode === 'lump' && <p className="mt-1.5 text-[10px] font-bold text-slate-500">المتبقي للشهر الحالي قبل التسوية: {formatCurrency(settlementCurrentRemaining)}</p>}
+              {customPaymentMode === 'lump' && <p className="mt-1.5 text-[10px] font-bold text-slate-500">إجمالي الذمة قبل التسوية: {formatCurrency(outstanding)}</p>}
               {customError && <p className="text-[11px] font-bold text-rose-500 mt-2">{customError}</p>}
               <button type="button" onClick={() => {
                 const amount = Number(customAmount);
-                const maxAmount = customPaymentMode === 'lump' ? settlementCurrentRemaining : outstanding;
+                const maxAmount = outstanding;
                 if (!Number.isFinite(amount) || amount <= 0 || amount > maxAmount) { setCustomError('أدخل مبلغاً بين 1 و ' + formatNum(maxAmount) + ' د.ع'); return; }
                 if (customPaymentMode === 'lump') handleLumpSettlement(amount); else handleCustomPayment('partial', amount);
               }} className="mt-4 w-full py-3.5 rounded-2xl bg-emerald-600 text-white text-xs font-black">{customPaymentMode === 'lump' ? 'اعتماد التسديد المقطوع وإغلاق الشهر' : 'تسديد المبلغ وإصدار الوصل'}</button>

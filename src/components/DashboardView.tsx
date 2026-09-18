@@ -50,9 +50,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const paidSubscribers = billingCycleActive ? dashboardSummary.paidSubscribers : [];
   const unpaidSubscribers = billingCycleActive ? dashboardSummary.unpaidSubscribers : [];
   const totalUnpaidDebt = billingCycleActive ? dashboardSummary.outstanding : 0;
-  const totalCollectedRevenue = billingCycleActive
+  const totalCollectedRevenue = useCashboxBalance(billingCycleActive
     ? reconciledCashbox(dashboardSummary.collected, auditLogs, walletResetTimestamp, activeMonthId)
-    : 0;
+    : 0);
 
   return (
     <div className="space-y-6 font-['Cairo']" dir="rtl">

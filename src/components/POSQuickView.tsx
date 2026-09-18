@@ -5,7 +5,7 @@ import { PaymentMethodModal, PaymentExecutionData } from './PaymentMethodModal';
 import { Subscriber, SubscriptionTierPricing, GeneratorSpecs, Collector, CollectorPermissions, SubscriberInvoice } from '../types';
 import { calculateSubscriberBill } from '../utils/formatters';
 import { getSubscriberFinancialRow } from '../utils/authoritativeAccounting';
-import { applyPaymentOldestFirst, ensureMonthInvoice, getInvoiceRemaining, getMonthId, getMonthNameAr, monthIdToDate } from '../utils/monthlyAccounting';
+import { applyLumpSettlementAllDebt, applyPaymentOldestFirst, ensureMonthInvoice, getInvoiceRemaining, getMonthId, getMonthNameAr, monthIdToDate } from '../utils/monthlyAccounting';
 
 interface POSQuickViewProps {
   subscribers: Subscriber[];
@@ -156,29 +156,39 @@ export const POSQuickView: React.FC<POSQuickViewProps> = ({
       return;
     }
 
-    // COLLECTOR_LUMP_SETTLEMENT_V1
+    // COLLECTOR_LUMP_SETTLEMENT_V2_ALL_DEBT
     if (data.method === 'lump') {
-      const current = ensured.invoices.find(inv => inv.monthId === monthId && inv.status !== 'cancelled' && inv.status !== 'free');
-      if (!current || String(current.notes || '').includes('MOLDATK_ONBOARDING_NO_CURRENT_CHARGE')) return;
-      const originalTotal = Math.max(0, Number(current.totalAmount || 0));
-      const alreadyPaid = Math.max(0, Number(current.paidAmount || 0));
-      const remainingBefore = getInvoiceRemaining(current);
-      const received = Math.min(remainingBefore, Math.max(0, Number(data.amountPaid || 0)));
-      if (remainingBefore <= 0 || received <= 0) return;
-      const effectiveTotal = alreadyPaid + received;
-      const discount = Math.max(0, originalTotal - effectiveTotal);
-      const marker = 'MOLDATK_LUMP_SETTLEMENT|original=' + originalTotal + '|settled=' + effectiveTotal + '|discount=' + discount + '|received=' + received;
-      const settledCurrent: SubscriberInvoice = { ...current, totalAmount: effectiveTotal, paidAmount: effectiveTotal, remainingAmount: 0, status: 'paid', paymentDate: now.toISOString(), notes: marker };
-      const invoices = ensured.invoices.map(inv => inv.id === current.id ? settledCurrent : inv);
-      const totalDebtAfter = invoices.reduce((sum, inv) => sum + getInvoiceRemaining(inv), 0);
-      const updated: Subscriber = { ...sub, invoicesHistory: invoices.sort((a, b) => b.monthId.localeCompare(a.monthId)), paymentStatus: totalDebtAfter === 0 ? 'paid' : 'partial', amountDue: totalDebtAfter, amountPaid: effectiveTotal, lastPaymentDate: now.toISOString() };
-      const receiptInvoice: SubscriberInvoice = { ...settledCurrent, id: 'receipt-lump-' + sub.id + '-' + Date.now(), receiptNumber: 'REC-' + (sub.code || sub.subscriberCode || 'MW') + '-' + Date.now().toString().slice(-6), totalAmount: received, paidAmount: received, remainingAmount: totalDebtAfter, status: totalDebtAfter === 0 ? 'paid' : 'partial', collectorName: data.collectorName || collectorName || 'المحاسب', previousDebtBefore: Math.max(0, Number(sub.amountDue || 0) - remainingBefore), currentCharge: effectiveTotal, totalBeforePayment: originalTotal, appliedToPreviousDebt: 0, appliedToCurrentMonth: received, totalOutstandingAfter: totalDebtAfter, paymentDate: now.toISOString(), notes: marker };
-      onSaveSubscriber(updated);
-      onAddAuditLog({ category: 'payment', title: 'تسديد مقطوع', details: 'الاستحقاق الأصلي ' + originalTotal.toLocaleString('en-US') + ' | المستلم ' + received.toLocaleString('en-US') + ' | فرق التسوية ' + discount.toLocaleString('en-US'), entityId: sub.id, entityName: sub.fullName + ' (' + (sub.code || sub.subscriberCode) + ')', actorName: data.collectorName || collectorName || 'المحاسب', amount: received });
-      setPaymentSubscriber(null);
-      setPaymentSuccess({ name: sub.fullName, amount: received, method: data.method });
-      if (data.autoPrintReceipt) window.setTimeout(() => onOpenReceiptModal(updated, receiptInvoice, true), 650);
-      window.setTimeout(() => setPaymentSuccess(null), 1800);
+      try {
+        const settlement = applyLumpSettlementAllDebt(sub, pricingTiers, data.amountPaid, now, monthId, monthName);
+        const received = settlement.receivedAmount;
+        const currentBefore = ensured.invoices.find(inv => inv.monthId === monthId && inv.status !== 'cancelled' && inv.status !== 'free');
+        const receiptBase = settlement.invoices.find(inv => inv.monthId === monthId && inv.status !== 'cancelled' && inv.status !== 'free') || settlement.invoices.find(inv => inv.status === 'paid') || ensured.currentInvoice;
+        const updated: Subscriber = { ...sub, invoicesHistory: settlement.invoices.sort((a, b) => b.monthId.localeCompare(a.monthId)), paymentStatus: 'paid', amountDue: 0, amountPaid: received, lastPaymentDate: now.toISOString() };
+        const receiptInvoice: SubscriberInvoice = {
+          ...receiptBase,
+          id: 'receipt-lump-' + sub.id + '-' + Date.now(),
+          receiptNumber: 'REC-' + (sub.code || sub.subscriberCode || 'MW') + '-' + Date.now().toString().slice(-6),
+          totalAmount: received,
+          paidAmount: received,
+          remainingAmount: 0,
+          status: 'paid',
+          collectorName: data.collectorName || collectorName || 'المحاسب',
+          previousDebtBefore: Math.max(0, settlement.totalDebtBefore - getInvoiceRemaining(currentBefore || ensured.currentInvoice)),
+          currentCharge: Math.max(0, Number(currentBefore?.totalAmount || 0)),
+          totalBeforePayment: settlement.totalDebtBefore,
+          appliedToPreviousDebt: settlement.allocations.filter(x => x.monthId < monthId).reduce((sum, x) => sum + x.amount, 0),
+          appliedToCurrentMonth: settlement.allocations.filter(x => x.monthId === monthId).reduce((sum, x) => sum + x.amount, 0),
+          totalOutstandingAfter: 0,
+          paymentDate: now.toISOString(),
+          notes: 'MOLDATK_LUMP_SETTLEMENT_ALL_DEBT_RECEIPT|received=' + received + '|waived=' + settlement.waivedAmount,
+        };
+        onSaveSubscriber(updated);
+        onAddAuditLog({ category: 'payment', title: 'تسديد مقطوع — تصفية كاملة', details: 'إجمالي الذمة قبل التسوية ' + settlement.totalDebtBefore.toLocaleString('en-US') + ' | المستلم فعلياً ' + received.toLocaleString('en-US') + ' | فرق التسوية ' + settlement.waivedAmount.toLocaleString('en-US') + ' | الرصيد المتبقي 0', entityId: sub.id, entityName: sub.fullName + ' (' + (sub.code || sub.subscriberCode) + ')', actorName: data.collectorName || collectorName || 'المحاسب', amount: received });
+        setPaymentSubscriber(null);
+        setPaymentSuccess({ name: sub.fullName, amount: received, method: data.method });
+        if (data.autoPrintReceipt) window.setTimeout(() => onOpenReceiptModal(updated, receiptInvoice, true), 650);
+        window.setTimeout(() => setPaymentSuccess(null), 1800);
+      } catch (error) { console.error('Lump settlement failed:', error); }
       return;
     }
 

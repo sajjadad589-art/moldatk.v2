@@ -95,48 +95,14 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   // WORKMODE_MOBILELAYOUT_THEME_FALLBACK
   const __moldatkTheme = (() => { try { return localStorage.getItem('moldatk_mobile_theme') || 'ocean-calm'; } catch (e) { return 'ocean-calm'; } })();
   const __setMoldatkTheme = (theme: string) => { try { localStorage.setItem('moldatk_mobile_theme', theme); document.documentElement.setAttribute('data-moldatk-theme', theme); } catch (e) {} };
-  // DASHBOARD_CASHBOX_WALLETVIEW_PARITY_V3
-  const dashboardWalletResetTime = walletResetTimestamp ? new Date(walletResetTimestamp).getTime() : 0;
-  const dashboardFinancialLogs = auditLogs.filter(log => {
-    if (log.category !== 'payment' && log.category !== 'cancellation') return false;
-    if (dashboardWalletResetTime > 0 && log.timestamp) {
-      const logTime = new Date(log.timestamp).getTime();
-      if (Number.isFinite(logTime) && logTime < dashboardWalletResetTime) return false;
-    }
-    return true;
-  });
-
-  const dashboardCashboxAmount = (() => {
-    const ordered = [...dashboardFinancialLogs].sort((a, b) =>
-      new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime()
-    );
-    const unmatchedPayments = new Map<string, number[]>();
-    let payments = 0;
-    let cancellations = 0;
-
-    ordered.forEach(log => {
-      const entityKey = String(log.entityId || 'unknown');
-      if (log.category === 'payment') {
-        const amount = Math.max(0, Number(log.amount) || 0);
-        payments += amount;
-        if (amount > 0) {
-          const stack = unmatchedPayments.get(entityKey) || [];
-          stack.push(amount);
-          unmatchedPayments.set(entityKey, stack);
-        }
-        return;
-      }
-
-      let amount = Math.max(0, Number(log.amount) || 0);
-      const stack = unmatchedPayments.get(entityKey) || [];
-      if (!amount && stack.length) amount = stack.pop() || 0;
-      else if (amount && stack.length) stack.pop();
-      unmatchedPayments.set(entityKey, stack);
-      cancellations += amount;
-    });
-
-    return Math.max(0, payments - cancellations);
-  })();
+  // MOBILE_CASHBOX_SINGLE_SOURCE_V3
+  const mobileCashboxSummary = summarizeSubscribers(subscribers, pricingTiers, activeMonthId);
+  const mobileCashboxAmount = useCashboxBalance(reconciledCashbox(
+    mobileCashboxSummary.collected,
+    auditLogs,
+    walletResetTimestamp,
+    activeMonthId,
+  ));
 
   return (
     <div data-moldatk-theme={__moldatkTheme} className="moldatk-mobile-shell min-h-screen bg-[#F7F9FC] dark:bg-[#081521] text-slate-900 dark:text-slate-100 flex flex-col font-['Cairo',sans-serif] selection:bg-[#F2B544] selection:text-[#0B1F3B] pb-16">
@@ -160,7 +126,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
             onOpenNewSubscriberModal={onOpenNewSubscriberModal}
             onNavigateToTab={onTabChange}
             activeMonthId={activeMonthId}
-            cashboxAmount={dashboardCashboxAmount}
+            cashboxAmount={mobileCashboxAmount}
           />
         )}
 

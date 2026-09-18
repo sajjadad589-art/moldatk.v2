@@ -49,6 +49,6 @@ assert(app.includes("getStorageKey('moldatk_deleted_tariffs')"), 'Tariff deletio
 assert(app.includes('normalized.length === 0'), 'Empty tariff list must have an explicit live-zero path');
 assert(eventSync.includes("client.rpc('delete_generator_tariff_month'"), 'Tariff deletion must use the accounting-safe server RPC');
 assert(!eventSync.includes("remove('generator_monthly_tariffs', sent.deletedTariffs)"), 'Raw cloud tariff deletion must not remain');
-assert(eventSync.includes('if (pending()) await push(snapshot());'), 'Pending local tariff deletion must be pushed before cloud pull');
+assert(eventSync.includes('if (hadPending) {') && eventSync.includes('await push(snapshot());'), 'Pending local tariff deletion must be pushed before cloud pull');
 
 console.log('Secure destructive controls audit passed: owner factory reset UI is absent, subscriber/generator purge wiring remains protected, annual report reset is non-destructive, and tariff deletion extinguishes only deleted-month unpaid liability while preserving real payment history.');

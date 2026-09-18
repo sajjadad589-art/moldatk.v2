@@ -86,7 +86,7 @@ export function getSubscriberFinancialRow(sub: Subscriber, tiers: SubscriptionTi
   return { sub, isFree: false, bill, paid, outstanding, status };
 }
 
-export function summarizeSubscribers(subscribers: Subscriber[], tiers: SubscriptionTierPricing[], activeMonthId = getMonthId()) {
+export function summarizeSubscribers(subscribers: Subscriber[], tiers: SubscriptionTierPricing[] = [], activeMonthId = getMonthId()) {
   const rows = subscribers.map(sub => getSubscriberFinancialRow(sub, tiers, activeMonthId));
   const billable = rows.filter(r => !r.isFree);
   const paidRows = billable.filter(r => r.status === 'paid' && r.outstanding === 0 && r.bill > 0);

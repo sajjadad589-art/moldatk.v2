@@ -160,6 +160,8 @@ public class SunmiPrinterPlugin extends Plugin {
 
         String amperes = raw(r, "amperes");
         if (!amperes.isEmpty()) addField(lines, "عدد الأمبيرات", amperes, false);
+        String pricePerAmp = raw(r, "pricePerAmp");
+        if (!pricePerAmp.isEmpty()) addField(lines, "سعر الأمبير الشهري", pricePerAmp, true);
 
         String month = raw(r, "month");
         if (!month.isEmpty()) addField(lines, "شهر التسديد", month, true);
@@ -181,13 +183,6 @@ public class SunmiPrinterPlugin extends Plugin {
         String paidAmount = raw(r, "paidAmount");
         String totalAmount = raw(r, "totalAmount");
         String finalAmount = !paidAmount.isEmpty() ? paidAmount : totalAmount;
-        if (!finalAmount.isEmpty()) {
-            lines.add(new DrawLine("المبلغ المستلم", 19f, true, Layout.Alignment.ALIGN_NORMAL, 1));
-            lines.add(new DrawLine(finalAmount, 29f, true, Layout.Alignment.ALIGN_NORMAL, 7));
-        }
-
-        String appliedToPreviousDebt = raw(r, "appliedToPreviousDebt");
-        if (!appliedToPreviousDebt.isEmpty()) addField(lines, "تسديد الدين السابق", appliedToPreviousDebt, false);
         String appliedToCurrentMonth = raw(r, "appliedToCurrentMonth");
         if (!appliedToCurrentMonth.isEmpty()) addField(lines, "تسديد الشهر الحالي", appliedToCurrentMonth, false);
 
@@ -200,7 +195,7 @@ public class SunmiPrinterPlugin extends Plugin {
         lines.add(separatorLine());
 
         if (!finalAmount.isEmpty()) {
-            lines.add(new DrawLine("المبلغ المستلم\n" + finalAmount, 31f, true, Layout.Alignment.ALIGN_CENTER, 10, true));
+            lines.add(new DrawLine("المبلغ المستلم\n" + finalAmount, 25f, true, Layout.Alignment.ALIGN_CENTER, 8, true));
         }
 
         lines.add(new DrawLine("شكراً لتسديدكم", 19f, true, Layout.Alignment.ALIGN_CENTER, 8));

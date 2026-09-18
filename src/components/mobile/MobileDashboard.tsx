@@ -222,7 +222,7 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
           </div>
         </div>
       )}
-{/* 3. Cashbox */}
+      {/* 3. Cashbox */}
       <button
         type="button"
         onClick={() => onNavigateToTab('wallet')}
@@ -241,7 +241,7 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
 
           <div className="text-left shrink-0">
             <span className="block text-lg font-black text-white tabular-nums" dir="ltr">
-              {formatCurrency(totalCollectedRevenue, generatorSpecs.currency)}
+              {formatCurrency(cashboxAmount, generatorSpecs.currency)}
             </span>
             <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-black text-emerald-200">
               فتح القاصة

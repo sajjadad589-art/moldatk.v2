@@ -802,25 +802,32 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
     let nextSubscribers = subscribers;
     let subscribersChanged = false;
 
+    // FINANCIAL_DELETE_LOCAL_CLEANUP_V2
+    const deletedTariffIds = monthlyTariffs.filter(record => !incomingIds.has(record.id)).map(record => record.id);
+    if (deletedTariffIds.length) {
+      nextSubscribers = extinguishDeletedTariffLiabilities(nextSubscribers, deletedTariffIds, activeRecord?.id || '');
+      subscribersChanged = true;
+    }
+
     if (!activeRecord || normalized.length === 0) {
       // Empty tariff list = no current monthly billing cycle. Historical invoices stay intact.
-      nextSubscribers = zeroLiveMonthlyCycle(subscribers);
+      nextSubscribers = zeroLiveMonthlyCycle(nextSubscribers);
       subscribersChanged = true;
       try { localStorage.removeItem(activationKey); } catch (e) {}
     } else if (isBrandNewMonth) {
       // THIS is the only place where paid/partial counters are reset.
       // Old unpaid balances remain in historical invoices and become carried debt.
-      nextSubscribers = startFreshMonthlyCycle(subscribers, previousActiveRecord, activeRecord, now);
+      nextSubscribers = startFreshMonthlyCycle(nextSubscribers, previousActiveRecord, activeRecord, now);
       subscribersChanged = true;
       try { localStorage.setItem(activationKey, activeRecord.id); } catch (e) {}
     } else if (isSameActiveMonthEdit) {
       // Editing prices in the already-active month must NEVER erase payments.
-      nextSubscribers = repriceActiveMonthlyCycle(subscribers, activeRecord, now);
+      nextSubscribers = repriceActiveMonthlyCycle(nextSubscribers, activeRecord, now);
       subscribersChanged = true;
     } else if (activeMonthChangedWithoutNewCycle || (previousActiveId && !incomingIds.has(previousActiveId))) {
       // Deleting the active tariff and falling back to an older remaining month restores that
       // month's existing ledger instead of inventing a new bill or keeping the deleted month live.
-      nextSubscribers = summarizeExistingMonthlyCycle(subscribers, activeRecord);
+      nextSubscribers = summarizeExistingMonthlyCycle(nextSubscribers, activeRecord);
       subscribersChanged = true;
       try { localStorage.setItem(activationKey, activeRecord.id); } catch (e) {}
     }
