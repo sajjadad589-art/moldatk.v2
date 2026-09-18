@@ -58,12 +58,41 @@ const must = (ok,msg) => { if (!ok) throw new Error('Sync speed/progress finaliz
   write(p,s);
 }
 
-// 3) Indicator: percentage while working, then clear connected state immediately after success.
+// 3) Indicator: percentage while working, then connected after a successful 100%.
 {
   const p = 'src/components/SyncProgressIndicator.tsx';
   let s = read(p);
-  s = s.replace("? \`جاري المزامنة \${Math.max(1, state.progress)}%\`", "? \`المزامنة \${Math.max(1, state.progress)}%\`");
+
+  s = s.replace(
+    /  const completed = [\\s\\S]*?\n\s*: 'مزامنة حية';/,
+`  const completed = state.online && !state.pending && state.progress >= 100;
+  const label = !state.online
+    ? 'غير متصل بالإنترنت'
+    : state.syncing || completed
+      ? \`المزامنة \${Math.max(1, state.progress)}%\`
+      : state.pending
+        ? 'بانتظار المزامنة'
+        : 'متصل بالإنترنت';`
+  );
+
+  // Also handle the pre-live-sync indicator shape.
+  s = s.replace(
+    /  const completed = state\\.online[\\s\\S]*?\n\s*: 'متصل بالإنترنت';/,
+`  const completed = state.online && !state.pending && state.progress >= 100;
+  const label = !state.online
+    ? 'غير متصل بالإنترنت'
+    : state.syncing || completed
+      ? \`المزامنة \${Math.max(1, state.progress)}%\`
+      : state.pending
+        ? 'بانتظار المزامنة'
+        : 'متصل بالإنترنت';`
+  );
+
   s = s.replace('}, 900);', '}, 450);');
+  // The live-sync finalizer may have removed the completed tone condition; restore it.
+  s = s.replace(': state.syncing\n      ? \'border-blue-200', ': state.syncing || completed\n      ? \'border-blue-200');
+  s = s.replace(': state.syncing\n      ? \'bg-blue-500 animate-pulse\'', ': state.syncing || completed\n      ? \'bg-blue-500 animate-pulse\'');
+
   must(s.includes('المزامنة ${Math.max(1, state.progress)}%'), 'percentage label missing');
   must(s.includes("'متصل بالإنترنت'"), 'connected label missing');
   write(p,s);
