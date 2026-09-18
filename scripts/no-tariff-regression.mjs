@@ -29,7 +29,7 @@ assert.equal(NO_TARIFF_LABEL, 'لا توجد تسعيرة');
 
 for (const [path, markers] of Object.entries({
   'src/App.tsx': ['zeroLiveMonthlyCycle', 'moldatk_deleted_tariffs'],
-  'src/utils/authoritativeAccounting.ts': ['hasMonthlyPricing(tiers)', "status: 'no_tariff'"],
+  'src/utils/authoritativeAccounting.ts': ["status: 'no_tariff'"],
   'src/components/SubscriberModal.tsx': ['hasPricing', 'if (!hasMonthlyPricing(pricingTiers)) return;'],
   'src/components/PaymentMethodModal.tsx': ['!subscriber || !hasMonthlyPricing(pricingTiers)'],
   'src/components/POSQuickView.tsx': ['!hasMonthlyPricing(pricingTiers)'],
@@ -38,6 +38,7 @@ for (const [path, markers] of Object.entries({
 })) {
   const text = fs.readFileSync(path, 'utf8');
   for (const marker of markers) assert.ok(text.includes(marker), `${path} missing ${marker}`);
+  if (path === 'src/utils/authoritativeAccounting.ts') assert.ok(text.includes('hasMonthlyPricing(tiers)') || text.includes('hasMonthlyPricing(pricingTiers)'), `${path} missing monthly-pricing availability guard`);
 }
 // Exercise the actual generated components and accounting code, not only markers.
 await build({ stdin: { contents: `
