@@ -8,6 +8,7 @@ const addImportAfter = (src, anchor, line) => src.includes(line) ? src : (src.in
 write('src/utils/authoritativeAccounting.ts', `import type { AuditLogEntry, Subscriber, SubscriberInvoice, SubscriptionTierPricing } from '../types';
 import { calculateSubscriberBill } from './formatters';
 import { getInvoiceRemaining, getMonthId } from './monthlyAccounting';
+import { hasMonthlyPricing } from './pricingAvailability';
 
 const n = (v: unknown) => Math.max(0, Number(v) || 0);
 
@@ -38,6 +39,7 @@ function canonicalInvoices(sub: Subscriber): SubscriberInvoice[] {
 
 export function getSubscriberFinancialRow(sub: Subscriber, tiers: SubscriptionTierPricing[], activeMonthId = getMonthId()) {
   const isFree = sub.tier === 'free' || sub.isExempted === true || sub.paymentStatus === 'free';
+  if (!hasMonthlyPricing(tiers)) return { sub, isFree, bill: 0, paid: 0, outstanding: 0, status: 'no_tariff' as const };
   if (isFree) return { sub, isFree, bill: 0, paid: 0, outstanding: 0, status: 'free' as const };
 
   const invoices = canonicalInvoices(sub);
