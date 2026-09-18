@@ -5,8 +5,9 @@ const write = (p, s) => fs.writeFileSync(p, s, 'utf8');
 const must = (ok, message) => { if (!ok) throw new Error(`Live sync/receipt/cashbox finalizer: ${message}`); };
 
 // ---------------------------------------------------------------------------
-// 1) ONLINE = live/event-driven and silent. OFFLINE = durable local queue.
-//    No polling spinner and no recurring "100%" completion animation.
+// 1) ONLINE = realtime/event-driven. Show real stage percentage only while a
+//    synchronization flight is active, then return to "متصل بالإنترنت".
+//    OFFLINE remains durable local-first and reconnect performs one flight.
 // ---------------------------------------------------------------------------
 {
   const p = 'src/lib/useEventDrivenGeneratorSync.ts';
@@ -17,34 +18,88 @@ const must = (ok, message) => { if (!ok) throw new Error(`Live sync/receipt/cash
   detail: { active, pending, progress: active ? 20 : pending ? 0 : 100,
     message: active ? 'جاري المزامنة' : pending ? 'تعديلات محفوظة — أعد المحاولة عند توفر الاتصال' : 'اكتملت المزامنة' },
 }));`,
-`const progress = (active: boolean, pending = false) => window.dispatchEvent(new CustomEvent('moldatk-sync-progress', {
-  // LIVE_SYNC_UI_V1: normal online realtime traffic is intentionally silent.
-  // Offline changes stay durable locally; reconnect performs one scheduler flight.
-  detail: { active, pending, progress: active ? 20 : 0,
-    message: active ? 'مزامنة التغييرات المحفوظة' : pending ? 'محفوظ محلياً — بانتظار الاتصال' : 'مزامنة حية' },
-}));`
+`const progress = (value: number, active = true, pending = false, message = 'جاري المزامنة') =>
+  window.dispatchEvent(new CustomEvent('moldatk-sync-progress', {
+    detail: { active, pending, progress: Math.max(0, Math.min(100, Math.round(value))), message },
+  }));`
   );
 
-  // The scheduler itself is still single-flight/debounced, but normal online events
-  // must not flash a loading state for every realtime notification.
+  // Replace the scheduler transport body only; push/pull accounting and conflict
+  // semantics remain unchanged.
   s = s.replace(
 `    progress(true);
     try {
-      if (pending()) await push(snapshot());`,
-`    try {
-      if (pending()) await push(snapshot());`
+      if (pending()) await push(snapshot());
+      // A newer user edit is already queued by its event; never overwrite it with a pull.
+      if (!disposed && !pending()) await pull();
+      if (!disposed) progress(false, pending());
+    } finally { stage = 'idle'; }`,
+`    progress(5, true, false, 'بدء المزامنة');
+    try {
+      const hadPending = pending();
+      if (hadPending) {
+        progress(15, true, false, 'رفع التغييرات');
+        await push(snapshot());
+        progress(55, true, false, 'تم رفع التغييرات');
+      } else {
+        progress(35, true, false, 'قراءة التحديثات');
+      }
+      // A newer user edit is already queued by its event; never overwrite it with a pull.
+      if (!disposed && !pending()) {
+        progress(hadPending ? 65 : 45, true, false, 'تحديث البيانات');
+        await pull();
+        progress(95, true, false, 'إنهاء المزامنة');
+      }
+      if (!disposed) {
+        const stillPending = pending();
+        progress(stillPending ? 0 : 100, false, stillPending,
+          stillPending ? 'تعديلات بانتظار المزامنة' : 'اكتملت المزامنة');
+      }
+    } finally { stage = 'idle'; }`
   );
 
-  // A tab becoming visible does not need a full pull: the realtime channel is the
-  // authoritative live feed. This also prevents focus/visibility churn from looking
-  // like repeated synchronization.
+  // Variant where an earlier performance guard already owns the completion timestamp.
+  s = s.replace(
+`    try {
+      if (pending()) await push(snapshot());
+      // A newer user edit is already queued by its event; never overwrite it with a pull.
+      if (!disposed && !pending()) await pull();
+      if (!disposed) { lastCompletedSyncAt = Date.now(); progress(false, pending()); }
+    } finally { stage = 'idle'; }`,
+`    progress(5, true, false, 'بدء المزامنة');
+    try {
+      const hadPending = pending();
+      if (hadPending) {
+        progress(15, true, false, 'رفع التغييرات');
+        await push(snapshot());
+        progress(55, true, false, 'تم رفع التغييرات');
+      } else {
+        progress(35, true, false, 'قراءة التحديثات');
+      }
+      if (!disposed && !pending()) {
+        progress(hadPending ? 65 : 45, true, false, 'تحديث البيانات');
+        await pull();
+        progress(95, true, false, 'إنهاء المزامنة');
+      }
+      if (!disposed) {
+        lastCompletedSyncAt = Date.now();
+        const stillPending = pending();
+        progress(stillPending ? 0 : 100, false, stillPending,
+          stillPending ? 'تعديلات بانتظار المزامنة' : 'اكتملت المزامنة');
+      }
+    } finally { stage = 'idle'; }`
+  );
+
+  s = s.replace(/progress\(false, true\);/g, "progress(0, false, true, 'تعذر إكمال المزامنة');");
+
+  // A tab becoming visible should not force constant full pulls. The later performance
+  // finalizer may add a stale-recovery throttle.
   s = s.replace(`    const visibility = () => { if (document.visibilityState === 'visible') sync.request(); };\n`, '');
   s = s.replace(`    document.addEventListener('visibilitychange', visibility);\n`, '');
   s = s.replace(`      document.removeEventListener('visibilitychange', visibility);\n`, '');
 
-  must(s.includes('LIVE_SYNC_UI_V1'), 'live-sync UI marker missing');
-  must(!s.includes('progress(true);\n    try {\n      if (pending())'), 'normal scheduler still starts visible progress');
-  must(!s.includes("document.addEventListener('visibilitychange', visibility)"), 'visibility polling-style pull still enabled');
+  must(s.includes("progress(5, true, false, 'بدء المزامنة')"), 'sync stage percentage start missing');
+  must(s.includes("stillPending ? 0 : 100"), 'sync completion percentage missing');
   must(s.includes("window.addEventListener('online', sync.request);"), 'one-shot reconnect trigger missing');
   must(s.includes("channel.on('postgres_changes'"), 'Supabase realtime subscription missing');
   must(!s.includes('setInterval('), 'sync runtime contains polling interval');
@@ -55,8 +110,7 @@ const must = (ok, message) => { if (!ok) throw new Error(`Live sync/receipt/cash
   const p = 'src/components/SyncProgressIndicator.tsx';
   let s = read(p);
 
-  // Stop checking the portal every 400ms forever. Resolve immediately and then use a
-  // short-lived MutationObserver only while the header slot has not mounted yet.
+  // Stop checking the portal every 400ms forever.
   s = s.replace(
 `  useEffect(() => {
     const resolveTarget = () => setPortalTarget(document.getElementById('moldatk-sync-status-slot'));
@@ -76,6 +130,8 @@ const must = (ok, message) => { if (!ok) throw new Error(`Live sync/receipt/cash
   }, []);`
   );
 
+  // While syncing show percentage. After 100% success the normal idle label is
+  // "متصل بالإنترنت".
   s = s.replace(
 `  const completed = state.online && !state.pending && state.progress >= 100;
   const label = !state.online
@@ -85,21 +141,20 @@ const must = (ok, message) => { if (!ok) throw new Error(`Live sync/receipt/cash
       : state.pending
         ? 'بانتظار المزامنة'
         : 'متصل بالإنترنت';`,
-`  const completed = false;
+`  const completed = state.online && !state.pending && state.progress >= 100;
   const label = !state.online
-    ? 'غير متصل — محفوظ محلياً'
-    : state.syncing
-      ? 'مزامنة التغييرات المحفوظة'
+    ? 'غير متصل بالإنترنت'
+    : state.syncing || completed
+      ? \`المزامنة \${Math.max(1, state.progress)}%\`
       : state.pending
-        ? 'بانتظار الاتصال'
-        : 'مزامنة حية';`
+        ? 'بانتظار المزامنة'
+        : 'متصل بالإنترنت';`
   );
-
-  s = s.replace(': state.syncing || completed\n      ? \'border-blue-200', ': state.syncing\n      ? \'border-blue-200');
-  s = s.replace(': state.syncing || completed\n      ? \'bg-blue-500 animate-pulse\'', ': state.syncing\n      ? \'bg-blue-500 animate-pulse\'');
+  s = s.replace('}, 900);', '}, 450);');
 
   must(!s.includes('setInterval(resolveTarget, 400)'), 'sync badge still polls DOM');
-  must(s.includes("'مزامنة حية'"), 'live-sync idle label missing');
+  must(s.includes('المزامنة ${Math.max(1, state.progress)}%'), 'sync percentage label missing');
+  must(s.includes("'متصل بالإنترنت'"), 'connected idle label missing');
   write(p, s);
 }
 
