@@ -317,7 +317,7 @@ export const INITIAL_GENERATOR_SPECS: GeneratorSpecs = {
 
 export const INITIAL_INVOICE_TEMPLATE: InvoiceTemplateSettings = {
   ...DEFAULT_INVOICE_TEMPLATE,
-  headerTitle: 'اسم المولدة',
+  headerTitle: '',
   subTitle: '',
   ownerPhone: '',
   locationAddress: '',
