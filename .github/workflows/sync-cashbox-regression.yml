@@ -17,6 +17,9 @@ jobs:
           node-version: 22
       - run: npm install --no-audit --no-fund
       - run: npm run lint
+      - name: Subscription access regression
+        run: npx tsx scripts/subscription-lock-regression.ts
+
       - name: Subscriber QR portal regression
         run: npm run test:portal
       - run: node scripts/sync-conflict-resolution-regression.mjs
