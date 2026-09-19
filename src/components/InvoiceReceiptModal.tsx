@@ -3,12 +3,14 @@ import { X, Printer, Share2 } from 'lucide-react';
 import { Subscriber, GeneratorSpecs, SubscriptionTierPricing, SubscriberInvoice } from '../types';
 import { formatCurrency, formatNumberArabic } from '../utils/formatters';
 import { isNativeAndroid, printSunmiReceipt } from '../utils/sunmiPrinter';
+import { ensureSubscriberPortalLink } from '../lib/subscriberPortal';
 
 interface InvoiceReceiptModalProps {
   isOpen: boolean;
   onClose: () => void;
   subscriber: Subscriber | null;
   generatorSpecs: GeneratorSpecs;
+  generatorId?: string | null;
   pricingTiers: SubscriptionTierPricing[];
   onMarkAsPaid: (subId: string) => void;
   autoPrint?: boolean;
@@ -22,12 +24,15 @@ export const InvoiceReceiptModal: React.FC<InvoiceReceiptModalProps> = ({
   onClose,
   subscriber,
   generatorSpecs,
+  generatorId,
   pricingTiers,
   autoPrint = false,
   invoice = null,
 }) => {
   const lastAutoPrintedReceiptRef = useRef('');
   const [printAnimationKey, setPrintAnimationKey] = useState(0);
+  const [portalUrl, setPortalUrl] = useState('');
+  const [portalQrDataUrl, setPortalQrDataUrl] = useState('');
 
   const currentTierType = invoice ? invoice.tier : subscriber?.tier;
   const currentTier = pricingTiers.find(p => p.type === currentTierType || p.id === currentTierType);
@@ -78,10 +83,46 @@ export const InvoiceReceiptModal: React.FC<InvoiceReceiptModalProps> = ({
   const displayIssueDate = formatReceiptDate(issueDate);
   const displayPaymentMonth = formatReceiptMonth(paymentMonth || invoice?.monthId);
 
+  // MOLDATK_SUBSCRIBER_PORTAL_QR_V1
+  useEffect(() => {
+    if (!isOpen || !subscriber?.id || !generatorId) {
+      setPortalUrl('');
+      setPortalQrDataUrl('');
+      return;
+    }
+
+    let cancelled = false;
+    void ensureSubscriberPortalLink(generatorId, subscriber.id)
+      .then(link => {
+        if (cancelled) return;
+        setPortalUrl(link.url);
+        setPortalQrDataUrl(link.qrDataUrl);
+      })
+      .catch(error => {
+        if (!cancelled) console.warn('تعذر تجهيز رابط حساب المشترك للوصول:', error);
+      });
+
+    return () => { cancelled = true; };
+  }, [isOpen, generatorId, subscriber?.id]);
+
   const handlePrint = async () => {
     if (!finalized) {
       window.alert(isFree ? 'الحساب المجاني لا يصدر له وصل تسديد.' : 'لا يمكن طباعة الوصل قبل إكمال عملية التسديد وحفظها.');
       return;
+    }
+
+    let printPortalUrl = portalUrl;
+    let printPortalQrDataUrl = portalQrDataUrl;
+    if (generatorId && subscriber?.id && (!printPortalUrl || !printPortalQrDataUrl)) {
+      try {
+        const link = await ensureSubscriberPortalLink(generatorId, subscriber.id);
+        printPortalUrl = link.url;
+        printPortalQrDataUrl = link.qrDataUrl;
+        setPortalUrl(link.url);
+        setPortalQrDataUrl(link.qrDataUrl);
+      } catch (error) {
+        console.warn('سيتم طباعة الوصل بدون QR لأن رابط المشترك غير متوفر حالياً:', error);
+      }
     }
 
     // MOLDATK_SCREEN_PRINT_MOTION_V2
@@ -114,11 +155,17 @@ export const InvoiceReceiptModal: React.FC<InvoiceReceiptModalProps> = ({
           note: '',
           issueDate: displayIssueDate,
           printTime: new Date().toLocaleTimeString('ar-IQ-u-nu-latn', { hour: '2-digit', minute: '2-digit' }),
+          portalUrl: printPortalUrl,
+          qrDataUrl: printPortalQrDataUrl,
         });
         return;
       } catch (error) {
         console.error('تعذر استخدام طابعة SUNMI، سيتم استخدام طباعة المتصفح:', error);
       }
+    }
+
+    if (printPortalQrDataUrl && printPortalQrDataUrl !== portalQrDataUrl) {
+      await new Promise<void>(resolve => window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve())));
     }
 
     const receipt = document.getElementById('thermal-receipt-printable');
@@ -142,7 +189,7 @@ export const InvoiceReceiptModal: React.FC<InvoiceReceiptModalProps> = ({
       frameDocument.open();
       frameDocument.write(`<!doctype html><html dir="rtl"><head><meta charset="utf-8" />
 <style>
-@page{size:58mm auto;margin:0!important}html,body{width:58mm!important;margin:0!important;padding:0!important;background:#fff!important;color:#000!important}body{font-family:Arial,Tahoma,sans-serif!important;direction:rtl!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}#thermal-receipt-printable{width:56mm!important;margin:4mm 1mm 1.5mm!important;padding:4.5mm 1.7mm 3mm!important;box-sizing:border-box!important;background:#fff!important;color:#000!important;border:2px solid #000!important;border-radius:7px!important;box-shadow:none!important;font-size:12px!important;line-height:1.42!important}#thermal-receipt-printable *{box-sizing:border-box!important;color:#000!important;font-weight:900!important;text-shadow:none!important;filter:none!important;-webkit-font-smoothing:none!important}#thermal-receipt-printable .receipt-generator{font-size:20px!important;font-weight:900!important;border:2px solid #000!important;padding:7px 4px!important;border-radius:8px!important}#thermal-receipt-printable .receipt-title{font-size:15px!important;font-weight:900!important}#thermal-receipt-printable .receipt-name{font-size:17px!important;font-weight:900!important}#thermal-receipt-printable .receipt-payment{font-size:16px!important;font-weight:900!important}#thermal-receipt-printable .receipt-total{font-size:14px!important;font-weight:900!important;border:2px solid #000!important;padding:6px 4px!important}#thermal-receipt-printable .receipt-total .receipt-amount{font-size:22px!important;line-height:1.15!important}#thermal-receipt-printable .receipt-brand{font-size:20px!important;font-weight:900!important}.receipt-logo{width:12mm!important;height:12mm!important;object-fit:contain!important;display:block!important;margin:0 auto!important}.receipt-system-name{font-size:20px!important;font-weight:900!important}#thermal-receipt-printable svg{display:none!important}.receipt-row{display:flex!important;justify-content:space-between!important;gap:8px!important;padding:4px 0!important;border-bottom:1px dotted #777!important}.receipt-label{font-weight:900!important;color:#000!important}.receipt-value{font-weight:900!important;color:#000!important;text-align:left!important}.receipt-divider{border-top:1px dashed #000!important;margin:7px 0!important}.receipt-hide-print{display:none!important}
+@page{size:58mm auto;margin:0!important}html,body{width:58mm!important;margin:0!important;padding:0!important;background:#fff!important;color:#000!important}body{font-family:Arial,Tahoma,sans-serif!important;direction:rtl!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}#thermal-receipt-printable{width:56mm!important;margin:4mm 1mm 1.5mm!important;padding:4.5mm 1.7mm 3mm!important;box-sizing:border-box!important;background:#fff!important;color:#000!important;border:2px solid #000!important;border-radius:7px!important;box-shadow:none!important;font-size:12px!important;line-height:1.42!important}#thermal-receipt-printable *{box-sizing:border-box!important;color:#000!important;font-weight:900!important;text-shadow:none!important;filter:none!important;-webkit-font-smoothing:none!important}#thermal-receipt-printable .receipt-generator{font-size:20px!important;font-weight:900!important;border:2px solid #000!important;padding:7px 4px!important;border-radius:8px!important}#thermal-receipt-printable .receipt-title{font-size:15px!important;font-weight:900!important}#thermal-receipt-printable .receipt-name{font-size:17px!important;font-weight:900!important}#thermal-receipt-printable .receipt-payment{font-size:16px!important;font-weight:900!important}#thermal-receipt-printable .receipt-total{font-size:14px!important;font-weight:900!important;border:2px solid #000!important;padding:6px 4px!important}#thermal-receipt-printable .receipt-total .receipt-amount{font-size:22px!important;line-height:1.15!important}#thermal-receipt-printable .receipt-brand{font-size:20px!important;font-weight:900!important}.receipt-logo{width:12mm!important;height:12mm!important;object-fit:contain!important;display:block!important;margin:0 auto!important}.receipt-system-name{font-size:20px!important;font-weight:900!important}#thermal-receipt-printable svg{display:none!important}.receipt-row{display:flex!important;justify-content:space-between!important;gap:8px!important;padding:4px 0!important;border-bottom:1px dotted #777!important}.receipt-label{font-weight:900!important;color:#000!important}.receipt-value{font-weight:900!important;color:#000!important;text-align:left!important}.receipt-divider{border-top:1px dashed #000!important;margin:7px 0!important}.receipt-qr{display:block!important;width:27mm!important;height:27mm!important;object-fit:contain!important;margin:2mm auto 1mm!important}.receipt-portal-url{font-size:7px!important;direction:ltr!important;word-break:break-all!important;text-align:center!important}.receipt-hide-print{display:none!important}
 </style></head><body>${receipt.outerHTML}</body></html>`);
       frameDocument.close();
 
@@ -191,6 +238,7 @@ export const InvoiceReceiptModal: React.FC<InvoiceReceiptModalProps> = ({
       `المتبقي بعد التسديد: ${formatCurrency(totalOutstandingAfter)}` ,
       `التاريخ: ${displayIssueDate}`,
       `الحالة: ${statusText}`,
+      portalUrl ? `متابعة الحساب: ${portalUrl}` : '',
       '',
       '*مولدتك*',
     ].filter(Boolean).join('\n');
@@ -260,6 +308,14 @@ export const InvoiceReceiptModal: React.FC<InvoiceReceiptModalProps> = ({
             </div>
 
             <div className="text-center text-[10px] font-black py-3">شكراً لتسديدكم</div>
+            {portalQrDataUrl && portalUrl && (
+              <>
+                <div className="receipt-divider border-t border-dashed border-slate-500 mb-2" />
+                <div className="text-center text-[9px] font-black">امسح الرمز لمتابعة حسابك</div>
+                <img src={portalQrDataUrl} alt="QR حساب المشترك" className="receipt-qr w-28 h-28 object-contain mx-auto my-2" />
+                <div className="receipt-portal-url text-[7px] font-black text-center break-all" dir="ltr">{portalUrl}</div>
+              </>
+            )}
             <div className="receipt-divider border-t border-dashed border-slate-500 mb-2" />
             <div className="text-center text-[8px] font-black text-black mt-1">نظام إدارة المولدات والجباية</div>
           </div>
