@@ -39,10 +39,16 @@ const [searchTerm, setSearchTerm] = useState('');
 
   const selectedLine = useMemo(() => lines.find(line => line.id === lineFilter), [lines, lineFilter]);
 
-  const getRemainingAmount = (sub: Subscriber) => Math.max(0, Number(sub.amountDue || 0) - Number(sub.amountPaid || 0));
+  // MOBILE_PAYMENT_STATUS_CLASSIFICATION_V2
+  // paymentStatus is the authoritative billing state. amountDue already stores the
+  // remaining debt, so subtracting amountPaid from it can turn a partial payment into
+  // zero and incorrectly classify it as fully paid.
+  const getRemainingAmount = (sub: Subscriber) => Math.max(0, Number(sub.amountDue || 0));
   const isFreeSubscriber = (sub: Subscriber) => sub.paymentStatus === 'free' || sub.tier === 'free';
-  const isPaidSubscriber = (sub: Subscriber) => !isFreeSubscriber(sub) && (sub.paymentStatus === 'paid' || getRemainingAmount(sub) === 0);
-  const isUnpaidSubscriber = (sub: Subscriber) => !isFreeSubscriber(sub) && (sub.paymentStatus === 'unpaid' || sub.paymentStatus === 'partial' || getRemainingAmount(sub) > 0);
+  const isPaidSubscriber = (sub: Subscriber) => !isFreeSubscriber(sub) && sub.paymentStatus === 'paid';
+  const isPartialSubscriber = (sub: Subscriber) => !isFreeSubscriber(sub) && sub.paymentStatus === 'partial';
+  const isUnpaidSubscriber = (sub: Subscriber) => !isFreeSubscriber(sub)
+    && (sub.paymentStatus === 'unpaid' || isPartialSubscriber(sub) || getRemainingAmount(sub) > 0);
 
   const filteredSubscribers = subscribers.filter(sub => {
     const needle = searchTerm.trim().toLowerCase();
@@ -62,6 +68,8 @@ const [searchTerm, setSearchTerm] = useState('');
       ? isPaidSubscriber(sub)
       : statusFilter === 'unpaid'
       ? isUnpaidSubscriber(sub)
+      : statusFilter === 'partial'
+      ? isPartialSubscriber(sub)
       : sub.paymentStatus === statusFilter;
 
     const matchesLine = lineFilter === 'all'
@@ -73,7 +81,7 @@ const [searchTerm, setSearchTerm] = useState('');
   });
 
   const paidCount = subscribers.filter(isPaidSubscriber).length;
-  const partialCount = subscribers.filter(s => s.paymentStatus === 'partial').length;
+  const partialCount = subscribers.filter(isPartialSubscriber).length;
   const unpaidCount = subscribers.filter(isUnpaidSubscriber).length;
   const freeCount = subscribers.filter(isFreeSubscriber).length;
 
@@ -129,7 +137,7 @@ const [searchTerm, setSearchTerm] = useState('');
             ['all', `الكل (${formatNumberArabic(subscribers.length)})`],
             ['unpaid', `غير مسدد (${formatNumberArabic(unpaidCount)})`],
             ['paid', `مسدد كامل (${formatNumberArabic(paidCount)})`],
-            ['partial', `جزئي (${formatNumberArabic(partialCount)})`],
+            ['partial', `مسدد جزئي (${formatNumberArabic(partialCount)})`],
             ['free', `إعفاء (${formatNumberArabic(freeCount)})`],
           ].map(([id, label]) => (
             <button
