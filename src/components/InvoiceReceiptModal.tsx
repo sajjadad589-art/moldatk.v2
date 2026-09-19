@@ -3,7 +3,7 @@ import { X, Printer, Share2 } from 'lucide-react';
 import { Subscriber, GeneratorSpecs, SubscriptionTierPricing, SubscriberInvoice } from '../types';
 import { formatCurrency, formatNumberArabic } from '../utils/formatters';
 import { isNativeAndroid, printSunmiReceipt } from '../utils/sunmiPrinter';
-import { ensureSubscriberPortalLink } from '../lib/subscriberPortal';
+import { ensureSubscriberPortalLink, recordSubscriberReceiptPayment } from '../lib/subscriberPortal';
 
 interface InvoiceReceiptModalProps {
   isOpen: boolean;
@@ -30,6 +30,7 @@ export const InvoiceReceiptModal: React.FC<InvoiceReceiptModalProps> = ({
   invoice = null,
 }) => {
   const lastAutoPrintedReceiptRef = useRef('');
+  const lastRecordedReceiptRef = useRef('');
   const [printAnimationKey, setPrintAnimationKey] = useState(0);
   const [portalUrl, setPortalUrl] = useState('');
   const [portalQrDataUrl, setPortalQrDataUrl] = useState('');
@@ -104,6 +105,74 @@ export const InvoiceReceiptModal: React.FC<InvoiceReceiptModalProps> = ({
 
     return () => { cancelled = true; };
   }, [isOpen, generatorId, subscriber?.id]);
+
+  // MOLDATK_PORTAL_RECEIPT_LEDGER_V1
+  // Persist the finalized receipt itself, not only the subscriber/invoice summary.
+  // This makes the public QR page able to show exact prior receipt numbers and amounts.
+  useEffect(() => {
+    if (!isOpen || !finalized || !generatorId || !subscriber?.id || !receiptNumber) return;
+    const ledgerKey = `${generatorId}:${subscriber.id}:${receiptNumber}`;
+    if (lastRecordedReceiptRef.current === ledgerKey) return;
+    lastRecordedReceiptRef.current = ledgerKey;
+
+    void recordSubscriberReceiptPayment({
+      generatorId,
+      subscriberId: subscriber.id,
+      receiptNumber,
+      amount: paymentAmount,
+      receivedAt: invoice?.paymentDate || invoice?.issueDate || subscriber.lastPaymentDate || new Date().toISOString(),
+      collectorName: invoice?.collectorName,
+      snapshot: {
+        monthId: invoice?.monthId,
+        monthNameAr: invoice?.monthNameAr,
+        issueDate: invoice?.issueDate,
+        paymentDate: invoice?.paymentDate,
+        amperes,
+        totalAmount: invoice?.totalAmount,
+        paidAmount: paymentAmount,
+        remainingAmount: invoice?.remainingAmount,
+        status: invoice?.status,
+        receiptNumber,
+        collectorName: invoice?.collectorName,
+        previousDebtBefore,
+        currentCharge,
+        totalBeforePayment,
+        appliedToPreviousDebt,
+        appliedToCurrentMonth,
+        totalOutstandingAfter,
+        paymentAllocations: invoice?.paymentAllocations,
+        notes: invoice?.notes,
+      },
+    }).catch(error => {
+      lastRecordedReceiptRef.current = '';
+      console.warn('تعذر حفظ سجل وصل المشترك للبوابة:', error);
+    });
+  }, [
+    isOpen,
+    finalized,
+    generatorId,
+    subscriber?.id,
+    subscriber?.lastPaymentDate,
+    receiptNumber,
+    paymentAmount,
+    invoice?.paymentDate,
+    invoice?.issueDate,
+    invoice?.collectorName,
+    invoice?.monthId,
+    invoice?.monthNameAr,
+    invoice?.totalAmount,
+    invoice?.remainingAmount,
+    invoice?.status,
+    invoice?.notes,
+    invoice?.paymentAllocations,
+    amperes,
+    previousDebtBefore,
+    currentCharge,
+    totalBeforePayment,
+    appliedToPreviousDebt,
+    appliedToCurrentMonth,
+    totalOutstandingAfter,
+  ]);
 
   const handlePrint = async () => {
     if (!finalized) {
