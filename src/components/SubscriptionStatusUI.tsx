@@ -11,6 +11,10 @@ export type SubscriptionInfo = {
   subscriptionStatus: string;
   accountStatus: string;
   suspensionReason?: string | null;
+  /** Server-authoritative access decision from get_my_subscription_access_state(). */
+  serverAccessActive?: boolean;
+  /** Postgres server timestamp used when the decision was made. */
+  serverNow?: string;
 };
 
 const formatDate = (value: string) => new Intl.DateTimeFormat('ar-IQ-u-nu-latn', { dateStyle: 'long', timeStyle: 'short' }).format(new Date(value));
@@ -35,6 +39,18 @@ export const SuspendedAccountScreen: React.FC<{ reason?: string | null; onLogout
       <h1 className="text-2xl font-black text-slate-900 dark:text-white">حسابك مقيد مؤقتاً</h1>
       <p className="text-sm text-slate-500 dark:text-slate-400 mt-3 leading-7">{reason || 'يرجى التواصل مع خدمة العملاء لمعرفة سبب التقييد وإعادة تفعيل الحساب.'}</p>
       <a href={whatsappUrl} target="_blank" rel="noreferrer" className="mt-7 w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white py-3.5 font-black"><Phone className="w-5 h-5" /> التواصل عبر واتساب</a>
+      {onLogout && <button onClick={onLogout} className="mt-3 text-sm font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white">تسجيل الخروج</button>}
+    </div>
+  </div>
+);
+
+export const SubscriptionUnavailableScreen: React.FC<{ onRetry?: () => void; onLogout?: () => void }> = ({ onRetry, onLogout }) => (
+  <div dir="rtl" className="min-h-screen bg-slate-100 dark:bg-[#070d1e] flex items-center justify-center p-5 font-['Cairo',sans-serif]">
+    <div className="w-full max-w-lg bg-white dark:bg-[#111c38] rounded-3xl border border-blue-200 dark:border-blue-950 shadow-2xl p-8 text-center">
+      <div className="w-20 h-20 mx-auto rounded-full bg-blue-100 dark:bg-blue-950/40 text-blue-600 flex items-center justify-center mb-5"><ShieldCheck className="w-10 h-10" /></div>
+      <h1 className="text-2xl font-black text-slate-900 dark:text-white">تعذر التحقق من الاشتراك</h1>
+      <p className="text-sm text-slate-500 dark:text-slate-400 mt-3 leading-7">لم يتم اعتبار الاشتراك منتهياً. تحقق من اتصال الإنترنت ثم أعد المحاولة.</p>
+      {onRetry && <button onClick={onRetry} className="mt-7 w-full rounded-2xl bg-blue-600 hover:bg-blue-700 text-white py-3.5 font-black">إعادة التحقق</button>}
       {onLogout && <button onClick={onLogout} className="mt-3 text-sm font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white">تسجيل الخروج</button>}
     </div>
   </div>
