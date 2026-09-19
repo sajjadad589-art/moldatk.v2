@@ -393,7 +393,7 @@ export const InvoiceReceiptModal: React.FC<InvoiceReceiptModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm overflow-y-auto font-['Cairo']" dir="rtl">
       <div className="relative w-full max-w-sm bg-white dark:bg-[#0f172a] rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col my-auto">
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80">
-          <span className="text-xs font-black text-slate-800 dark:text-slate-200">معاينة إيصال التسديد 58 مم</span>
+          <span className="text-xs font-black text-slate-800 dark:text-slate-200">معاينة إيصال التسديد — {template.paperSize === 'thermal_80' ? '80 مم' : template.paperSize === 'a5' ? 'A5' : template.paperSize === 'a4' ? 'A4' : '58 مم'}</span>
           <div className="flex items-center gap-2">
             <button type="button" onClick={handleWhatsAppShare} disabled={!finalized} className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="مشاركة الوصل"><Share2 className="w-4 h-4" /></button>
             <button type="button" onClick={() => void handlePrint()} disabled={!finalized} className="px-3 py-2 rounded-lg bg-[#0B1F3B] text-white disabled:bg-slate-300 disabled:text-black text-xs font-black flex items-center gap-1.5"><Printer className="w-4 h-4" />طباعة</button>
