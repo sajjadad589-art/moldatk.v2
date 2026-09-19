@@ -1,4 +1,3 @@
-import QRCode from 'qrcode';
 import { Capacitor } from '@capacitor/core';
 import { supabase } from './supabase';
 
@@ -45,6 +44,7 @@ function writeCached(generatorId: string, subscriberId: string, token: string, u
 }
 
 export async function makeSubscriberPortalQr(url: string): Promise<string> {
+  const { default: QRCode } = await import('qrcode');
   return QRCode.toDataURL(url, {
     errorCorrectionLevel: 'M',
     margin: 1,
