@@ -13,6 +13,10 @@ const admin = source('src/components/SuperAdminDashboard.tsx');
 const mobile = source('src/components/mobile/MobileDashboard.tsx');
 const desktop = source('src/components/DashboardView.tsx');
 const sw = source('public/sw.js');
+const collectorPos = source('src/components/POSQuickView.tsx');
+const mobileHeader = source('src/components/mobile/MobileHeader.tsx');
+const mobileBottomNav = source('src/components/MobileBottomNav.tsx');
+const css = source('src/index.css');
 const count = (text, marker) => text.split(marker).length - 1;
 
 assert.match(app, /lazy\(\(\) => import\('\.\/components\/SuperAdminDashboard'\)/);
@@ -45,3 +49,11 @@ assert.equal(count(desktop, '<section data-ampere-discount-dashboard'), 1);
 assert.doesNotMatch(sw, /client\.navigate\(client\.url\)/);
 assert.match(sw, /url\.pathname\.startsWith\('\/assets\/'\)/);
 console.log('Source guards passed.');
+
+assert.match(css, /MOLDATK_IOS_PWA_SAFE_AREA_V1/);
+assert.match(css, /safe-area-inset-top/);
+assert.match(css, /safe-area-inset-bottom/);
+assert.match(css, /100dvh/);
+assert.match(collectorPos, /moldatk-safe-screen/);
+assert.match(mobileHeader, /moldatk-mobile-header-safe/);
+assert.match(mobileBottomNav, /moldatk-mobile-bottom-safe/);
