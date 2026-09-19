@@ -284,6 +284,18 @@ public class SunmiPrinterPlugin extends Plugin {
         return bitmap;
     }
 
+    private Bitmap decodeQrDataUrl(String dataUrl) {
+        if (dataUrl == null || dataUrl.trim().isEmpty()) return null;
+        try {
+            String rawValue = dataUrl.trim();
+            int comma = rawValue.indexOf(',');
+            String encoded = comma >= 0 ? rawValue.substring(comma + 1) : rawValue;
+            byte[] bytes = Base64.decode(encoded, Base64.DEFAULT);
+            return BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
     private void addField(List<DrawLine> lines, String label, String value, boolean strong) {
         if (value == null || value.trim().isEmpty()) return;
         lines.add(new DrawLine(label + ":  " + value, strong ? 23f : 21f, true, Layout.Alignment.ALIGN_NORMAL, 6));
