@@ -60,6 +60,9 @@ jobs:
       - name: Typecheck launch build
         run: npm run lint
 
+      - name: Subscriber QR portal regression
+        run: npm run test:portal
+
       - name: Verify calm brand identity
         run: |
           grep -q '<string name="app_name">مولدتك</string>' android/app/src/main/res/values/strings.xml
