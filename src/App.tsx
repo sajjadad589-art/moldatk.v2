@@ -974,8 +974,9 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
       localStorage.setItem(getStorageKey('moldatk_monthly_tariffs'), JSON.stringify(jsonData.monthlyTariffs));
     }
     if (jsonData.invoiceTemplate) {
-      setInvoiceTemplate(jsonData.invoiceTemplate);
-      localStorage.setItem(getStorageKey('moldatk_invoice_template'), JSON.stringify(jsonData.invoiceTemplate));
+      const restoredTemplate = normalizeInvoiceTemplate(jsonData.invoiceTemplate);
+      setInvoiceTemplate(restoredTemplate);
+      localStorage.setItem(getStorageKey('moldatk_invoice_template'), JSON.stringify(restoredTemplate));
     }
     if (Array.isArray(jsonData.auditLogs)) {
       setAuditLogs(jsonData.auditLogs);
