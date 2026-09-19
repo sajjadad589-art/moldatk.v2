@@ -1358,6 +1358,7 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
           }}
           subscriber={selectedReceiptSubscriber}
           generatorSpecs={generatorSpecs}
+          generatorId={userSession?.generatorId}
           pricingTiers={pricingTiers}
           autoPrint={autoPrintReceipt}
           invoice={selectedReceiptInvoice}
@@ -1501,6 +1502,7 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
           onClose={() => { setIsReceiptModalOpen(false); setSelectedReceiptSubscriber(null); setSelectedReceiptInvoice(null); }}
           subscriber={selectedReceiptSubscriber}
           generatorSpecs={generatorSpecs}
+          generatorId={userSession?.generatorId}
           pricingTiers={pricingTiers}
           autoPrint={autoPrintReceipt}
           invoice={selectedReceiptInvoice}
@@ -1754,6 +1756,7 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
         onClose={() => { setIsReceiptModalOpen(false); setSelectedReceiptSubscriber(null); setSelectedReceiptInvoice(null); }}
         subscriber={selectedReceiptSubscriber}
         generatorSpecs={generatorSpecs}
+        generatorId={userSession?.generatorId}
         pricingTiers={pricingTiers}
         autoPrint={autoPrintReceipt}
         invoice={selectedReceiptInvoice}
