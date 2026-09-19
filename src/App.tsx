@@ -54,7 +54,7 @@ import { loadCloudCollectors, syncCloudCollectorRoster } from './lib/collectorCl
 import { persistCollectorSubscriber } from './lib/subscriberCloud';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
-import { ExpiredSubscriptionScreen, SuspendedAccountScreen, SubscriptionWarningBanner, SubscriptionInfo, daysUntilExpiry } from './components/SubscriptionStatusUI';
+import { ExpiredSubscriptionScreen, SuspendedAccountScreen, SubscriptionUnavailableScreen, SubscriptionWarningBanner, SubscriptionInfo, daysUntilExpiry } from './components/SubscriptionStatusUI';
 import { GeneratorNotifications } from './components/GeneratorNotifications';
 import { OwnerAIWatcher } from './components/OwnerAIWatcher';
 import { PricingModal } from './components/PricingModal';
@@ -213,7 +213,7 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
       return null;
     }
   });
-  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(() => Boolean(userSession?.generatorId && (userSession.role === 'generator_admin' || userSession.role === 'collector')));
   const [subscriptionUnavailable, setSubscriptionUnavailable] = useState(false);
 
   const [darkMode, setDarkMode] = useState<boolean>(false);
@@ -627,91 +627,86 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
 
   useEffect(() => {
     let cancelled = false;
-    // SUBSCRIPTION_LOCK_STABILITY_V1: background refresh must never unlock an expired/suspended account.
+    // SUBSCRIPTION_ACCESS_RPC_V2
+    // Owner and collector use the exact same server-authoritative subscription decision.
+    // The RPC evaluates starts_at/ends_at with Postgres now(), so a device clock or stale
+    // local cache cannot falsely mark an active account as expired.
     const loadSubscription = async (showBlockingLoader = false) => {
       if (!userSession || (userSession.role !== 'generator_admin' && userSession.role !== 'collector') || !userSession.generatorId) {
         setSubscriptionInfo(null);
+        setSubscriptionUnavailable(false);
+        setSubscriptionLoading(false);
         return;
       }
+
       if (showBlockingLoader) setSubscriptionLoading(true);
-      const [g, sub] = await Promise.all([
-        supabase.from('generators').select('id,name,owner_name,phone,area,status,suspension_reason').eq('id', userSession.generatorId).maybeSingle(),
-        supabase.from('subscriptions').select('starts_at,ends_at,status').eq('generator_id', userSession.generatorId).order('ends_at', { ascending: false }).limit(1).maybeSingle(),
-      ]);
-      if (!cancelled) {
-        const requestFailed = Boolean(g.error || (userSession.role === 'generator_admin' && sub.error));
 
-        if (requestFailed) {
-          // فشل الشبكة أو Supabase لا يعني أن الاشتراك انتهى. أبقِ آخر حالة ناجحة محفوظة.
-          setSubscriptionUnavailable(true);
-          if (userSession.role === 'generator_admin') {
-            try {
-              const cached = localStorage.getItem(`moldatk_subscription_info_${userSession.generatorId}`);
-              if (cached) setSubscriptionInfo(JSON.parse(cached) as SubscriptionInfo);
-            } catch (e) {}
-          }
-          if (showBlockingLoader) setSubscriptionLoading(false);
-          return;
-        }
+      const { data, error } = await supabase.rpc('get_my_subscription_access_state');
+      if (cancelled) return;
 
-        setSubscriptionUnavailable(false);
-
-        if (g.data) {
-          const serverGeneratorName = g.data.name || 'مولدتك';
-          const serverOwnerName = g.data.owner_name || 'صاحب المولدة';
-
-          if (userSession.role === 'generator_admin') {
-            if (sub.data) {
-              const nextSubscriptionInfo: SubscriptionInfo = {
-                generatorId: g.data.id,
-                generatorName: serverGeneratorName,
-                ownerName: serverOwnerName,
-                phone: g.data.phone,
-                startsAt: sub.data.starts_at,
-                endsAt: sub.data.ends_at,
-                subscriptionStatus: sub.data.status,
-                accountStatus: g.data.status,
-                suspensionReason: g.data.suspension_reason,
-              };
-              setSubscriptionInfo(nextSubscriptionInfo);
-              try {
-                localStorage.setItem(`moldatk_subscription_info_${userSession.generatorId}`, JSON.stringify(nextSubscriptionInfo));
-              } catch (e) {}
-            } else {
-              // الاستعلام نجح فعلاً ولا يوجد اشتراك: هذه حالة حقيقية وليست انقطاع شبكة.
-              setSubscriptionInfo(null);
-              try { localStorage.removeItem(`moldatk_subscription_info_${userSession.generatorId}`); } catch (e) {}
-            }
-          }
-
-          setGeneratorSpecs(prev => {
-            const updated = {
-              ...prev,
-              generatorName: serverGeneratorName,
-              ownerName: serverOwnerName,
-              location: g.data.area || prev.location,
-            };
-
-            try {
-              localStorage.setItem(getStorageKey('moldatk_generator'), JSON.stringify(updated));
-              rememberGeneratorAccount(userSession, updated);
-
-              const rawInvoiceSettings = localStorage.getItem(getStorageKey('moldatk_invoice_custom_settings'));
-              if (rawInvoiceSettings) {
-                const parsedInvoiceSettings = JSON.parse(rawInvoiceSettings);
-                localStorage.setItem(
-                  getStorageKey('moldatk_invoice_custom_settings'),
-                  JSON.stringify({ ...parsedInvoiceSettings, headerTitle: serverGeneratorName })
-                );
-              }
-            } catch (e) {}
-
-            return updated;
-          });
-        }
-        setSubscriptionLoading(false);
+      if (error || !data?.ok) {
+        setSubscriptionUnavailable(true);
+        try {
+          const cached = localStorage.getItem(`moldatk_subscription_info_${userSession.generatorId}`);
+          if (cached) setSubscriptionInfo(JSON.parse(cached) as SubscriptionInfo);
+        } catch (e) {}
+        if (showBlockingLoader) setSubscriptionLoading(false);
+        return;
       }
+
+      setSubscriptionUnavailable(false);
+
+      const generator = data.generator || {};
+      const subscription = data.subscription || null;
+      const serverNow = String(data.serverNow || new Date().toISOString());
+
+      const nextSubscriptionInfo: SubscriptionInfo = {
+        generatorId: String(generator.id || userSession.generatorId),
+        generatorName: String(generator.name || 'مولدتك'),
+        ownerName: String(generator.ownerName || 'صاحب المولدة'),
+        phone: generator.phone ? String(generator.phone) : null,
+        startsAt: String(subscription?.startsAt || serverNow),
+        endsAt: String(subscription?.endsAt || serverNow),
+        subscriptionStatus: String(subscription?.status || 'missing'),
+        accountStatus: String(generator.status || 'active'),
+        suspensionReason: generator.suspensionReason ? String(generator.suspensionReason) : null,
+        serverAccessActive: Boolean(data.accessActive),
+        serverNow,
+      };
+
+      setSubscriptionInfo(nextSubscriptionInfo);
+      try {
+        localStorage.setItem(`moldatk_subscription_info_${userSession.generatorId}`, JSON.stringify(nextSubscriptionInfo));
+      } catch (e) {}
+
+      setGeneratorSpecs(prev => {
+        const updated = {
+          ...prev,
+          generatorName: nextSubscriptionInfo.generatorName,
+          ownerName: nextSubscriptionInfo.ownerName,
+          location: generator.area || prev.location,
+        };
+
+        try {
+          localStorage.setItem(getStorageKey('moldatk_generator'), JSON.stringify(updated));
+          rememberGeneratorAccount(userSession, updated);
+
+          const rawInvoiceSettings = localStorage.getItem(getStorageKey('moldatk_invoice_custom_settings'));
+          if (rawInvoiceSettings) {
+            const parsedInvoiceSettings = JSON.parse(rawInvoiceSettings);
+            localStorage.setItem(
+              getStorageKey('moldatk_invoice_custom_settings'),
+              JSON.stringify({ ...parsedInvoiceSettings, headerTitle: nextSubscriptionInfo.generatorName })
+            );
+          }
+        } catch (e) {}
+
+        return updated;
+      });
+
+      setSubscriptionLoading(false);
     };
+
     void loadSubscription(true);
     const timer = window.setInterval(() => void loadSubscription(false), 30 * 1000);
     return () => { cancelled = true; window.clearInterval(timer); };
@@ -735,6 +730,10 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
 
 
   const handleLoginSuccess = (session: ActiveUserSession) => {
+    const accessControlled = session.role === 'generator_admin' || session.role === 'collector';
+    setSubscriptionInfo(null);
+    setSubscriptionUnavailable(false);
+    setSubscriptionLoading(accessControlled);
     setUserSession(session);
     try {
       localStorage.setItem('moldatk_session', JSON.stringify(session));
@@ -743,6 +742,9 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
   };
 
   const handleLogout = () => {
+    setSubscriptionInfo(null);
+    setSubscriptionUnavailable(false);
+    setSubscriptionLoading(false);
     setUserSession(null);
     try {
       localStorage.removeItem('moldatk_session');
@@ -1160,8 +1162,12 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
     return <SuspendedAccountScreen reason={subscriptionInfo.suspensionReason} onLogout={handleLogout} />;
   }
 
-  if (subscriptionAccessControlled && subscriptionInfo && (subscriptionInfo.subscriptionStatus !== 'active' || daysUntilExpiry(subscriptionInfo.endsAt) <= 0)) {
-    return <ExpiredSubscriptionScreen onLogout={handleLogout} />;
+  if (subscriptionAccessControlled && subscriptionInfo) {
+    const legacyExpired = subscriptionInfo.serverAccessActive == null
+      && (subscriptionInfo.subscriptionStatus !== 'active' || daysUntilExpiry(subscriptionInfo.endsAt) <= 0);
+    if (subscriptionInfo.serverAccessActive === false || legacyExpired) {
+      return <ExpiredSubscriptionScreen onLogout={handleLogout} />;
+    }
   }
 
   if (subscriptionAccessControlled && !subscriptionInfo) {
@@ -1174,6 +1180,9 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
           </div>
         </div>
       );
+    }
+    if (subscriptionUnavailable) {
+      return <SubscriptionUnavailableScreen onRetry={() => window.location.reload()} onLogout={handleLogout} />;
     }
     return <ExpiredSubscriptionScreen onLogout={handleLogout} />;
   }
