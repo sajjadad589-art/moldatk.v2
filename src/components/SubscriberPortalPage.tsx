@@ -19,6 +19,19 @@ interface PortalPayment {
   receivedAt?: string;
   amount?: number;
   receiptNumber?: string;
+  collectorName?: string;
+  source?: 'receipt' | 'invoice' | 'audit' | string;
+  title?: string;
+  cancelled?: boolean;
+  receiptSnapshot?: PortalInvoice & {
+    collectorName?: string;
+    previousDebtBefore?: number;
+    currentCharge?: number;
+    totalBeforePayment?: number;
+    appliedToPreviousDebt?: number;
+    appliedToCurrentMonth?: number;
+    totalOutstandingAfter?: number;
+  };
 }
 
 interface PortalPayload {
@@ -108,11 +121,16 @@ export default function SubscriberPortalPage({ token }: { token: string }) {
 
   const recentRows = useMemo(() => {
     const payments = Array.isArray(data?.payments) ? data!.payments! : [];
-    if (payments.length) return payments.slice(0, 8).map((p, index) => ({
-      key: `p-${index}-${p.receivedAt || ''}`,
+    if (payments.length) return payments.slice(0, 12).map((p, index) => ({
+      key: `p-${index}-${p.receivedAt || ''}-${p.receiptNumber || ''}`,
       date: p.receivedAt,
       amount: p.amount || 0,
       receipt: p.receiptNumber || '',
+      collector: p.collectorName || '',
+      source: p.source || 'audit',
+      title: p.title || 'تسديد',
+      cancelled: Boolean(p.cancelled),
+      snapshot: p.receiptSnapshot,
     }));
 
     return (data?.invoices || [])
@@ -123,8 +141,24 @@ export default function SubscriberPortalPage({ token }: { token: string }) {
         date: inv.paymentDate || inv.issueDate,
         amount: inv.paidAmount || 0,
         receipt: inv.receiptNumber || '',
+        collector: '',
+        source: 'invoice',
+        title: 'وصل مسدد محفوظ بالفاتورة',
+        cancelled: false,
+        snapshot: inv,
       }));
   }, [data]);
+
+  const receiptRows = useMemo(
+    () => recentRows.filter(row => !row.cancelled && Boolean(row.receipt)),
+    [recentRows],
+  );
+  const legacyOnlyRows = useMemo(
+    () => recentRows.filter(row => row.source === 'audit' && !row.receipt),
+    [recentRows],
+  );
+  const effectiveLastPaymentDate = data?.subscriber?.lastPaymentDate
+    || recentRows.find(row => !row.cancelled && Number(row.amount || 0) > 0)?.date;
 
   const shareText = data
     ? [
@@ -226,7 +260,7 @@ export default function SubscriberPortalPage({ token }: { token: string }) {
             </div>
             <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4">
               <div className="text-[11px] text-slate-500">آخر تسديد</div>
-              <div className="font-black text-sm mt-1">{dateText(data.subscriber?.lastPaymentDate)}</div>
+              <div className="font-black text-sm mt-1">{dateText(effectiveLastPaymentDate)}</div>
             </div>
           </div>
         </section>
@@ -264,14 +298,17 @@ export default function SubscriberPortalPage({ token }: { token: string }) {
           {recentRows.length ? (
             <div className="space-y-2">
               {recentRows.map(row => (
-                <div key={row.key} className="flex items-center justify-between rounded-2xl bg-slate-50 border border-slate-100 px-4 py-3">
+                <div key={row.key} className={`flex items-center justify-between rounded-2xl border px-4 py-3 ${row.cancelled ? 'bg-rose-50 border-rose-100' : 'bg-slate-50 border-slate-100'}`}>
                   <div>
-                    <div className="font-black text-sm text-emerald-700">{money(row.amount, currency)}</div>
+                    <div className={`font-black text-sm ${row.cancelled ? 'text-rose-700' : 'text-emerald-700'}`}>
+                      {row.cancelled ? (row.title || 'إلغاء تسديد') : money(row.amount, currency)}
+                    </div>
                     <div className="text-[11px] text-slate-500 mt-1">{dateText(row.date)}</div>
+                    {row.collector && <div className="text-[10px] text-slate-400 mt-1">بواسطة {row.collector}</div>}
                   </div>
                   <div className="text-left">
-                    <div className="text-[11px] text-slate-500">رقم الوصل</div>
-                    <div className="font-bold text-xs mt-1" dir="ltr">{row.receipt || '—'}</div>
+                    <div className="text-[11px] text-slate-500">{row.receipt ? 'رقم الوصل' : 'نوع العملية'}</div>
+                    <div className="font-bold text-xs mt-1" dir={row.receipt ? 'ltr' : 'rtl'}>{row.receipt || row.title || 'تسديد سابق'}</div>
                   </div>
                 </div>
               ))}
@@ -280,6 +317,53 @@ export default function SubscriberPortalPage({ token }: { token: string }) {
             <div className="rounded-2xl bg-slate-50 border border-slate-100 p-5 text-center text-sm text-slate-500">لا توجد تسديدات مسجلة بعد.</div>
           )}
         </section>
+
+        {receiptRows.length > 0 && (
+          <section className="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 mt-4">
+            <div className="flex items-center gap-2 mb-4">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              <h3 className="font-black text-lg">الإيصالات المسددة السابقة</h3>
+            </div>
+            <div className="space-y-3">
+              {receiptRows.map(row => {
+                const receipt = row.snapshot || {};
+                return (
+                  <div key={`receipt-${row.key}`} className="rounded-2xl border border-emerald-100 bg-emerald-50/40 px-4 py-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-[11px] text-slate-500">رقم الوصل</div>
+                        <div className="font-black text-sm mt-1" dir="ltr">{row.receipt}</div>
+                        <div className="text-[11px] text-slate-500 mt-2">{dateText(row.date)}</div>
+                      </div>
+                      <div className="text-left">
+                        <div className="text-[11px] text-slate-500">المبلغ المسدد</div>
+                        <div className="font-black text-lg text-emerald-700 mt-1">{money(row.amount, currency)}</div>
+                      </div>
+                    </div>
+                    {(receipt.monthNameAr || receipt.monthId) && (
+                      <div className="mt-3 pt-3 border-t border-emerald-100 text-xs text-slate-600 flex justify-between gap-3">
+                        <span>الشهر</span>
+                        <b>{receipt.monthNameAr || receipt.monthId}</b>
+                      </div>
+                    )}
+                    {Number(receipt.totalOutstandingAfter || 0) > 0 && (
+                      <div className="mt-2 text-xs text-slate-600 flex justify-between gap-3">
+                        <span>المتبقي بعد التسديد</span>
+                        <b>{money(receipt.totalOutstandingAfter, currency)}</b>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {legacyOnlyRows.length > 0 && (
+          <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900 leading-6">
+            بعض التسديدات القديمة تمت قبل تفعيل حفظ رقم الوصل في السحابة، لذلك تظهر تفاصيل المبلغ والتاريخ من سجل الحركات بدون رقم وصل قديم.
+          </div>
+        )}
 
         {(data.invoices || []).length > 0 && (
           <section className="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 mt-4">
