@@ -10,8 +10,10 @@ const receipt = read('src/components/InvoiceReceiptModal.tsx');
 const portal = read('src/components/SubscriberPortalPage.tsx');
 const sunmi = read('android/app/src/main/java/com/mwaldatk/app/SunmiPrinterPlugin.java');
 const migration = read('supabase/migrations/20260919110000_subscriber_portal_qr.sql');
+const vercel = read('vercel.json');
 
 assert.match(main, /\/s\\\/\(\[0-9a-fA-F-\]\{36\}\)/, 'subscriber QR route is missing');
+assert.ok(vercel.includes('"source": "/s/:path*"'), 'subscriber QR deep-link rewrite is missing');
 assert.match(receipt, /ensureSubscriberPortalLink/, 'receipt must request a secure portal token');
 assert.match(receipt, /portalQrDataUrl/, 'browser receipt QR is missing');
 assert.match(receipt, /generatorId\?: string \| null/, 'receipt must be scoped to generator id');
