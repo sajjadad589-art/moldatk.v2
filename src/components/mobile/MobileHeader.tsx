@@ -25,7 +25,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
   showSyncStatus = false,
 }) => {
   return (
-    <header className="sticky top-0 z-40 bg-[#0B1F3B] text-white border-b border-[#1C3654] shadow-md">
+    <header className="moldatk-mobile-header-safe sticky top-0 z-40 bg-[#0B1F3B] text-white border-b border-[#1C3654] shadow-md">
       {/* Top Bar: Brand, Status, and Controls */}
       <div className="px-3.5 py-2.5 flex items-center justify-between gap-2">
         {/* Brand & Live Status */}
