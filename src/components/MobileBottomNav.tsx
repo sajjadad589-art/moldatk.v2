@@ -63,7 +63,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#0c1427]/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800/80 px-1.5 py-1.5 shadow-lg select-none">
+    <div className="moldatk-mobile-bottom-safe fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#0c1427]/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800/80 px-1.5 py-1.5 shadow-lg select-none">
       <div className="flex items-center justify-around max-w-md mx-auto gap-0.5">
         {tabs.slice(0, 2).map(renderTab)}
 
