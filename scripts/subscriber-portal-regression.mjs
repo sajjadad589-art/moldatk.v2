@@ -17,7 +17,7 @@ assert.ok(vercel.includes('"source": "/s/:path*"'), 'subscriber QR deep-link rew
 assert.match(receipt, /ensureSubscriberPortalLink/, 'receipt must request a secure portal token');
 assert.match(receipt, /portalQrDataUrl/, 'browser receipt QR is missing');
 assert.match(receipt, /generatorId\?: string \| null/, 'receipt must be scoped to generator id');
-assert.match(sunmi, /MOLDATK_NATIVE_SUBSCRIBER_QR_V1/, 'SUNMI QR rendering is missing');
+assert.match(sunmi, /MOLDATK_NATIVE_SUBSCRIBER_QR_V2/, 'SUNMI QR/template rendering is missing');
 assert.match(sunmi, /decodeQrDataUrl/, 'SUNMI QR decoder is missing');
 assert.match(portal, /get_public_subscriber_account/, 'portal must use the public allowlisted RPC');
 assert.doesNotMatch(portal, /subscriber\?\.phone|subscriber\?\.address|subscriber\?\.notes/, 'portal UI must not expose private subscriber fields');
