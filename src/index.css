@@ -206,3 +206,39 @@ html:not(.dark) [class~="text-blue-600"],html:not(.dark) [class~="text-blue-700"
 html:not(.dark) [class~="border-blue-600"],html:not(.dark) [class~="border-blue-700"],html:not(.dark) [class~="border-blue-800"]{border-color:#D89A21!important;}
 html:not(.dark) [class~="hover:bg-blue-700"]:hover,html:not(.dark) [class~="hover:bg-blue-800"]:hover,html:not(.dark) [class~="hover:bg-blue-900"]:hover{background-color:#142A45!important;}
 html:not(.dark) input:focus,html:not(.dark) select:focus,html:not(.dark) textarea:focus{border-color:#D89A21!important;box-shadow:0 0 0 2px rgba(242,181,68,.22)!important;}
+
+
+/* MOLDATK_IOS_PWA_SAFE_AREA_V1
+ * iPhone standalone PWAs use viewport-fit=cover, so content must explicitly
+ * respect the Dynamic Island/status bar and the home indicator.
+ */
+.moldatk-safe-screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+  box-sizing: border-box;
+  padding-top: max(16px, calc(env(safe-area-inset-top, 0px) + 10px)) !important;
+  padding-right: max(16px, calc(env(safe-area-inset-right, 0px) + 8px)) !important;
+  padding-bottom: max(16px, calc(env(safe-area-inset-bottom, 0px) + 10px)) !important;
+  padding-left: max(16px, calc(env(safe-area-inset-left, 0px) + 8px)) !important;
+}
+
+.moldatk-mobile-header-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.moldatk-mobile-bottom-safe {
+  padding-bottom: max(6px, env(safe-area-inset-bottom, 0px)) !important;
+}
+
+.moldatk-mobile-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+@supports not (height: 100dvh) {
+  .moldatk-safe-screen,
+  .moldatk-mobile-shell {
+    min-height: 100vh;
+  }
+}
