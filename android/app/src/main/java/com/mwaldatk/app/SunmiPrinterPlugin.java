@@ -3,6 +3,7 @@ package com.mwaldatk.app;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.BitmapFactory;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.Typeface;
@@ -12,6 +13,7 @@ import android.os.Looper;
 import android.text.Layout;
 import android.text.StaticLayout;
 import android.text.TextPaint;
+import android.util.Base64;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -108,6 +110,8 @@ public class SunmiPrinterPlugin extends Plugin {
     private static final int CONTENT_WIDTH = PAPER_WIDTH_PX - (PADDING * 2);
     private static final int RECEIPT_LOGO_SIZE = 64;
     private static final int RECEIPT_LOGO_GAP = 8;
+    private static final int RECEIPT_QR_SIZE = 168;
+    private static final int RECEIPT_QR_GAP = 8;
 
     private void printReceiptNow(PluginCall call, JSObject r) {
         new Thread(() -> {
@@ -202,7 +206,11 @@ public class SunmiPrinterPlugin extends Plugin {
         lines.add(separatorLine());
         lines.add(new DrawLine("نظام إدارة المولدات والجباية", 16f, true, Layout.Alignment.ALIGN_CENTER, 2));
 
-        int totalHeight = PADDING * 2 + 18 + RECEIPT_LOGO_SIZE + RECEIPT_LOGO_GAP;
+        // MOLDATK_NATIVE_SUBSCRIBER_QR_V1
+        Bitmap subscriberQr = decodeQrDataUrl(raw(r, "qrDataUrl"));
+        int qrExtraHeight = subscriberQr != null ? (36 + RECEIPT_QR_SIZE + RECEIPT_QR_GAP) : 0;
+
+        int totalHeight = PADDING * 2 + 18 + RECEIPT_LOGO_SIZE + RECEIPT_LOGO_GAP + qrExtraHeight;
         List<StaticLayout> layouts = new ArrayList<>();
         for (DrawLine dl : lines) {
             StaticLayout sl = buildLayout(dl);
@@ -258,6 +266,19 @@ public class SunmiPrinterPlugin extends Plugin {
                 canvas.restore();
                 y += sl.getHeight() + dl.marginBottom;
             }
+        }
+
+        if (subscriberQr != null) {
+            StaticLayout qrTitle = buildLayout(new DrawLine("امسح الرمز لمتابعة حسابك", 18f, true, Layout.Alignment.ALIGN_CENTER, 5));
+            canvas.save();
+            canvas.translate(PADDING, y);
+            qrTitle.draw(canvas);
+            canvas.restore();
+            y += qrTitle.getHeight() + 4;
+
+            Bitmap scaledQr = Bitmap.createScaledBitmap(subscriberQr, RECEIPT_QR_SIZE, RECEIPT_QR_SIZE, false);
+            float qrLeft = (PAPER_WIDTH_PX - RECEIPT_QR_SIZE) / 2f;
+            canvas.drawBitmap(scaledQr, qrLeft, y, null);
         }
 
         return bitmap;
