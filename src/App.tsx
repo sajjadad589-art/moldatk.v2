@@ -60,6 +60,7 @@ import { OwnerAIWatcher } from './components/OwnerAIWatcher';
 import { PricingModal } from './components/PricingModal';
 import { FolderDetailModal } from './components/FolderDetailModal';
 import type { SecureResetResult } from './components/SecureSystemReset';
+import { normalizeInvoiceTemplate } from './lib/invoiceTemplate';
 
 const BackNavigation = registerPlugin<{ exitApp(): Promise<void> }>('BackNavigation');
 
@@ -324,9 +325,9 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
   const [invoiceTemplate, setInvoiceTemplate] = useState<InvoiceTemplateSettings>(() => {
     try {
       const saved = localStorage.getItem(getStorageKey('moldatk_invoice_template'));
-      return saved ? JSON.parse(saved) : INITIAL_INVOICE_TEMPLATE;
+      return normalizeInvoiceTemplate(saved ? JSON.parse(saved) : INITIAL_INVOICE_TEMPLATE);
     } catch (e) {
-      return INITIAL_INVOICE_TEMPLATE;
+      return normalizeInvoiceTemplate(INITIAL_INVOICE_TEMPLATE);
     }
   });
 
@@ -371,6 +372,9 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
     }
 
     setGeneratorSpecs(readGeneratorSpecsForSession(userSession));
+    setInvoiceTemplate(normalizeInvoiceTemplate(
+      readLocalJson<InvoiceTemplateSettings>('moldatk_invoice_template', INITIAL_INVOICE_TEMPLATE, userSession)
+    ));
   }, [userSession?.role, userSession?.generatorId]);
 
   useEffect(() => {
@@ -383,6 +387,9 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
       setMonthlyTariffs(readLocalJson<MonthlyTariffRecord[]>('moldatk_monthly_tariffs', INITIAL_MONTHLY_TARIFFS, userSession));
       setAuditLogs(readLocalJson<AuditLogEntry[]>('moldatk_audit_logs', [], userSession));
       setGeneratorSpecs(readGeneratorSpecsForSession(userSession));
+      setInvoiceTemplate(normalizeInvoiceTemplate(
+        readLocalJson<InvoiceTemplateSettings>('moldatk_invoice_template', INITIAL_INVOICE_TEMPLATE, userSession)
+      ));
       try {
         setWalletResetTimestamp(localStorage.getItem(getStorageKey('moldatk_wallet_reset_timestamp', userSession)) || '');
       } catch (e) {
@@ -1006,11 +1013,15 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
   };
 
   const handleUpdateInvoiceTemplate = (template: InvoiceTemplateSettings) => {
-    setInvoiceTemplate(template);
+    const normalized = normalizeInvoiceTemplate(template);
+    setInvoiceTemplate(normalized);
     try {
-      localStorage.setItem(getStorageKey('moldatk_invoice_template'), JSON.stringify(template));
+      localStorage.setItem(getStorageKey('moldatk_invoice_template'), JSON.stringify(normalized));
+      // Keep one canonical source and wake the event-driven cloud synchronizer.
+      markLocalWrite();
+      window.dispatchEvent(new Event('moldatk-local-sync'));
     } catch (e) {}
-    showToast('تم حفظ إعدادات القالب');
+    showToast('تم حفظ إعدادات الفواتير والطباعة وتطبيقها فعلياً');
   };
 
   const handleSaveSubscriber = async (newSub: Subscriber) => {
@@ -1369,6 +1380,7 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
           generatorSpecs={generatorSpecs}
           generatorId={userSession?.generatorId}
           pricingTiers={pricingTiers}
+          invoiceTemplate={invoiceTemplate}
           autoPrint={autoPrintReceipt}
           invoice={selectedReceiptInvoice}
           onMarkAsPaid={subId => {
@@ -1513,6 +1525,7 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
           generatorSpecs={generatorSpecs}
           generatorId={userSession?.generatorId}
           pricingTiers={pricingTiers}
+          invoiceTemplate={invoiceTemplate}
           autoPrint={autoPrintReceipt}
           invoice={selectedReceiptInvoice}
           onMarkAsPaid={subId => {
@@ -1767,6 +1780,7 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
         generatorSpecs={generatorSpecs}
         generatorId={userSession?.generatorId}
         pricingTiers={pricingTiers}
+          invoiceTemplate={invoiceTemplate}
         autoPrint={autoPrintReceipt}
         invoice={selectedReceiptInvoice}
         onMarkAsPaid={subId => {
