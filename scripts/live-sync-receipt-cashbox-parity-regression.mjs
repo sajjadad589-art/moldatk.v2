@@ -17,24 +17,35 @@ assert.ok(indicator.includes("'غير متصل — محفوظ محلياً'"), '
 assert.ok(!indicator.includes('setInterval(resolveTarget, 400)'), 'sync badge must not poll the DOM');
 
 const receipt = read('src/components/InvoiceReceiptModal.tsx');
-assert.ok(receipt.includes('receipt-system-brand text-center'), 'Moldatk brand must remain centered');
-assert.ok(receipt.includes('>مولدتك</div>'), 'brand name must be مولدتك');
-assert.ok(receipt.includes('<Row label="سعر الأمبير الشهري"'), 'visual receipt must show monthly ampere price');
-assert.ok(receipt.includes('<Row label="استحقاق الشهر الحالي" value={formatCurrency(currentCharge)} strong />'), 'visual receipt must show current-month due');
-assert.ok(!receipt.includes('<Row label="تسديد الدين السابق"'), 'visual receipt must not show previous-debt allocation row');
+const receiptTemplate = read('src/lib/invoiceTemplate.ts');
+assert.ok(receipt.includes('MOLDATK_RECEIPT_TEMPLATE_V2'), 'configurable receipt renderer marker missing');
+assert.ok(receipt.includes('receipt-system-brand text-center'), 'receipt brand block must remain centered when enabled');
+assert.ok(receipt.includes('template.systemBrandText'), 'brand text must come from receipt settings');
+assert.ok(receipt.includes('template.showPricePerAmp'), 'ampere price visibility must be configurable');
+assert.ok(receipt.includes('template.showCurrentCharge'), 'current-month due visibility must be configurable');
+assert.ok(receipt.includes('template.showAppliedToPreviousDebt'), 'previous-debt allocation visibility must be configurable');
+assert.ok(receipt.includes('template.showFooterNotes'), 'custom receipt note visibility must be configurable');
+assert.ok(receipt.includes('template.footerNotes'), 'custom receipt note text must feed the renderer');
+assert.ok(receipt.includes('template.showQr'), 'QR visibility must be configurable');
 assert.ok(receipt.includes('receipt-amount text-xl'), 'received amount box must use compact amount typography');
 assert.ok(receipt.includes('id="thermal-receipt-printable"'), 'canonical receipt DOM missing');
 assert.ok(receipt.includes('${receipt.outerHTML}'), 'browser/portable printing must use the visible canonical receipt');
 assert.ok(receipt.includes("pricePerAmp: pricePerAmp > 0 ? formatCurrency(pricePerAmp) : ''"), 'native receipt payload must include ampere price');
-assert.ok(receipt.includes("appliedToPreviousDebt: ''"), 'native payload must suppress previous-debt allocation row');
+assert.ok(receipt.includes('showAppliedToPreviousDebt: template.showAppliedToPreviousDebt'), 'native payload must use the same previous-debt visibility switch');
+assert.ok(receiptTemplate.includes("systemBrandText: 'مولدتك'"), 'default Moldatk brand text must remain مولدتك');
+assert.ok(receiptTemplate.includes("showAppliedToPreviousDebt: false"), 'previous-debt allocation stays hidden by default');
+assert.ok(receiptTemplate.includes("showCurrentCharge: true"), 'current charge stays visible by default');
+assert.ok(receiptTemplate.includes("showPricePerAmp: true"), 'monthly ampere price stays visible by default');
 
 const nativeReceipt = read('android/app/src/main/java/com/mwaldatk/app/SunmiPrinterPlugin.java');
-assert.ok(nativeReceipt.includes('new DrawLine("مولدتك", 31f, true, Layout.Alignment.ALIGN_CENTER'), 'native title must be centered');
-assert.ok(nativeReceipt.includes('addField(lines, "سعر الأمبير الشهري"'), 'native receipt must show monthly ampere price');
-assert.ok(nativeReceipt.includes('addField(lines, "استحقاق الشهر الحالي"'), 'native receipt must show current-month due');
-assert.ok(!nativeReceipt.includes('addField(lines, "تسديد الدين السابق"'), 'native receipt must not show previous-debt allocation row');
-assert.equal((nativeReceipt.match(/"المبلغ المستلم/g) || []).length, 1, 'native receipt must print received amount once');
-assert.ok(nativeReceipt.includes('"المبلغ المستلم\\n" + finalAmount, 25f'), 'native amount box must use compact typography');
+assert.ok(nativeReceipt.includes('MOLDATK_NATIVE_SUBSCRIBER_QR_V2'), 'native configurable receipt marker missing');
+assert.ok(nativeReceipt.includes('String systemTitle = val(r, "systemTitle", "مولدتك")'), 'native brand title must use configurable payload with Moldatk fallback');
+assert.ok(nativeReceipt.includes('if (showPricePerAmp && !pricePerAmp.isEmpty())'), 'native monthly ampere price must obey visibility setting');
+assert.ok(nativeReceipt.includes('if (showCurrentCharge && !currentCharge.isEmpty())'), 'native current-month due must obey visibility setting');
+assert.ok(nativeReceipt.includes('if (showAppliedToPreviousDebt && !appliedToPreviousDebt.isEmpty())'), 'native previous-debt allocation must obey visibility setting');
+assert.ok(nativeReceipt.includes('if (showFooterNotes && !note.isEmpty())'), 'native custom note must obey visibility setting');
+assert.ok(nativeReceipt.includes('Bitmap subscriberQr = showQr ? decodeQrDataUrl'), 'native QR must obey visibility setting');
+assert.ok(nativeReceipt.includes('val(r, "receivedAmountLabel", "المبلغ المستلم") + "\\n" + finalAmount'), 'native amount box must use configurable label and compact typography');
 
 const wallet = read('src/components/WalletView.tsx');
 assert.ok(wallet.includes('(isWalletFilterActive ? totalCollected : authoritativeCashbox).toLocaleString'), 'unfiltered wallet headline must use authoritative cashbox');
