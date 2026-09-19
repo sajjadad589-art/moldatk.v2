@@ -41,7 +41,7 @@ assert.match(portalMigration, /subscriber_portal_tokens/);
 assert.match(portalMigration, /revoke all on table public\.subscriber_portal_tokens from public, anon, authenticated/);
 assert.match(portalMigration, /get_public_subscriber_account/);
 assert.match(portalMigration, /grant execute on function public\.get_public_subscriber_account\(uuid\) to anon/);
-assert.match(sunmiPrinter, /MOLDATK_NATIVE_SUBSCRIBER_QR_V1/);
+assert.match(sunmiPrinter, /MOLDATK_NATIVE_SUBSCRIBER_QR_V2/);
 assert.match(sunmiPrinter, /private Bitmap decodeQrDataUrl/);
 assert.match(admin, /await import\('xlsx'\)/);
 assert.doesNotMatch(admin, /import \* as XLSX from 'xlsx'/);
