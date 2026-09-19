@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "audit": "node scripts/source-guards.mjs && node scripts/launch-audit.mjs",
     "lint": "node scripts/source-guards.mjs && tsc --noEmit",
-    "test:sync-cashbox": "node scripts/event-sync-cashbox-regression.mjs && node scripts/cashbox-database-regression.mjs && node scripts/no-tariff-regression.mjs && node scripts/no-tariff-database-regression.mjs"
+    "test:sync-cashbox": "node scripts/event-sync-cashbox-regression.mjs && node scripts/cashbox-database-regression.mjs && node scripts/no-tariff-regression.mjs && node scripts/no-tariff-database-regression.mjs",
+    "test:portal": "node scripts/subscriber-portal-regression.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",
