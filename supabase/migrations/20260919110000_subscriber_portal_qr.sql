@@ -138,7 +138,7 @@ begin
   order by i.month_id desc, i.updated_at desc nulls last, i.created_at desc
   limit 1;
 
-  select coalesce(jsonb_agg(to_jsonb(x) order by x.month_id desc, x.issue_date desc), '[]'::jsonb)
+  select coalesce(jsonb_agg(to_jsonb(x) order by x."monthId" desc, x."issueDate" desc), '[]'::jsonb)
     into v_invoices
   from (
     select
@@ -160,7 +160,7 @@ begin
     limit 18
   ) x;
 
-  select coalesce(jsonb_agg(to_jsonb(x) order by x.received_at desc), '[]'::jsonb),
+  select coalesce(jsonb_agg(to_jsonb(x) order by x."receivedAt" desc), '[]'::jsonb),
          coalesce(sum(x.amount), 0)
     into v_payments, v_total_paid
   from (
