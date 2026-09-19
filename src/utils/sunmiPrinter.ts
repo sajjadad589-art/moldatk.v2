@@ -25,6 +25,8 @@ export interface SunmiReceiptPayload {
   note?: string;
   issueDate: string;
   printTime: string;
+  portalUrl?: string;
+  qrDataUrl?: string;
 }
 
 interface SunmiPrinterPlugin {
