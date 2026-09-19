@@ -16,6 +16,11 @@ const sw = source('public/sw.js');
 const count = (text, marker) => text.split(marker).length - 1;
 
 assert.match(app, /lazy\(\(\) => import\('\.\/components\/SuperAdminDashboard'\)/);
+assert.match(app, /SUBSCRIPTION_ACCESS_RPC_V2/);
+assert.match(app, /supabase\.rpc\('get_my_subscription_access_state'\)/);
+assert.match(app, /serverAccessActive/);
+assert.match(app, /SubscriptionUnavailableScreen/);
+assert.doesNotMatch(app, /userSession\.role === 'generator_admin' && sub\.error/);
 assert.match(main, /subscriberPortalMatch/);
 assert.match(main, /SubscriberPortalPage/);
 assert.match(receipt, /MOLDATK_SUBSCRIBER_PORTAL_QR_V1/);
