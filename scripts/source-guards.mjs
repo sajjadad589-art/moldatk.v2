@@ -31,6 +31,7 @@ assert.match(main, /SubscriberPortalPage/);
 assert.match(receipt, /MOLDATK_SUBSCRIBER_PORTAL_QR_V1/);
 assert.match(receipt, /generatorId=|generatorId\?:/);
 assert.match(receipt, /qrDataUrl/);
+assert.doesNotMatch(receipt, /receipt-portal-url/);
 assert.match(portal, /get_public_subscriber_account/);
 assert.doesNotMatch(portal, /subscriber\.phone|subscriber\.address|subscriber\.notes/);
 assert.match(portalMigration, /subscriber_portal_tokens/);
