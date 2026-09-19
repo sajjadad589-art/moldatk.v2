@@ -298,12 +298,18 @@ export const InvoiceReceiptModal: React.FC<InvoiceReceiptModalProps> = ({
     const receipt = document.getElementById('thermal-receipt-printable');
     if (!receipt) return;
 
-    const iframe = document.createElement('iframe');
+    const normalizedPaperSize = template.paperSize === 'thermal' ? 'thermal_58' : template.paperSize;
+    const pageWidthMm = normalizedPaperSize === 'thermal_80' ? 80 : normalizedPaperSize === 'a5' ? 148 : normalizedPaperSize === 'a4' ? 210 : 58;
+    const receiptWidthMm = normalizedPaperSize === 'thermal_80' ? 78 : normalizedPaperSize === 'a5' ? 138 : normalizedPaperSize === 'a4' ? 190 : 56;
+    const pageSizeCss = normalizedPaperSize === 'a5' ? 'A5 portrait' : normalizedPaperSize === 'a4' ? 'A4 portrait' : `${pageWidthMm}mm auto`;
+    const isThermalPaper = normalizedPaperSize === 'thermal_58' || normalizedPaperSize === 'thermal_80';
+
+        const iframe = document.createElement('iframe');
     iframe.setAttribute('aria-hidden', 'true');
     iframe.style.position = 'fixed';
     iframe.style.left = '-10000px';
     iframe.style.top = '0';
-    iframe.style.width = '58mm';
+    iframe.style.width = `${pageWidthMm}mm`;
     iframe.style.height = '1px';
     iframe.style.border = '0';
     document.body.appendChild(iframe);
@@ -316,7 +322,7 @@ export const InvoiceReceiptModal: React.FC<InvoiceReceiptModalProps> = ({
       frameDocument.open();
       frameDocument.write(`<!doctype html><html dir="rtl"><head><meta charset="utf-8" />
 <style>
-@page{size:58mm auto;margin:0!important}html,body{width:58mm!important;margin:0!important;padding:0!important;background:#fff!important;color:#000!important}body{font-family:Arial,Tahoma,sans-serif!important;direction:rtl!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}#thermal-receipt-printable{width:56mm!important;margin:4mm 1mm 1.5mm!important;padding:4.5mm 1.7mm 3mm!important;box-sizing:border-box!important;background:#fff!important;color:#000!important;border:2px solid #000!important;border-radius:7px!important;box-shadow:none!important;font-size:12px!important;line-height:1.42!important}#thermal-receipt-printable *{box-sizing:border-box!important;color:#000!important;font-weight:900!important;text-shadow:none!important;filter:none!important;-webkit-font-smoothing:none!important}#thermal-receipt-printable .receipt-generator{font-size:20px!important;font-weight:900!important;border:2px solid #000!important;padding:7px 4px!important;border-radius:8px!important}#thermal-receipt-printable .receipt-title{font-size:15px!important;font-weight:900!important}#thermal-receipt-printable .receipt-name{font-size:17px!important;font-weight:900!important}#thermal-receipt-printable .receipt-payment{font-size:16px!important;font-weight:900!important}#thermal-receipt-printable .receipt-total{font-size:14px!important;font-weight:900!important;border:2px solid #000!important;padding:6px 4px!important}#thermal-receipt-printable .receipt-total .receipt-amount{font-size:22px!important;line-height:1.15!important}#thermal-receipt-printable .receipt-brand{font-size:20px!important;font-weight:900!important}.receipt-logo{width:12mm!important;height:12mm!important;object-fit:contain!important;display:block!important;margin:0 auto!important}.receipt-system-name{font-size:20px!important;font-weight:900!important}#thermal-receipt-printable svg{display:none!important}.receipt-row{display:flex!important;justify-content:space-between!important;gap:8px!important;padding:4px 0!important;border-bottom:1px dotted #777!important}.receipt-label{font-weight:900!important;color:#000!important}.receipt-value{font-weight:900!important;color:#000!important;text-align:left!important}.receipt-divider{border-top:1px dashed #000!important;margin:7px 0!important}.receipt-qr{display:block!important;width:27mm!important;height:27mm!important;object-fit:contain!important;margin:2mm auto 1mm!important}.receipt-hide-print{display:none!important}
+@page{size:${pageSizeCss};margin:0!important}html,body{width:${pageWidthMm}mm!important;margin:0!important;padding:0!important;background:#fff!important;color:#000!important}body{font-family:Arial,Tahoma,sans-serif!important;direction:rtl!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}#thermal-receipt-printable{width:${receiptWidthMm}mm!important;margin:4mm auto 1.5mm!important;padding:4.5mm 1.7mm 3mm!important;box-sizing:border-box!important;background:#fff!important;color:#000!important;border:2px solid #000!important;border-radius:7px!important;box-shadow:none!important;font-size:12px!important;line-height:1.42!important}#thermal-receipt-printable *{box-sizing:border-box!important;color:#000!important;font-weight:900!important;text-shadow:none!important;filter:none!important;-webkit-font-smoothing:none!important}#thermal-receipt-printable .receipt-generator{font-size:20px!important;font-weight:900!important;border:2px solid #000!important;padding:7px 4px!important;border-radius:8px!important}#thermal-receipt-printable .receipt-title{font-size:15px!important;font-weight:900!important}#thermal-receipt-printable .receipt-name{font-size:17px!important;font-weight:900!important}#thermal-receipt-printable .receipt-payment{font-size:16px!important;font-weight:900!important}#thermal-receipt-printable .receipt-total{font-size:14px!important;font-weight:900!important;border:2px solid #000!important;padding:6px 4px!important}#thermal-receipt-printable .receipt-total .receipt-amount{font-size:22px!important;line-height:1.15!important}#thermal-receipt-printable .receipt-brand{font-size:20px!important;font-weight:900!important}.receipt-logo{width:12mm!important;height:12mm!important;object-fit:contain!important;display:block!important;margin:0 auto!important}.receipt-system-name{font-size:20px!important;font-weight:900!important}#thermal-receipt-printable svg{display:none!important}.receipt-row{display:flex!important;justify-content:space-between!important;gap:8px!important;padding:4px 0!important;border-bottom:1px dotted #777!important}.receipt-label{font-weight:900!important;color:#000!important}.receipt-value{font-weight:900!important;color:#000!important;text-align:left!important}.receipt-divider{border-top:1px dashed #000!important;margin:7px 0!important}.receipt-qr{display:block!important;width:27mm!important;height:27mm!important;object-fit:contain!important;margin:2mm auto 1mm!important}.receipt-hide-print{display:none!important}
 </style></head><body>${receipt.outerHTML}</body></html>`);
       frameDocument.close();
 
@@ -326,7 +332,9 @@ export const InvoiceReceiptModal: React.FC<InvoiceReceiptModalProps> = ({
         const pxHeight = Math.ceil(printed.scrollHeight || printed.getBoundingClientRect().height);
         const heightMm = Math.max(40, Math.ceil((pxHeight * 25.4) / 96));
         const style = frameDocument.createElement('style');
-        style.textContent = `@page{size:58mm ${heightMm}mm;margin:0!important}html,body{height:${heightMm}mm!important}`;
+        style.textContent = isThermalPaper
+          ? `@page{size:${pageWidthMm}mm ${heightMm}mm;margin:0!important}html,body{height:${heightMm}mm!important}`
+          : `@page{size:${pageSizeCss};margin:0!important}`;
         frameDocument.head.appendChild(style);
         iframe.style.height = `${pxHeight}px`;
         frameWindow.focus();
