@@ -7,6 +7,7 @@ import { SyncProgressIndicator } from './components/SyncProgressIndicator';
 import { SeasonalCampaignRuntime } from './components/SeasonalCampaignRuntime';
 import { CustomerOrderAssistant } from './components/CustomerOrderAssistant';
 import LegalPage from './components/LegalPage';
+import SubscriberPortalPage from './components/SubscriberPortalPage';
 import './index.css';
 
 function RootRouter() {
@@ -23,6 +24,9 @@ function RootRouter() {
       window.removeEventListener('popstate', handleLocationChange);
     };
   }, []);
+
+  const subscriberPortalMatch = window.location.pathname.match(/^\/s\/([0-9a-fA-F-]{36})$/);
+  if (subscriberPortalMatch) return <SubscriberPortalPage token={subscriberPortalMatch[1]} />;
 
   if (window.location.pathname === '/privacy') return <LegalPage kind="privacy" />;
   if (window.location.pathname === '/terms') return <LegalPage kind="terms" />;
