@@ -503,7 +503,7 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
 
         {/* إعدادات الفواتير والطباعة */}
         <div
-          onClick={() => setIsInvoiceModalOpen(true)}
+          onClick={() => onOpenFolderModal('invoices_templates')}
           className="bg-white dark:bg-[#131E38] border border-slate-200 dark:border-blue-900/50 hover:border-blue-500 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between space-y-4 group"
         >
           <div className="flex items-start justify-between">
@@ -511,7 +511,7 @@ export const SettingsFolderView: React.FC<SettingsFolderViewProps> = ({
               <Printer className="w-5 h-5 text-indigo-400" />
             </div>
             <span className="px-3 py-1 rounded-full text-[10px] font-black border bg-indigo-500/10 text-indigo-400 border-indigo-500/30">
-              {getPrinterTypeName(invoiceSettings.printerType)}
+              موحد
             </span>
           </div>
           <div className="space-y-1">
