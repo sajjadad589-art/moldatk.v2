@@ -407,51 +407,78 @@ export const InvoiceReceiptModal: React.FC<InvoiceReceiptModalProps> = ({
             id="thermal-receipt-printable"
             className={`bg-white text-black font-black rounded-xl px-3 pt-7 pb-5 shadow-lg border-2 border-black w-[260px] text-xs ${autoPrint && printAnimationKey === 0 ? 'receipt-awaiting-print' : ''} ${printAnimationKey > 0 ? 'receipt-screen-printing' : ''}`}
           >
-            {/* MOLDATK_RECEIPT_BRAND_HEADER_V1 */}
-            <div className="receipt-system-brand text-center pb-2">
-              <img src="/brand/moldatk-mark.svg" alt="مولدتك" className="receipt-logo mx-auto w-12 h-12 object-contain" />
-              <div className="receipt-system-name text-xl font-black leading-none mt-1">مولدتك</div>
-            </div>
-            <div className="receipt-generator text-center text-base font-black border-2 border-slate-950 rounded-lg px-2 py-2">{generatorName}</div>
-<Row label="التاريخ" value={displayIssueDate} strong />
+            {/* MOLDATK_RECEIPT_TEMPLATE_V2 */}
+            {(template.showLogo || template.showSystemBrand) && (
+              <div className="receipt-system-brand text-center pb-2">
+                {template.showLogo && <img src="/brand/moldatk-mark.svg" alt="مولدتك" className="receipt-logo mx-auto w-12 h-12 object-contain" />}
+                {template.showSystemBrand && <div className="receipt-system-name text-xl font-black leading-none mt-1">{template.systemBrandText}</div>}
+              </div>
+            )}
+            {template.showGeneratorName && (
+              <div className="receipt-generator text-center text-base font-black border-2 border-slate-950 rounded-lg px-2 py-2">{generatorName}</div>
+            )}
+            {template.showSubTitle && clean(template.subTitle) && (
+              <div className="text-center text-[10px] font-black mt-1">{template.subTitle}</div>
+            )}
+            {template.showDate && <Row label={template.dateLabel} value={displayIssueDate} strong />}
+            {template.showReceiptNumber && receiptNumber && <Row label={template.receiptNumberLabel} value={<span dir="ltr">{receiptNumber}</span>} />}
+            {template.showOwnerPhone && clean(template.ownerPhone) && <Row label={template.ownerPhoneLabel} value={<span dir="ltr">{template.ownerPhone}</span>} />}
+            {template.showLocationAddress && clean(template.locationAddress) && <Row label={template.locationAddressLabel} value={template.locationAddress} />}
 
             <div className="receipt-divider border-t border-dashed border-slate-500 my-2" />
-            <div className="py-1">
-              <div className="text-[10px] font-black text-black">اسم المشترك</div>
-              <div className="receipt-name text-lg font-black text-black leading-tight mt-0.5 tracking-tight">{subscriber.fullName}</div>
-            </div>
-            {phone && <Row label="رقم الهاتف" value={<span dir="ltr">{phone}</span>} />}
-            {lineName && <Row label="الكابينة" value={lineName} />}
-            {amperes > 0 && <Row label="عدد الأمبيرات" value={`${formatNumberArabic(amperes)} أمبير`} />}
-            {pricePerAmp > 0 && <Row label="سعر الأمبير الشهري" value={formatCurrency(pricePerAmp)} strong />}
-            {displayPaymentMonth && <Row label="شهر التسديد" value={displayPaymentMonth} strong />}
-            <Row label="حالة التسديد" value={statusText} />
+            {template.showSubscriberName && (
+              <div className="py-1">
+                <div className="text-[10px] font-black text-black">{template.subscriberNameLabel}</div>
+                <div className="receipt-name text-lg font-black text-black leading-tight mt-0.5 tracking-tight">{subscriber.fullName}</div>
+              </div>
+            )}
+            {template.showPhone && phone && <Row label={template.phoneLabel} value={<span dir="ltr">{phone}</span>} />}
+            {template.showLineName && lineName && <Row label={template.lineNameLabel} value={lineName} />}
+            {template.showAmperes && amperes > 0 && <Row label={template.amperesLabel} value={`${formatNumberArabic(amperes)} أمبير`} />}
+            {template.showPricePerAmp && pricePerAmp > 0 && <Row label={template.pricePerAmpLabel} value={formatCurrency(pricePerAmp)} strong />}
+            {template.showPaymentMonth && displayPaymentMonth && <Row label={template.paymentMonthLabel} value={displayPaymentMonth} strong />}
+            {template.showPaymentStatus && <Row label={template.paymentStatusLabel} value={statusText} />}
+            {template.showCollectorName && clean(invoice?.collectorName) && <Row label={template.collectorNameLabel} value={invoice?.collectorName} />}
 
             <div className="receipt-divider border-t border-dashed border-slate-500 my-2" />
-            {previousDebtBefore > 0 && <Row label="الدين السابق" value={formatCurrency(previousDebtBefore)} strong />}
-            <Row label="استحقاق الشهر الحالي" value={formatCurrency(currentCharge)} strong />
-            <Row label="الإجمالي قبل التسديد" value={formatCurrency(totalBeforePayment)} strong />
+            {template.showPreviousDebt && previousDebtBefore > 0 && <Row label={template.previousDebtLabel} value={formatCurrency(previousDebtBefore)} strong />}
+            {template.showCurrentCharge && <Row label={template.currentChargeLabel} value={formatCurrency(currentCharge)} strong />}
+            {template.showTotalBeforePayment && <Row label={template.totalBeforePaymentLabel} value={formatCurrency(totalBeforePayment)} strong />}
 
             <div className="receipt-divider border-t border-dashed border-slate-500 my-2" />
-            {appliedToCurrentMonth > 0 && <Row label="تسديد الشهر الحالي" value={formatCurrency(appliedToCurrentMonth)} />}
-            <Row label="المتبقي بعد التسديد" value={formatCurrency(totalOutstandingAfter)} strong />
+            {template.showAppliedToPreviousDebt && appliedToPreviousDebt > 0 && <Row label={template.appliedToPreviousDebtLabel} value={formatCurrency(appliedToPreviousDebt)} />}
+            {template.showAppliedToCurrentMonth && appliedToCurrentMonth > 0 && <Row label={template.appliedToCurrentMonthLabel} value={formatCurrency(appliedToCurrentMonth)} />}
+            {template.showRemainingAfterPayment && <Row label={template.remainingAfterPaymentLabel} value={formatCurrency(totalOutstandingAfter)} strong />}
 
-            <div className="receipt-divider border-t border-dashed border-slate-500 my-2" />
-            <div className="receipt-total text-center border-2 border-slate-950 rounded-lg py-2 px-1">
-              <div className="text-[10px] font-black mb-0.5">المبلغ المستلم</div>
-              <div className="receipt-amount text-xl font-black tracking-tight leading-tight">{formatCurrency(paymentAmount)}</div>
-            </div>
+            {template.showReceivedAmount && (
+              <>
+                <div className="receipt-divider border-t border-dashed border-slate-500 my-2" />
+                <div className="receipt-total text-center border-2 border-slate-950 rounded-lg py-2 px-1">
+                  <div className="text-[10px] font-black mb-0.5">{template.receivedAmountLabel}</div>
+                  <div className="receipt-amount text-xl font-black tracking-tight leading-tight">{formatCurrency(paymentAmount)}</div>
+                </div>
+              </>
+            )}
 
-            <div className="text-center text-[10px] font-black py-3">شكراً لتسديدكم</div>
-            {portalQrDataUrl && portalUrl && (
+            {template.showThankYou && clean(template.thankYouText) && (
+              <div className="text-center text-[10px] font-black py-3">{template.thankYouText}</div>
+            )}
+            {template.showFooterNotes && clean(template.footerNotes) && (
+              <div className="text-center text-[9px] font-black py-2 whitespace-pre-wrap">{template.footerNotes}</div>
+            )}
+            {template.showQr && portalQrDataUrl && portalUrl && (
               <>
                 <div className="receipt-divider border-t border-dashed border-slate-500 mb-2" />
-                <div className="text-center text-[9px] font-black">امسح الرمز لمتابعة حسابك</div>
+                <div className="text-center text-[9px] font-black">{template.qrCaption}</div>
                 <img src={portalQrDataUrl} alt="QR حساب المشترك" className="receipt-qr w-28 h-28 object-contain mx-auto my-2" />
               </>
             )}
-            <div className="receipt-divider border-t border-dashed border-slate-500 mb-2" />
-            <div className="text-center text-[8px] font-black text-black mt-1">نظام إدارة المولدات والجباية</div>
+            {template.showFooterSystemText && clean(template.footerSystemText) && (
+              <>
+                <div className="receipt-divider border-t border-dashed border-slate-500 mb-2" />
+                <div className="text-center text-[8px] font-black text-black mt-1">{template.footerSystemText}</div>
+              </>
+            )}
           </div>
         </div>
 
