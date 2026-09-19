@@ -47,7 +47,7 @@ import {
 } from '../types';
 import { formatCurrency, formatNumberArabic } from '../utils/formatters';
 import { syncCloudCollectorRoster } from '../lib/collectorCloud';
-import { normalizeInvoiceTemplate, receiptVisibilityFields, receiptLabelFields } from '../lib/invoiceTemplate';
+import { normalizeInvoiceTemplate, receiptVisibilityFields, receiptLabelFields, ReceiptVisibilityKey, ReceiptTextKey } from '../lib/invoiceTemplate';
 
 interface FolderDetailModalProps {
   isOpen: boolean;
@@ -286,6 +286,14 @@ export const FolderDetailModal: React.FC<FolderDetailModalProps> = ({
   const handleGenerateNewPin = (collectorId: string) => {
     const newPin = Math.floor(1000 + Math.random() * 9000).toString();
     handleUpdateCollector(collectorId, { passcode: newPin });
+  };
+
+  const updateReceiptVisibility = (key: ReceiptVisibilityKey, value: boolean) => {
+    setCurrentTemplate(prev => ({ ...prev, [key]: value } as InvoiceTemplateSettings));
+  };
+
+  const updateReceiptText = (key: ReceiptTextKey, value: string) => {
+    setCurrentTemplate(prev => ({ ...prev, [key]: value } as InvoiceTemplateSettings));
   };
 
   // --- File Import Handler ---
@@ -1099,7 +1107,7 @@ export const FolderDetailModal: React.FC<FolderDetailModalProps> = ({
                         <input
                           type="checkbox"
                           checked={checked}
-                          onChange={e => setCurrentTemplate({ ...currentTemplate, [item.key]: e.target.checked })}
+                          onChange={e => updateReceiptVisibility(item.key, e.target.checked)}
                           className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
                         />
                       </label>
@@ -1120,7 +1128,7 @@ export const FolderDetailModal: React.FC<FolderDetailModalProps> = ({
                       <input
                         type="text"
                         value={String(currentTemplate[item.key] ?? '')}
-                        onChange={e => setCurrentTemplate({ ...currentTemplate, [item.key]: e.target.value })}
+                        onChange={e => updateReceiptText(item.key, e.target.value)}
                         className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
