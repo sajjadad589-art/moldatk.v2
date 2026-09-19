@@ -221,8 +221,55 @@ export interface InvoiceTemplateSettings {
   ownerPhone: string;
   locationAddress: string;
   footerNotes: string;
+  paperSize: 'thermal' | 'thermal_58' | 'thermal_80' | 'a5' | 'a4';
+
+  // Receipt visibility. These switches are authoritative for preview, browser print and SUNMI print.
   showLogo: boolean;
-  paperSize: 'thermal' | 'a5' | 'a4';
+  showSystemBrand: boolean;
+  showGeneratorName: boolean;
+  showSubTitle: boolean;
+  showDate: boolean;
+  showReceiptNumber: boolean;
+  showSubscriberName: boolean;
+  showPhone: boolean;
+  showLineName: boolean;
+  showAmperes: boolean;
+  showPricePerAmp: boolean;
+  showPaymentMonth: boolean;
+  showPaymentStatus: boolean;
+  showCollectorName: boolean;
+  showPreviousDebt: boolean;
+  showCurrentCharge: boolean;
+  showTotalBeforePayment: boolean;
+  showAppliedToCurrentMonth: boolean;
+  showRemainingAfterPayment: boolean;
+  showReceivedAmount: boolean;
+  showThankYou: boolean;
+  showQr: boolean;
+  showFooterNotes: boolean;
+  showFooterSystemText: boolean;
+
+  // Customizable labels/text rendered on the receipt.
+  systemBrandText: string;
+  dateLabel: string;
+  receiptNumberLabel: string;
+  subscriberNameLabel: string;
+  phoneLabel: string;
+  lineNameLabel: string;
+  amperesLabel: string;
+  pricePerAmpLabel: string;
+  paymentMonthLabel: string;
+  paymentStatusLabel: string;
+  collectorNameLabel: string;
+  previousDebtLabel: string;
+  currentChargeLabel: string;
+  totalBeforePaymentLabel: string;
+  appliedToCurrentMonthLabel: string;
+  remainingAfterPaymentLabel: string;
+  receivedAmountLabel: string;
+  thankYouText: string;
+  qrCaption: string;
+  footerSystemText: string;
 }
 
 export interface SettingsFolderItem {
