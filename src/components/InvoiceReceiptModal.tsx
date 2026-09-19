@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { X, Printer, Share2 } from 'lucide-react';
-import { Subscriber, GeneratorSpecs, SubscriptionTierPricing, SubscriberInvoice } from '../types';
+import { Subscriber, GeneratorSpecs, SubscriptionTierPricing, SubscriberInvoice, InvoiceTemplateSettings } from '../types';
 import { formatCurrency, formatNumberArabic } from '../utils/formatters';
 import { isNativeAndroid, printSunmiReceipt } from '../utils/sunmiPrinter';
 import { ensureSubscriberPortalLink, recordSubscriberReceiptPayment } from '../lib/subscriberPortal';
+import { normalizeInvoiceTemplate } from '../lib/invoiceTemplate';
 
 interface InvoiceReceiptModalProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface InvoiceReceiptModalProps {
   generatorSpecs: GeneratorSpecs;
   generatorId?: string | null;
   pricingTiers: SubscriptionTierPricing[];
+  invoiceTemplate: InvoiceTemplateSettings;
   onMarkAsPaid: (subId: string) => void;
   autoPrint?: boolean;
   invoice?: SubscriberInvoice | null;
@@ -26,6 +28,7 @@ export const InvoiceReceiptModal: React.FC<InvoiceReceiptModalProps> = ({
   generatorSpecs,
   generatorId,
   pricingTiers,
+  invoiceTemplate,
   autoPrint = false,
   invoice = null,
 }) => {
@@ -34,6 +37,7 @@ export const InvoiceReceiptModal: React.FC<InvoiceReceiptModalProps> = ({
   const [printAnimationKey, setPrintAnimationKey] = useState(0);
   const [portalUrl, setPortalUrl] = useState('');
   const [portalQrDataUrl, setPortalQrDataUrl] = useState('');
+  const template = normalizeInvoiceTemplate(invoiceTemplate);
 
   const currentTierType = invoice ? invoice.tier : subscriber?.tier;
   const currentTier = pricingTiers.find(p => p.type === currentTierType || p.id === currentTierType);
@@ -57,7 +61,7 @@ export const InvoiceReceiptModal: React.FC<InvoiceReceiptModalProps> = ({
   const appliedToPreviousDebt = Math.max(0, Number(invoice?.appliedToPreviousDebt || 0));
   const appliedToCurrentMonth = Math.max(0, Number(invoice?.appliedToCurrentMonth || 0));
   const totalOutstandingAfter = Math.max(0, Number(invoice?.totalOutstandingAfter ?? remainingAmount));
-  const generatorName = clean(generatorSpecs.generatorName) || 'المولدة';
+  const generatorName = clean(template.headerTitle) || clean(generatorSpecs.generatorName) || 'المولدة';
   const lineName = clean(subscriber?.lineName || subscriber?.line);
   const phone = clean(subscriber?.phone);
 
