@@ -47,6 +47,7 @@ import {
 } from '../types';
 import { formatCurrency, formatNumberArabic } from '../utils/formatters';
 import { syncCloudCollectorRoster } from '../lib/collectorCloud';
+import { normalizeInvoiceTemplate, receiptVisibilityFields, receiptLabelFields } from '../lib/invoiceTemplate';
 
 interface FolderDetailModalProps {
   isOpen: boolean;
@@ -90,7 +91,7 @@ export const FolderDetailModal: React.FC<FolderDetailModalProps> = ({
   const [specs, setSpecs] = useState<GeneratorSpecs>(generatorSpecs);
   const [currentLines, setCurrentLines] = useState<LineDistribution[]>(lines);
   const [currentCollectors, setCurrentCollectors] = useState<Collector[]>(collectors);
-  const [currentTemplate, setCurrentTemplate] = useState<InvoiceTemplateSettings>(invoiceTemplate);
+  const [currentTemplate, setCurrentTemplate] = useState<InvoiceTemplateSettings>(() => normalizeInvoiceTemplate(invoiceTemplate));
   const [saved, setSaved] = useState(false);
   const [resetConfirm, setResetConfirm] = useState(false);
   const [auditFilter, setAuditFilter] = useState<string>('all');
@@ -104,7 +105,7 @@ export const FolderDetailModal: React.FC<FolderDetailModalProps> = ({
       setSpecs(generatorSpecs);
       setCurrentLines(lines);
       setCurrentCollectors(collectors);
-      setCurrentTemplate(invoiceTemplate);
+      setCurrentTemplate(normalizeInvoiceTemplate(invoiceTemplate));
       setSaved(false);
       setResetConfirm(false);
       setAuditFilter('all');
@@ -1008,82 +1009,133 @@ export const FolderDetailModal: React.FC<FolderDetailModalProps> = ({
 
           {/* ================= 4. Invoices templates ================= */}
           {folderKey === 'invoices_templates' && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-5">
+              <div className="rounded-2xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/70 dark:bg-blue-950/20 p-4">
+                <div className="font-black text-slate-900 dark:text-white">إعدادات الوصل الفعلية</div>
+                <div className="text-[11px] text-slate-600 dark:text-slate-300 mt-1 leading-6">
+                  أي تغيير هنا يُطبّق على معاينة الوصل، طباعة المتصفح وطابعة SUNMI. نفس الإعدادات مستخدمة في الهاتف والحاسوب.
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">حجم ورق الطباعة</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      ['thermal_58', 'حراري 58 مم'],
+                      ['thermal_80', 'حراري 80 مم'],
+                      ['a5', 'A5'],
+                      ['a4', 'A4'],
+                    ].map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setCurrentTemplate({ ...currentTemplate, paperSize: value as InvoiceTemplateSettings['paperSize'] })}
+                        className={`p-2.5 rounded-xl border font-black transition-all ${
+                          (currentTemplate.paperSize === value || (currentTemplate.paperSize === 'thermal' && value === 'thermal_58'))
+                            ? 'bg-[#0B1F3B] text-white border-blue-500'
+                            : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    ترويسة الوصل الرسمية
-                  </label>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">اسم المولدة على الوصل</label>
                   <input
                     type="text"
                     value={currentTemplate.headerTitle}
-                    onChange={e =>
-                      setCurrentTemplate({ ...currentTemplate, headerTitle: e.target.value })
-                    }
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={e => setCurrentTemplate({ ...currentTemplate, headerTitle: e.target.value })}
+                    placeholder={generatorSpecs.generatorName}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    العنوان الفرعي للوصل
-                  </label>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">العنوان الفرعي</label>
                   <input
                     type="text"
                     value={currentTemplate.subTitle}
-                    onChange={e =>
-                      setCurrentTemplate({ ...currentTemplate, subTitle: e.target.value })
-                    }
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={e => setCurrentTemplate({ ...currentTemplate, subTitle: e.target.value })}
+                    placeholder="اختياري"
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    أرقام هواتف الإدارة المسجلة بالوصل
-                  </label>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">هاتف الإدارة</label>
                   <input
                     type="text"
                     value={currentTemplate.ownerPhone}
-                    onChange={e =>
-                      setCurrentTemplate({ ...currentTemplate, ownerPhone: e.target.value })
-                    }
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={e => setCurrentTemplate({ ...currentTemplate, ownerPhone: e.target.value })}
+                    placeholder="اختياري"
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    حجم ورق الطباعة الافتراضي
-                  </label>
-                  <select
-                    value={currentTemplate.paperSize}
-                    onChange={e =>
-                      setCurrentTemplate({
-                        ...currentTemplate,
-                        paperSize: e.target.value as any,
-                      })
-                    }
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-bold outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="thermal">طابعة حرارية سريعة (80mm Thermal POS)</option>
-                    <option value="a5">ورق نصف صفحة (A5 Receipt)</option>
-                    <option value="a4">ورق صفحة كاملة (A4 Full Page)</option>
-                  </select>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">عنوان المولدة</label>
+                  <input
+                    type="text"
+                    value={currentTemplate.locationAddress}
+                    onChange={e => setCurrentTemplate({ ...currentTemplate, locationAddress: e.target.value })}
+                    placeholder="اختياري"
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="font-black text-slate-900 dark:text-white">إظهار أو إخفاء حقول الوصل</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {receiptVisibilityFields.map(item => {
+                    const checked = Boolean(currentTemplate[item.key]);
+                    return (
+                      <label key={String(item.key)} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 cursor-pointer">
+                        <span className="font-bold text-slate-700 dark:text-slate-300">{item.label}</span>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={e => setCurrentTemplate({ ...currentTemplate, [item.key]: e.target.checked })}
+                          className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <div className="font-black text-slate-900 dark:text-white">تخصيص أسماء الحقول والنصوص</div>
+                  <div className="text-[11px] text-slate-500 mt-1">تقدر تغيّر اسم أي فقرة تظهر على الوصل بدون تغيير الحسابات.</div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {receiptLabelFields.map(item => (
+                    <div key={String(item.key)}>
+                      <label className="block font-bold text-slate-600 dark:text-slate-400 mb-1">{item.label}</label>
+                      <input
+                        type="text"
+                        value={String(currentTemplate[item.key] ?? '')}
+                        onChange={e => setCurrentTemplate({ ...currentTemplate, [item.key]: e.target.value })}
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  ))}
                 </div>
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  نص التذييل والشروط القانونية
-                </label>
+                <label className="block font-black text-slate-900 dark:text-white mb-1">ملاحظة مخصصة أسفل الوصل</label>
                 <textarea
-                  rows={3}
+                  rows={4}
                   value={currentTemplate.footerNotes}
-                  onChange={e =>
-                    setCurrentTemplate({ ...currentTemplate, footerNotes: e.target.value })
-                  }
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={e => setCurrentTemplate({ ...currentTemplate, footerNotes: e.target.value })}
+                  placeholder="مثال: يرجى الاحتفاظ بالوصل..."
+                  className="w-full px-3 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
