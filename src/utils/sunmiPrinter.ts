@@ -2,7 +2,10 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 
 export interface SunmiReceiptPayload {
   header: string;
+  systemTitle?: string;
+  subTitle?: string;
   location?: string;
+  ownerPhone?: string;
   receiptNumber: string;
   subscriberName: string;
   subscriberCode: string;
@@ -27,6 +30,57 @@ export interface SunmiReceiptPayload {
   printTime: string;
   portalUrl?: string;
   qrDataUrl?: string;
+
+  showLogo?: boolean;
+  showSystemBrand?: boolean;
+  showGeneratorName?: boolean;
+  showSubTitle?: boolean;
+  showDate?: boolean;
+  showReceiptNumber?: boolean;
+  showSubscriberName?: boolean;
+  showPhone?: boolean;
+  showOwnerPhone?: boolean;
+  showLocationAddress?: boolean;
+  showLineName?: boolean;
+  showAmperes?: boolean;
+  showPricePerAmp?: boolean;
+  showPaymentMonth?: boolean;
+  showPaymentStatus?: boolean;
+  showCollectorName?: boolean;
+  showPreviousDebt?: boolean;
+  showCurrentCharge?: boolean;
+  showTotalBeforePayment?: boolean;
+  showAppliedToPreviousDebt?: boolean;
+  showAppliedToCurrentMonth?: boolean;
+  showRemainingAfterPayment?: boolean;
+  showReceivedAmount?: boolean;
+  showThankYou?: boolean;
+  showQr?: boolean;
+  showFooterNotes?: boolean;
+  showFooterSystemText?: boolean;
+
+  dateLabel?: string;
+  receiptNumberLabel?: string;
+  subscriberNameLabel?: string;
+  phoneLabel?: string;
+  ownerPhoneLabel?: string;
+  locationAddressLabel?: string;
+  lineNameLabel?: string;
+  amperesLabel?: string;
+  pricePerAmpLabel?: string;
+  paymentMonthLabel?: string;
+  paymentStatusLabel?: string;
+  collectorNameLabel?: string;
+  previousDebtLabel?: string;
+  currentChargeLabel?: string;
+  totalBeforePaymentLabel?: string;
+  appliedToPreviousDebtLabel?: string;
+  appliedToCurrentMonthLabel?: string;
+  remainingAfterPaymentLabel?: string;
+  receivedAmountLabel?: string;
+  thankYouText?: string;
+  qrCaption?: string;
+  footerSystemText?: string;
 }
 
 interface SunmiPrinterPlugin {
