@@ -96,3 +96,58 @@ export async function ensureSubscriberPortalLink(
     cached: false,
   };
 }
+
+
+export interface SubscriberReceiptSnapshot {
+  monthId?: string;
+  monthNameAr?: string;
+  issueDate?: string;
+  paymentDate?: string;
+  amperes?: number;
+  totalAmount?: number;
+  paidAmount?: number;
+  remainingAmount?: number;
+  status?: string;
+  receiptNumber?: string;
+  collectorName?: string;
+  previousDebtBefore?: number;
+  currentCharge?: number;
+  totalBeforePayment?: number;
+  appliedToPreviousDebt?: number;
+  appliedToCurrentMonth?: number;
+  totalOutstandingAfter?: number;
+  paymentAllocations?: Array<{ monthId?: string; monthNameAr?: string; amount?: number }>;
+  notes?: string;
+}
+
+export async function recordSubscriberReceiptPayment(args: {
+  generatorId: string;
+  subscriberId: string;
+  receiptNumber: string;
+  amount: number;
+  receivedAt: string;
+  collectorName?: string;
+  snapshot: SubscriberReceiptSnapshot;
+}) {
+  const receiptNumber = String(args.receiptNumber || '').trim();
+  if (!args.generatorId || !args.subscriberId || !receiptNumber) return;
+
+  const row = {
+    generator_id: args.generatorId,
+    id: `receipt-${receiptNumber}`,
+    subscriber_id: args.subscriberId,
+    received_at: args.receivedAt || new Date().toISOString(),
+    amount: Math.max(0, Math.round(Number(args.amount) || 0)),
+    collector_name: String(args.collectorName || args.snapshot.collectorName || 'الإدارة العامة'),
+    receipt_number: receiptNumber,
+    notes: args.snapshot.notes || null,
+    receipt_snapshot: args.snapshot,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = await supabase
+    .from('generator_payments')
+    .upsert(row, { onConflict: 'generator_id,receipt_number' });
+
+  if (error) throw error;
+}
