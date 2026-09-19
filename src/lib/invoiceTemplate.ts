@@ -84,7 +84,10 @@ export function normalizeInvoiceTemplate(value?: Partial<InvoiceTemplateSettings
   };
 }
 
-export const receiptVisibilityFields: Array<{ key: keyof InvoiceTemplateSettings; label: string }> = [
+export type ReceiptVisibilityKey = Extract<keyof InvoiceTemplateSettings, `show${string}`>;
+export type ReceiptTextKey = Extract<keyof InvoiceTemplateSettings, `${string}Label`> | 'systemBrandText' | 'thankYouText' | 'qrCaption' | 'footerSystemText';
+
+export const receiptVisibilityFields: Array<{ key: ReceiptVisibilityKey; label: string }> = [
   { key: 'showLogo', label: 'شعار مولدتك' },
   { key: 'showSystemBrand', label: 'اسم النظام' },
   { key: 'showGeneratorName', label: 'اسم المولدة' },
@@ -114,7 +117,7 @@ export const receiptVisibilityFields: Array<{ key: keyof InvoiceTemplateSettings
   { key: 'showFooterSystemText', label: 'تذييل النظام' },
 ];
 
-export const receiptLabelFields: Array<{ key: keyof InvoiceTemplateSettings; label: string }> = [
+export const receiptLabelFields: Array<{ key: ReceiptTextKey; label: string }> = [
   { key: 'systemBrandText', label: 'اسم النظام' },
   { key: 'dateLabel', label: 'عنوان التاريخ' },
   { key: 'receiptNumberLabel', label: 'عنوان رقم الوصل' },
