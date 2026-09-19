@@ -60,6 +60,9 @@ jobs:
       - name: Typecheck launch build
         run: npm run lint
 
+      - name: Subscription access regression
+        run: npx tsx scripts/subscription-lock-regression.ts
+
       - name: Subscriber QR portal regression
         run: npm run test:portal
 
