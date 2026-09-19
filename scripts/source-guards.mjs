@@ -17,6 +17,7 @@ const collectorPos = source('src/components/POSQuickView.tsx');
 const mobileHeader = source('src/components/mobile/MobileHeader.tsx');
 const mobileBottomNav = source('src/components/MobileBottomNav.tsx');
 const css = source('src/index.css');
+const mobileSubscribers = source('src/components/mobile/MobileSubscribers.tsx');
 const count = (text, marker) => text.split(marker).length - 1;
 
 assert.match(app, /lazy\(\(\) => import\('\.\/components\/SuperAdminDashboard'\)/);
@@ -57,3 +58,9 @@ assert.match(css, /100dvh/);
 assert.match(collectorPos, /moldatk-safe-screen/);
 assert.match(mobileHeader, /moldatk-mobile-header-safe/);
 assert.match(mobileBottomNav, /moldatk-mobile-bottom-safe/);
+
+assert.match(mobileSubscribers, /MOBILE_PAYMENT_STATUS_CLASSIFICATION_V2/);
+assert.match(mobileSubscribers, /sub\.paymentStatus === 'paid'/);
+assert.match(mobileSubscribers, /sub\.paymentStatus === 'partial'/);
+assert.doesNotMatch(mobileSubscribers, /sub\.paymentStatus === 'paid' \|\| getRemainingAmount\(sub\) === 0/);
+assert.match(mobileSubscribers, /مسدد جزئي/);
