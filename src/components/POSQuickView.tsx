@@ -382,7 +382,7 @@ export const POSQuickView: React.FC<POSQuickViewProps> = ({
   const activeTierPrice = Math.max(0, Number(activeTier?.pricePerAmpere || 0));
 
   return (
-    <div className="min-h-screen bg-[#070d1e] text-white p-4 sm:p-6 font-['Cairo'] select-none flex justify-center" dir="rtl">
+    <div className="moldatk-safe-screen min-h-screen bg-[#070d1e] text-white p-4 sm:p-6 font-['Cairo'] select-none flex justify-center" dir="rtl">
       <div className={`w-full ${viewMode === 'mobile' ? 'max-w-md border-x border-blue-900/40 shadow-2xl px-3' : 'max-w-6xl'} space-y-6 pb-12 transition-all`}>
         
         {/* الشريط العلوي */}
