@@ -11,6 +11,7 @@ import {
   AuditLogEntry,
   SubscriberInvoice,
 } from '../types';
+import { DEFAULT_INVOICE_TEMPLATE } from '../lib/invoiceTemplate';
 
 export const INITIAL_PRICING_TIERS: SubscriptionTierPricing[] = [
   {
@@ -315,13 +316,13 @@ export const INITIAL_GENERATOR_SPECS: GeneratorSpecs = {
 };
 
 export const INITIAL_INVOICE_TEMPLATE: InvoiceTemplateSettings = {
-  headerTitle: 'منظومة مولدتك - وصل اشتراك شهري معتمد',
-  subTitle: 'إدارة وتوزيع الطاقة الكهربائية - المنصور',
-  ownerPhone: '07701234567 / 07801234567',
-  locationAddress: 'بغداد - المنصور / حي دراغ - محطة التوليد 1',
-  footerNotes: 'يرجى تسديد مبلغ الاشتراك خلال أول 7 أيام من بداية كل شهر لضمان استمرار التغذية الكهربائية.',
-  showLogo: true,
-  paperSize: 'thermal',
+  ...DEFAULT_INVOICE_TEMPLATE,
+  headerTitle: 'اسم المولدة',
+  subTitle: '',
+  ownerPhone: '',
+  locationAddress: '',
+  footerNotes: '',
+  paperSize: 'thermal_58',
 };
 
 
