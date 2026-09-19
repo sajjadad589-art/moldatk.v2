@@ -17,6 +17,8 @@ jobs:
           node-version: 22
       - run: npm install --no-audit --no-fund
       - run: npm run lint
+      - name: Subscriber QR portal regression
+        run: npm run test:portal
       - run: node scripts/sync-conflict-resolution-regression.mjs
       - run: npm run test:sync-cashbox
       - run: node scripts/live-sync-receipt-cashbox-parity-regression.mjs
