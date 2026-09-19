@@ -232,6 +232,8 @@ export interface InvoiceTemplateSettings {
   showReceiptNumber: boolean;
   showSubscriberName: boolean;
   showPhone: boolean;
+  showOwnerPhone: boolean;
+  showLocationAddress: boolean;
   showLineName: boolean;
   showAmperes: boolean;
   showPricePerAmp: boolean;
@@ -241,6 +243,7 @@ export interface InvoiceTemplateSettings {
   showPreviousDebt: boolean;
   showCurrentCharge: boolean;
   showTotalBeforePayment: boolean;
+  showAppliedToPreviousDebt: boolean;
   showAppliedToCurrentMonth: boolean;
   showRemainingAfterPayment: boolean;
   showReceivedAmount: boolean;
@@ -255,6 +258,8 @@ export interface InvoiceTemplateSettings {
   receiptNumberLabel: string;
   subscriberNameLabel: string;
   phoneLabel: string;
+  ownerPhoneLabel: string;
+  locationAddressLabel: string;
   lineNameLabel: string;
   amperesLabel: string;
   pricePerAmpLabel: string;
@@ -264,6 +269,7 @@ export interface InvoiceTemplateSettings {
   previousDebtLabel: string;
   currentChargeLabel: string;
   totalBeforePaymentLabel: string;
+  appliedToPreviousDebtLabel: string;
   appliedToCurrentMonthLabel: string;
   remainingAfterPaymentLabel: string;
   receivedAmountLabel: string;
