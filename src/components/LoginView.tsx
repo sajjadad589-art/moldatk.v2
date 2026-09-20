@@ -54,6 +54,15 @@ const cleanError = (error: unknown) => {
 const roleLabel = (role?: LoginAccountRole) => role === 'collector' ? 'جابي' : 'صاحب المولدة';
 
 export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, forceSuperAdmin = false }) => {
+  // SUPER_ADMIN_ROUTE_FAILSAFE_V1
+  // Route detection is repeated here as a fail-safe so the dedicated admin portal
+  // can never fall through to normal account discovery if a parent forgets the prop.
+  const isSuperAdminPortal = forceSuperAdmin
+    || (typeof window !== 'undefined' && (
+      window.location.pathname === '/super-admin'
+      || window.location.hash.includes('super-admin')
+    ));
+
   const [savedAccounts, setSavedAccounts] = useState<SavedLoginAccount[]>(() => loadSavedLoginAccounts());
   const [step, setStep] = useState<AddStep>('accounts');
   const [identifier, setIdentifier] = useState('');
@@ -246,7 +255,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, forceSuper
     [savedAccounts],
   );
 
-  if (forceSuperAdmin) {
+  if (isSuperAdminPortal) {
     return (
       <div className="moldatk-safe-screen min-h-screen bg-[#050b16] text-white flex items-center justify-center font-['Cairo',sans-serif]" dir="rtl">
         <div className="w-full max-w-md rounded-[32px] border border-blue-900/60 bg-[#0a1629] p-6 sm:p-8 shadow-2xl">
