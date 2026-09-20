@@ -21,6 +21,10 @@ const mobileSubscribers = source('src/components/mobile/MobileSubscribers.tsx');
 const folderDetail = source('src/components/FolderDetailModal.tsx');
 const settingsFolder = source('src/components/SettingsFolderView.tsx');
 const invoiceTemplateLib = source('src/lib/invoiceTemplate.ts');
+const login = source('src/components/LoginView.tsx');
+const authAccounts = source('src/lib/authAccounts.ts');
+const authEdge = source('supabase/functions/moldatk-auth/index.ts');
+const authMigration = source('supabase/migrations/20260920090000_saved_account_passkeys.sql');
 const count = (text, marker) => text.split(marker).length - 1;
 
 assert.match(app, /lazy\(\(\) => import\('\.\/components\/SuperAdminDashboard'\)/);
@@ -87,3 +91,17 @@ assert.match(sunmiPrinter, /MOLDATK_NATIVE_SUBSCRIBER_QR_V2/);
 assert.match(sunmiPrinter, /showReceiptNumber/);
 assert.match(sunmiPrinter, /showFooterNotes/);
 assert.doesNotMatch(receipt, /receipt-portal-url/);
+
+
+assert.match(login, /إضافة حساب آخر/);
+assert.match(login, /loginWithPasskey/);
+assert.match(login, /registerPasskeyForCurrentAccount/);
+assert.match(login, /\/brand\/moldatk-mark\.svg/);
+assert.match(authAccounts, /moldatk_saved_login_accounts_v2/);
+assert.match(authAccounts, /navigator\.credentials\.create/);
+assert.match(authAccounts, /navigator\.credentials\.get/);
+assert.match(app, /QUICK_LOGIN_LOCK_V2/);
+assert.match(app, /moldatk_session_unlocked_v2/);
+assert.match(authEdge, /passkey-auth-verify/);
+assert.match(authEdge, /password-login/);
+assert.match(authMigration, /moldatk_passkeys/);
