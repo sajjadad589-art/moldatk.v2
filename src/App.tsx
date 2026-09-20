@@ -136,6 +136,7 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
           ...stored,
           generatorName: account?.generatorName || stored.generatorName || INITIAL_GENERATOR_SPECS.generatorName,
           ownerName: account?.ownerName || stored.ownerName || INITIAL_GENERATOR_SPECS.ownerName,
+          location: account?.location || stored.location || INITIAL_GENERATOR_SPECS.location,
         };
       } catch (e) {
         return stored;
@@ -153,7 +154,10 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
       const record = {
         generatorId: session.generatorId,
         generatorName: specs?.generatorName || generatorSpecs?.generatorName || 'مولدتك',
-        ownerName: specs?.ownerName || generatorSpecs?.ownerName || 'صاحب المولدة',
+        ownerName: specs?.ownerName || session.ownerName || generatorSpecs?.ownerName || 'صاحب المولدة',
+        location: specs?.location || session.generatorLocation || generatorSpecs?.location || '',
+        role: session.role,
+        collectorName: session.collectorName || null,
         updatedAt: new Date().toISOString(),
       };
       const next = [record, ...safeList.filter((x: any) => x?.generatorId !== session.generatorId)];
@@ -741,6 +745,13 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
     setSubscriptionInfo(null);
     setSubscriptionUnavailable(false);
     setSubscriptionLoading(accessControlled);
+    if (accessControlled && session.generatorId) {
+      rememberGeneratorAccount(session, {
+        generatorName: session.generatorName,
+        ownerName: session.ownerName,
+        location: session.generatorLocation,
+      });
+    }
     setUserSession(session);
     try {
       localStorage.setItem('moldatk_session', JSON.stringify(session));
@@ -1156,11 +1167,11 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
   };
 
   if (!userSession) {
-    return <LoginView collectors={forceSuperAdmin ? [] : loadCollectorLoginIndex()} onLoginSuccess={handleLoginSuccess} />;
+    return <LoginView collectors={forceSuperAdmin ? [] : loadCollectorLoginIndex()} forceSuperAdmin={forceSuperAdmin} onLoginSuccess={handleLoginSuccess} />;
   }
 
   if (forceSuperAdmin && userSession.role !== 'super_admin' && userSession.role !== 'super_admin_manager') {
-    return <LoginView collectors={[]} onLoginSuccess={handleLoginSuccess} />;
+    return <LoginView collectors={[]} forceSuperAdmin onLoginSuccess={handleLoginSuccess} />;
   }
 
   if (userSession.role === 'super_admin' || userSession.role === 'super_admin_manager') {
