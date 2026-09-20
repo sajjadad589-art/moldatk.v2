@@ -65,7 +65,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 // تفعيل نسخة الويب المصغرة على iPhone/Android. لا نعتمد عليها داخل Capacitor للطباعة أو الميزات الأصلية.
 if ('serviceWorker' in navigator && !window.location.protocol.startsWith('file')) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js?v=1.3.28', { updateViaCache: 'none' }).then(registration => {
+    navigator.serviceWorker.register('/sw.js?v=1.3.29', { updateViaCache: 'none' }).then(registration => {
       const UPDATE_INTERVAL_MS = 6 * 60 * 60 * 1000;
       let lastUpdateCheck = 0;
       const checkForUpdate = () => {

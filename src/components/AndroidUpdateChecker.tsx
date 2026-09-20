@@ -20,6 +20,7 @@ type AppUpdaterPlugin = {
 
 const AppUpdater = registerPlugin<AppUpdaterPlugin>('AppUpdater');
 const AUTO_UPDATE_KEY_PREFIX = 'moldatk_auto_update_started_';
+const REMOTE_MANIFEST_URL = 'https://raw.githubusercontent.com/sajjadad589-art/moldatk.v2/main/public/app-version.json';
 const AUTO_UPDATE_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 
 export const AndroidUpdateChecker: React.FC = () => {
@@ -85,6 +86,18 @@ export const AndroidUpdateChecker: React.FC = () => {
             notes: release.release_notes,
           };
           if (Number.isFinite(Number(fromDb.versionCode)) && Number(fromDb.versionCode) > 0) candidates.push(fromDb);
+        }
+      } catch {}
+
+      // Remote release manifest keeps installed APKs aware of new builds.
+      try {
+        const response = await fetch(REMOTE_MANIFEST_URL + '?ts=' + Date.now(), {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' },
+        });
+        if (response.ok) {
+          const remoteManifest = await response.json() as VersionManifest;
+          if (remoteManifest?.enabled && Number.isFinite(Number(remoteManifest.versionCode)) && Number(remoteManifest.versionCode) > 0) candidates.push(remoteManifest);
         }
       } catch {}
 
