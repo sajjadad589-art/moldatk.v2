@@ -1,4 +1,4 @@
-const CACHE_NAME = 'moldatk-shell-v4-1.3.29';
+const CACHE_NAME = 'moldatk-shell-v4-1.3.30';
 const APP_SHELL = ['/', '/manifest.webmanifest'];
 
 self.addEventListener('install', event => {
