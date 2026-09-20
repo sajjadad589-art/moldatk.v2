@@ -5,6 +5,14 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/super-admin",
+      "destination": "/"
+    },
+    {
+      "source": "/super-admin/:path*",
+      "destination": "/"
+    },
+    {
       "source": "/s/:path*",
       "destination": "/"
     },
