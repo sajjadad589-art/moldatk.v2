@@ -40,8 +40,11 @@ function RootRouter() {
     return <CustomerOrderAssistant />;
   }
 
-  // بوابة Super Admin منفصلة عن جلسة الأدمن المحلية القديمة.
-  if (window.location.pathname === '/super-admin' || route.includes('#super-admin')) {
+  // SUPER_ADMIN_ROUTE_V2
+  // Accept direct, trailing-slash and nested admin URLs. Vercel rewrites these paths
+  // back to the SPA entry point, while App still enforces the super-admin role.
+  const normalizedPath = window.location.pathname.replace(/\/+$/, '') || '/';
+  if (normalizedPath === '/super-admin' || normalizedPath.startsWith('/super-admin/') || route.includes('#super-admin')) {
     return <App forceSuperAdmin />;
   }
 
