@@ -34,8 +34,8 @@ jobs:
       VITE_SUPABASE_URL: https://adluynhkikoodjljoxeu.supabase.co
       VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CObjK2Uua18kVkXCkxdRog_keQLIDiE
       VITE_ENABLE_NATIVE_PUSH: 'true'
-      CURRENT_VERSION: 1.3.29
-      CURRENT_VERSION_CODE: 33
+      CURRENT_VERSION: 1.3.30
+      CURRENT_VERSION_CODE: 34
       SHOULD_RELEASE: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release')) }}
 
     steps:
@@ -77,7 +77,7 @@ jobs:
           grep -q 'moldatk-mark.svg' src/LandingPage.tsx
           grep -q 'MOLDATK_CALM_BRAND_V2' src/index.css
           grep -q 'MOLDATK_INTERNAL_CALM_THEME_V3' src/index.css
-          grep -q 'moldatk-shell-v4-1.3.29' public/sw.js
+          grep -q 'moldatk-shell-v4-1.3.30' public/sw.js
           grep -q 'moldatk-apple-touch-v6.png' index.html
           grep -q 'moldatk-icon-192-v6.png' public/manifest.webmanifest
 
@@ -137,8 +137,8 @@ jobs:
           test -f android/app/google-services.json
           grep -q 'com.mwaldatk.app' android/app/google-services.json
           grep -q 'POST_NOTIFICATIONS' android/app/src/main/AndroidManifest.xml
-          grep -q 'versionCode 33' android/app/build.gradle
-          grep -q 'versionName "1.3.29"' android/app/build.gradle
+          grep -q 'versionCode 34' android/app/build.gradle
+          grep -q 'versionName "1.3.30"' android/app/build.gradle
 
       - name: Build debug APK
         run: |
@@ -235,7 +235,7 @@ jobs:
             minimumVersionCode: versionCode,
             force: true,
             apkUrl: `https://github.com/sajjadad589-art/moldatk.v2/releases/download/v${version}/Moldatk-Android-Release.apk`,
-            notes: 'تحديث إلزامي 1.3.29: يتضمن جميع آخر تحديثات التطبيق، واجهة تسجيل الدخول الجديدة، الحسابات المحفوظة والبصمة، وتحسينات الطباعة والمزامنة.'
+            notes: `تحديث إلزامي ${version}: آخر واجهات التطبيق وإصلاحات المزامنة وتحديثات SUNMI.`
           };
           fs.writeFileSync('public/app-version.json', JSON.stringify(manifest, null, 2) + '\n');
           NODE
