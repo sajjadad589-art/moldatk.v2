@@ -90,10 +90,14 @@ interface AppProps {
 export default function App({ forceSuperAdmin = false }: AppProps) {
   const [userSession, setUserSession] = useState<ActiveUserSession | null>(() => {
     try {
+      // QUICK_LOGIN_LOCK_V2
+      // A remembered account is not considered unlocked on a fresh app/browser session.
+      // This keeps the account cards + Face ID/passkey gate meaningful while preserving
+      // normal in-tab refreshes after a successful unlock.
+      if (sessionStorage.getItem('moldatk_session_unlocked_v2') !== '1') return null;
       const saved = localStorage.getItem('moldatk_session');
       if (!saved) return null;
       const parsed = JSON.parse(saved) as ActiveUserSession;
-      // المسار /super-admin لا يسمح بإعادة استخدام جلسة الأدمن القديمة المحلية.
       if (forceSuperAdmin && parsed.role !== 'super_admin' && parsed.role !== 'super_admin_manager') return null;
       return parsed;
     } catch (e) {
@@ -627,7 +631,10 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
     const handleAuthExpired = () => {
       setUserSession(null);
       setSubscriptionInfo(null);
-      try { localStorage.removeItem('moldatk_session'); } catch {}
+      try {
+        localStorage.removeItem('moldatk_session');
+        sessionStorage.removeItem('moldatk_session_unlocked_v2');
+      } catch {}
       void supabase.auth.signOut({ scope: 'local' }).catch(() => {});
       showToast('انتهت جلسة الدخول، سجل الدخول مرة أخرى');
     };
@@ -755,6 +762,7 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
     setUserSession(session);
     try {
       localStorage.setItem('moldatk_session', JSON.stringify(session));
+      sessionStorage.setItem('moldatk_session_unlocked_v2', '1');
     } catch (e) {}
     showToast('مرحباً بك! تم تسجيل الدخول بنجاح');
   };
@@ -766,6 +774,7 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
     setUserSession(null);
     try {
       localStorage.removeItem('moldatk_session');
+      sessionStorage.removeItem('moldatk_session_unlocked_v2');
     } catch (e) {}
     void supabase.auth.signOut();
     showToast('تم تسجيل الخروج بنجاح');
