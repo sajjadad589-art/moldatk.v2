@@ -58,10 +58,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, forceSuper
   // Route detection is repeated here as a fail-safe so the dedicated admin portal
   // can never fall through to normal account discovery if a parent forgets the prop.
   const isSuperAdminPortal = forceSuperAdmin
-    || (typeof window !== 'undefined' && (
-      window.location.pathname === '/super-admin'
-      || window.location.hash.includes('super-admin')
-    ));
+    || (typeof window !== 'undefined' && (() => {
+      const normalizedPath = window.location.pathname.replace(/\/+$/, '') || '/';
+      return normalizedPath === '/super-admin'
+        || normalizedPath.startsWith('/super-admin/')
+        || window.location.hash.includes('super-admin');
+    })());
 
   const [savedAccounts, setSavedAccounts] = useState<SavedLoginAccount[]>(() => loadSavedLoginAccounts());
   const [step, setStep] = useState<AddStep>('accounts');
