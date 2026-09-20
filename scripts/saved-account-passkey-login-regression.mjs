@@ -20,7 +20,8 @@ assert.match(login, /تابع لـ/);
 assert.match(login, /\/brand\/moldatk-mark\.svg/);
 assert.match(login, /forceSuperAdmin/);
 assert.match(login, /SUPER_ADMIN_ROUTE_FAILSAFE_V1/);
-assert.match(login, /window\.location\.pathname === '\/super-admin'/);
+assert.match(login, /normalizedPath === '\/super-admin'/);
+assert.match(login, /normalizedPath\.startsWith\('\/super-admin\/'\)/);
 assert.match(login, /if \(isSuperAdminPortal\)/);
 assert.doesNotMatch(login, /صاحب المولد<\/span>.*جابي \/ كادر/s);
 
