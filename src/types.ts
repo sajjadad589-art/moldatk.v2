@@ -179,6 +179,7 @@ export type UserRole = 'super_admin' | 'super_admin_manager' | 'generator_admin'
 
 export interface ActiveUserSession {
   role: UserRole;
+  authUserId?: string;
   collectorId?: string;
   collectorName?: string;
   collectorPermissions?: CollectorPermissions;
@@ -190,6 +191,9 @@ export interface ActiveUserSession {
   loginTime?: string;
   email?: string;
   generatorId?: string | null;
+  generatorName?: string;
+  ownerName?: string;
+  generatorLocation?: string;
 }
 
 export interface GeneratorSpecs {
