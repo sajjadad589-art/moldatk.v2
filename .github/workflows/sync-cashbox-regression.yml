@@ -20,6 +20,9 @@ jobs:
       - name: Subscription access regression
         run: npx tsx scripts/subscription-lock-regression.ts
 
+      - name: Saved account biometric login regression
+        run: node scripts/saved-account-passkey-login-regression.mjs
+
       - name: Subscriber QR portal regression
         run: npm run test:portal
       - run: node scripts/sync-conflict-resolution-regression.mjs
