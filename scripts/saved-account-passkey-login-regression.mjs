@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 const read = (path) => readFileSync(path, 'utf8');
 
 const login = read('src/components/LoginView.tsx');
+const router = read('src/main.tsx');
+const vercel = read('vercel.json');
 const auth = read('src/lib/authAccounts.ts');
 const app = read('src/App.tsx');
 const types = read('src/types.ts');
@@ -51,3 +53,8 @@ assert.match(migration, /enable row level security/);
 assert.match(migration, /revoke all on table public\.moldatk_passkeys from anon, authenticated/);
 
 console.log('Saved account + passkey login regression: OK');
+
+assert.match(router, /SUPER_ADMIN_ROUTE_V2/);
+assert.match(router, /normalizedPath === '\/super-admin'/);
+assert.match(vercel, /\"source\": \"\/super-admin\"/);
+assert.match(vercel, /\"source\": \"\/super-admin\/:path\*\"/);
