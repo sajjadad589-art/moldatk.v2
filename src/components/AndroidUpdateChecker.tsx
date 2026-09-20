@@ -21,7 +21,9 @@ type AppUpdaterPlugin = {
 const AppUpdater = registerPlugin<AppUpdaterPlugin>('AppUpdater');
 const AUTO_UPDATE_KEY_PREFIX = 'moldatk_auto_update_started_';
 const REMOTE_MANIFEST_URL = 'https://raw.githubusercontent.com/sajjadad589-art/moldatk.v2/main/public/app-version.json';
-const AUTO_UPDATE_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+const WEB_MANIFEST_URL = 'https://moldatk-v2-beta.vercel.app/app-version.json';
+const UPDATE_CHECK_INTERVAL_MS = 60 * 1000;
+const AUTO_UPDATE_COOLDOWN_MS = 2 * 60 * 1000;
 
 export const AndroidUpdateChecker: React.FC = () => {
   const [manifest, setManifest] = useState<VersionManifest | null>(null);
@@ -89,28 +91,27 @@ export const AndroidUpdateChecker: React.FC = () => {
         }
       } catch {}
 
-      // Remote release manifest keeps installed APKs aware of new builds.
-      try {
-        const response = await fetch(REMOTE_MANIFEST_URL + '?ts=' + Date.now(), {
-          cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache' },
-        });
-        if (response.ok) {
-          const remoteManifest = await response.json() as VersionManifest;
-          if (remoteManifest?.enabled && Number.isFinite(Number(remoteManifest.versionCode)) && Number(remoteManifest.versionCode) > 0) candidates.push(remoteManifest);
-        }
-      } catch {}
-
-      try {
-        const response = await fetch('/app-version.json?ts=' + Date.now(), {
-          cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache' },
-        });
-        if (response.ok) {
-          const staticManifest = await response.json() as VersionManifest;
-          if (staticManifest?.enabled && Number.isFinite(Number(staticManifest.versionCode)) && Number(staticManifest.versionCode) > 0) candidates.push(staticManifest);
-        }
-      } catch {}
+      // Use two independent internet manifests plus the bundled copy. Every request has a
+      // cache-buster so SUNMI/Android WebView/CDNs cannot keep an old release decision.
+      const manifestUrls = [REMOTE_MANIFEST_URL, WEB_MANIFEST_URL, '/app-version.json'];
+      for (const manifestUrl of manifestUrls) {
+        try {
+          const separator = manifestUrl.includes('?') ? '&' : '?';
+          const response = await fetch(manifestUrl + separator + 'ts=' + Date.now(), {
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache, no-store, max-age=0',
+              'Pragma': 'no-cache',
+              'Expires': '0',
+            },
+          });
+          if (!response.ok) continue;
+          const candidate = await response.json() as VersionManifest;
+          if (candidate?.enabled && Number.isFinite(Number(candidate.versionCode)) && Number(candidate.versionCode) > 0) {
+            candidates.push(candidate);
+          }
+        } catch {}
+      }
 
       if (!candidates.length) throw new Error('تعذر التحقق من آخر إصدار');
       const latestManifest = candidates.sort((a, b) => Number(b.versionCode) - Number(a.versionCode))[0];
@@ -120,6 +121,7 @@ export const AndroidUpdateChecker: React.FC = () => {
       setCurrentVersionCode(installedCode);
       setCurrentVersionName(version.versionName || '');
       setManifest(latestManifest);
+      if (Number(latestManifest.versionCode) > installedCode) setDismissed(false);
 
       if (!latestManifest.enabled || Number(latestManifest.versionCode) <= installedCode) {
         autoStartedRef.current = null;
@@ -136,18 +138,30 @@ export const AndroidUpdateChecker: React.FC = () => {
 
   useEffect(() => {
     if (!isAndroidNative) return;
-    void checkForUpdates();
 
     let resumeTimer = 0;
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') {
-        window.clearTimeout(resumeTimer);
-        resumeTimer = window.setTimeout(() => void checkForUpdates(), 1200);
-      }
+    const triggerFastCheck = () => {
+      window.clearTimeout(resumeTimer);
+      resumeTimer = window.setTimeout(() => void checkForUpdates(), 250);
     };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') triggerFastCheck();
+    };
+
+    void checkForUpdates();
+    const periodic = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void checkForUpdates();
+    }, UPDATE_CHECK_INTERVAL_MS);
+
     document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', triggerFastCheck);
+    window.addEventListener('online', triggerFastCheck);
+
     return () => {
+      window.clearInterval(periodic);
       document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', triggerFastCheck);
+      window.removeEventListener('online', triggerFastCheck);
       window.clearTimeout(resumeTimer);
     };
   }, [isAndroidNative]);
