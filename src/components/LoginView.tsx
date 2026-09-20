@@ -388,8 +388,15 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, forceSuper
               <div className="mt-4 text-center text-xs text-slate-500">أضف حسابك مرة واحدة، وبعدها يظهر هنا للدخول السريع.</div>
             )}
 
-            <div className="mt-auto pt-10 text-center text-[11px] text-slate-500">
+            <div className="mt-auto pt-10 text-center text-[11px] text-slate-500 space-y-3">
               <div>دخول آمن • لا يتم حفظ كلمة المرور أو رمز الحساب</div>
+              <div className="flex items-center justify-center gap-3 flex-wrap">
+                <a href="/privacy" className="hover:text-blue-300">الخصوصية</a>
+                <span>•</span>
+                <a href="/terms" className="hover:text-blue-300">الشروط</a>
+                <span>•</span>
+                <a href="/delete-account" className="hover:text-rose-300">حذف الحساب</a>
+              </div>
             </div>
           </>
         )}
