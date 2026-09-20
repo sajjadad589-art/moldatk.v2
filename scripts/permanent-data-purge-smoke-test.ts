@@ -26,6 +26,6 @@ assert(/versionCode\s+33\b/.test(gradle), 'versionCode 33 missing');
 assert(/versionName\s+"1\.3\.29"/.test(gradle), 'versionName 1.3.29 missing');
 assert.equal(versionManifest.versionCode, 33, 'update manifest versionCode mismatch');
 assert.equal(versionManifest.versionName, '1.3.29', 'update manifest versionName mismatch');
-assert.equal(versionManifest.minimumVersionCode, 32, 'mandatory update minimum version mismatch');
+assert.equal(versionManifest.minimumVersionCode, 33, 'mandatory update minimum version mismatch');
 
 console.log('Permanent data purge regression passed: factory reset, subscriber deletion and generator-account purge are cloud-authoritative, extended cleanup is wired, and release 1.3.29 is aligned.');
