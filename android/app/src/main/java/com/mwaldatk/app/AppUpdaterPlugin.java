@@ -74,6 +74,9 @@ public class AppUpdaterPlugin extends Plugin {
                 connection.setConnectTimeout(20000);
                 connection.setReadTimeout(60000);
                 connection.setInstanceFollowRedirects(true);
+                connection.setUseCaches(false);
+                connection.setRequestProperty("Cache-Control", "no-cache, no-store, max-age=0");
+                connection.setRequestProperty("Pragma", "no-cache");
                 connection.connect();
 
                 if (connection.getResponseCode() < 200 || connection.getResponseCode() >= 300) {
@@ -81,6 +84,9 @@ public class AppUpdaterPlugin extends Plugin {
                 }
 
                 File apkFile = new File(getContext().getCacheDir(), "moldatk-update.apk");
+                if (apkFile.exists() && !apkFile.delete()) {
+                    throw new IllegalStateException("تعذر استبدال ملف التحديث القديم");
+                }
                 try (InputStream in = connection.getInputStream();
                      FileOutputStream out = new FileOutputStream(apkFile)) {
                     byte[] buffer = new byte[8192];
