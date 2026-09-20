@@ -15,7 +15,7 @@ assert.match(login, /loginWithPasskey/);
 assert.match(login, /registerPasskeyForCurrentAccount/);
 assert.match(login, /إضافة حساب آخر/);
 assert.match(login, /تابع لـ/);
-assert.match(login, //brand/moldatk-mark\.svg/);
+assert.match(login, /\/brand\/moldatk-mark\.svg/);
 assert.match(login, /forceSuperAdmin/);
 assert.doesNotMatch(login, /صاحب المولد<\/span>.*جابي \/ كادر/s);
 
