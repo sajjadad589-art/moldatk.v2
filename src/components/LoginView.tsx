@@ -165,7 +165,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, forceSuper
       });
       refreshSaved();
 
-      if (!fromSavedCard && passkeyAvailable && !saved.passkeyEnabled) {
+      if (passkeyAvailable && !saved.passkeyEnabled) {
         setPendingAccount(saved);
         setPendingSession(result.session);
         setStep('biometric');
