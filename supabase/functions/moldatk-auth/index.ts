@@ -67,8 +67,28 @@ async function loadAccount(admin: any, userId: string) {
     .single();
 
   if (profileError || !profile || !profile.is_active) throw new Error("account_inactive");
+
+  const profileRole = String(profile.role);
+  if (profileRole === "super_admin" || profileRole === "super_admin_manager") {
+    return {
+      userId,
+      role: profileRole,
+      generatorId: "",
+      generatorName: "مولدتك",
+      ownerName: String(profile.full_name || "الإدارة"),
+      location: "",
+      collectorName: null,
+      collectorId: null,
+      collectorPermissions: null,
+      assignedLineId: null,
+      assignedLineName: null,
+      assignedLineIds: [],
+      assignedAllLines: false,
+    };
+  }
+
   if (!profile.generator_id) throw new Error("generator_not_linked");
-  if (!["generator_admin", "employee"].includes(String(profile.role))) throw new Error("use_super_admin_portal");
+  if (!["generator_admin", "employee"].includes(profileRole)) throw new Error("use_super_admin_portal");
 
   const { data: generator, error: generatorError } = await admin
     .from("generators")
@@ -118,8 +138,30 @@ async function phoneProfiles(admin: any, phone: string) {
   return (data || []).filter((row: any) => normalizePhone(row.phone) === phone);
 }
 
+async function findActiveSuperAdminByEmail(admin: any, identifier: string) {
+  const normalizedEmail = normalizeIdentifier(identifier);
+  const { data: profiles, error } = await admin
+    .from("profiles")
+    .select("id,role,is_active")
+    .eq("is_active", true)
+    .in("role", ["super_admin", "super_admin_manager"]);
+  if (error) throw error;
+
+  for (const profile of profiles || []) {
+    const { data: authUser, error: authError } = await admin.auth.admin.getUserById(profile.id);
+    if (authError || !authUser?.user) continue;
+    if (normalizeIdentifier(authUser.user.email) === normalizedEmail) return profile;
+  }
+  return null;
+}
+
 async function discoverRole(admin: any, identifier: string) {
   if (identifier.includes("@")) {
+    // Keep the existing unified login UI unchanged: this value is only a hint
+    // used to advance to the password step. The real role is loaded after auth.
+    const superAdmin = await findActiveSuperAdminByEmail(admin, identifier);
+    if (superAdmin) return "generator_admin";
+
     const { data: gen } = await admin.from("generators").select("id").ilike("email", identifier).limit(1).maybeSingle();
     if (!gen?.id) return null;
     const { data: profile } = await admin
