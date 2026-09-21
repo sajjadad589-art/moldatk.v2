@@ -1024,29 +1024,29 @@ export const SuperAdminDashboard: React.FC<Props> = ({ onLogout }) => {
   ] as const;
 
   return (
-    <div dir="rtl" className="min-h-screen bg-slate-100 text-slate-900 font-['Cairo',sans-serif] min-w-0 overflow-x-hidden">
-      <header className="bg-[#0b1530] text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-8 py-4 sm:py-3 shadow-lg">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-blue-700 flex items-center justify-center"><ShieldCheck className="w-6 h-6" /></div>
-          <div><h1 className="text-xl font-black">molidatk — Super Admin</h1><p className="text-xs text-slate-400">إدارة الحسابات، الإيرادات والإشعارات</p></div>
+    <div dir="rtl" className="moldatk-responsive-screen min-h-screen bg-slate-100 text-slate-900 font-['Cairo',sans-serif] min-w-0 overflow-x-hidden">
+      <header className="moldatk-superadmin-header bg-[#0b1530] text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-8 pb-4 sm:pb-3 shadow-lg min-w-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-blue-700 flex items-center justify-center shrink-0"><ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6" /></div>
+          <div className="min-w-0"><h1 className="text-base sm:text-xl leading-tight font-black break-words">molidatk — Super Admin</h1><p className="text-[11px] sm:text-xs text-slate-400 mt-1 leading-5">إدارة الحسابات، الإيرادات والإشعارات</p></div>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => void load()} className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20" title="تحديث"><RefreshCw className="w-4 h-4" /></button>
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto moldatk-mobile-actions">
+          <button onClick={() => void load()} className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 shrink-0" title="تحديث"><RefreshCw className="w-4 h-4" /></button>
           {isOwnerSuperAdmin && <button
             onClick={() => void resetAllDataForRelease()}
             disabled={resettingAllData}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-60 text-sm font-bold"
+            className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-60 text-xs sm:text-sm font-bold min-w-0"
             title="تصفير بيانات التجربة قبل الإطلاق"
           >
             <Trash2 className="w-4 h-4" />{resettingAllData ? 'جاري التصفير...' : 'تصفير بيانات التجربة'}
           </button>}
-          <button onClick={signOut} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm font-bold"><LogOut className="w-4 h-4" />تسجيل الخروج</button>
+          <button onClick={signOut} className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs sm:text-sm font-bold min-w-0"><LogOut className="w-4 h-4" />تسجيل الخروج</button>
         </div>
       </header>
 
-      <div className="flex flex-col lg:flex-row max-w-[1700px] mx-auto">
-        <aside className="w-full lg:w-64 p-3 sm:p-5 shrink-0">
-          <div className="bg-white border border-slate-200 rounded-2xl p-2 shadow-sm lg:sticky lg:top-5 flex lg:block gap-1 overflow-x-auto">
+      <div className="flex flex-col lg:flex-row w-full max-w-[1700px] mx-auto min-w-0">
+        <aside className="w-full lg:w-64 p-3 sm:p-5 shrink-0 min-w-0">
+          <div className="moldatk-responsive-scroll bg-white border border-slate-200 rounded-2xl p-2 shadow-sm lg:sticky lg:top-5 flex lg:block gap-1 overflow-x-auto max-w-full">
             {nav.map(([key, label, Icon]) => (
               <button key={key} onClick={() => setTab(key)} className={`w-auto lg:w-full shrink-0 flex items-center gap-2 lg:gap-3 px-3 lg:px-4 py-3 rounded-xl text-sm font-black lg:mb-1 whitespace-nowrap ${tab === key ? 'bg-[#0B1F3B] text-white' : 'hover:bg-slate-100 text-slate-600'}`}>
                 <Icon className="w-5 h-5" />{label}
@@ -1055,7 +1055,7 @@ export const SuperAdminDashboard: React.FC<Props> = ({ onLogout }) => {
           </div>
         </aside>
 
-        <main className="p-3 sm:p-5 lg:pl-8 flex-1 min-w-0 overflow-x-hidden">
+        <main className="p-3 sm:p-5 lg:pl-8 flex-1 w-full max-w-full min-w-0 overflow-x-hidden">
           {message && <div className="mb-4 bg-blue-50 border border-blue-200 text-blue-800 rounded-xl px-4 py-3 font-bold text-sm">{message}</div>}
           {error && <div className="mb-4 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 font-bold text-sm">{error}</div>}
 
@@ -1089,15 +1089,15 @@ export const SuperAdminDashboard: React.FC<Props> = ({ onLogout }) => {
                 ['إيراد هذا الشهر', iqd(stats.monthRevenue), WalletCards],
               ].map(([label, value, Icon]: any) => (
                 <div key={label} className="min-h-[116px] bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between overflow-hidden last:col-span-2 sm:last:col-span-1">
-                  <div className="min-w-0"><p className="text-xs sm:text-sm leading-5 text-slate-500 font-black">{label}</p><p className="text-xl sm:text-2xl leading-none font-black mt-3 whitespace-nowrap">{value}</p></div>
+                  <div className="min-w-0"><p className="text-xs sm:text-sm leading-5 text-slate-500 font-black">{label}</p><p className="text-lg sm:text-2xl leading-tight font-black mt-3 break-words tabular-nums">{value}</p></div>
                   <div className="w-9 h-9 mt-3 rounded-xl bg-blue-50 flex items-center justify-center self-end shrink-0"><Icon className="w-5 h-5 text-blue-700" /></div>
                 </div>
               ))}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-5">
-              <div className="min-h-[108px] bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-center"><p className="text-slate-500 font-bold">إجمالي المستحصل</p><p className="text-2xl sm:text-3xl font-black mt-3 whitespace-nowrap">{iqd(stats.allRevenue)}</p></div>
-              <div className="min-h-[108px] bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-center"><p className="text-slate-500 font-bold">إيراد السنة</p><p className="text-2xl sm:text-3xl font-black mt-3 whitespace-nowrap">{iqd(stats.yearRevenue)}</p></div>
-              <div className="min-h-[108px] bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-center"><p className="text-slate-500 font-bold">إشعارات منشورة</p><p className="text-2xl sm:text-3xl font-black mt-3 whitespace-nowrap">{notifications.length}</p></div>
+              <div className="min-h-[108px] bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-center"><p className="text-slate-500 font-bold">إجمالي المستحصل</p><p className="text-xl sm:text-3xl font-black mt-3 break-words tabular-nums">{iqd(stats.allRevenue)}</p></div>
+              <div className="min-h-[108px] bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-center"><p className="text-slate-500 font-bold">إيراد السنة</p><p className="text-xl sm:text-3xl font-black mt-3 break-words tabular-nums">{iqd(stats.yearRevenue)}</p></div>
+              <div className="min-h-[108px] bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-center"><p className="text-slate-500 font-bold">إشعارات منشورة</p><p className="text-xl sm:text-3xl font-black mt-3 break-words tabular-nums">{notifications.length}</p></div>
             </div>
           </>}
           {/* SUPER_ADMIN_SUBSCRIPTION_STATUS_V2 */}
@@ -1170,13 +1170,13 @@ export const SuperAdminDashboard: React.FC<Props> = ({ onLogout }) => {
 
           {tab === 'finance' && <>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-5 mb-5">
-              <div className="bg-white border rounded-2xl p-5"><p className="text-slate-500 font-bold">إيراد الشهر</p><p className="text-3xl font-black mt-2">{iqd(stats.monthRevenue)}</p></div>
-              <div className="bg-white border rounded-2xl p-5"><p className="text-slate-500 font-bold">إيراد السنة</p><p className="text-3xl font-black mt-2">{iqd(stats.yearRevenue)}</p></div>
-              <div className="bg-white border rounded-2xl p-5"><p className="text-slate-500 font-bold">الإجمالي</p><p className="text-3xl font-black mt-2">{iqd(stats.allRevenue)}</p></div>
+              <div className="bg-white border rounded-2xl p-4 sm:p-5 min-w-0"><p className="text-slate-500 font-bold">إيراد الشهر</p><p className="text-xl sm:text-3xl font-black mt-2 break-words tabular-nums">{iqd(stats.monthRevenue)}</p></div>
+              <div className="bg-white border rounded-2xl p-4 sm:p-5 min-w-0"><p className="text-slate-500 font-bold">إيراد السنة</p><p className="text-xl sm:text-3xl font-black mt-2 break-words tabular-nums">{iqd(stats.yearRevenue)}</p></div>
+              <div className="bg-white border rounded-2xl p-4 sm:p-5 min-w-0"><p className="text-slate-500 font-bold">الإجمالي</p><p className="text-xl sm:text-3xl font-black mt-2 break-words tabular-nums">{iqd(stats.allRevenue)}</p></div>
             </div>
             <section className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-              <div className="p-5 border-b flex items-center justify-between"><div><h2 className="text-lg font-black">الحسابات والواردات</h2><p className="text-xs text-slate-500 mt-1">كل مبلغ تستحصله من بيع أو تجديد الحسابات</p></div><button onClick={() => setFinanceOpen(v => !v)} className="bg-[#0B1F3B] text-white px-4 py-2.5 rounded-xl font-black text-sm flex items-center gap-2"><Plus className="w-4 h-4" />تسجيل مبلغ</button></div>
-              {financeOpen && <form onSubmit={addTransaction} className="p-5 bg-slate-50 grid grid-cols-3 gap-4 border-b">
+              <div className="p-4 sm:p-5 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3"><div className="min-w-0"><h2 className="text-lg font-black">الحسابات والواردات</h2><p className="text-xs text-slate-500 mt-1">كل مبلغ تستحصله من بيع أو تجديد الحسابات</p></div><button onClick={() => setFinanceOpen(v => !v)} className="w-full sm:w-auto justify-center bg-[#0B1F3B] text-white px-4 py-2.5 rounded-xl font-black text-sm flex items-center gap-2"><Plus className="w-4 h-4" />تسجيل مبلغ</button></div>
+              {financeOpen && <form onSubmit={addTransaction} className="p-4 sm:p-5 bg-slate-50 grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 border-b">
                 <select value={financeForm.generator_id} onChange={e => setFinanceForm(f => ({...f, generator_id:e.target.value}))} className="border rounded-xl px-3 py-3 bg-white"><option value="">بدون ربط بمولدة</option>{generators.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select>
                 <input inputMode="numeric" placeholder="المبلغ بالدينار" value={financeForm.amount_iqd} onChange={e => setFinanceForm(f => ({...f, amount_iqd:e.target.value.replace(/\D/g,'')}))} className="border rounded-xl px-3 py-3" />
                 <select value={financeForm.category} onChange={e => setFinanceForm(f => ({...f, category:e.target.value}))} className="border rounded-xl px-3 py-3 bg-white"><option value="subscription">بيع اشتراك</option><option value="renewal">تجديد</option><option value="setup">تهيئة/تنصيب</option><option value="other">أخرى</option></select>
@@ -1184,26 +1184,26 @@ export const SuperAdminDashboard: React.FC<Props> = ({ onLogout }) => {
                 <input placeholder="ملاحظات" value={financeForm.notes} onChange={e => setFinanceForm(f => ({...f, notes:e.target.value}))} className="border rounded-xl px-3 py-3" />
                 <button className="bg-emerald-600 text-white rounded-xl font-black">حفظ المبلغ</button>
               </form>}
-              <table className="w-full min-w-[760px] text-sm"><thead className="bg-slate-50 text-slate-500"><tr><th className="p-4 text-right">التاريخ</th><th className="p-4 text-right">المولدة</th><th className="p-4 text-right">النوع</th><th className="p-4 text-right">طريقة الدفع</th><th className="p-4 text-right">المبلغ</th></tr></thead><tbody>{transactions.map(x => <tr key={x.id} className="border-t"><td className="p-4">{dateText(x.received_at)}</td><td className="p-4 font-bold">{generatorName(x.generator_id)}</td><td className="p-4">{x.category}</td><td className="p-4">{x.payment_method || '—'}</td><td className="p-4 font-black text-emerald-700">{x.direction === 'refund' ? '-' : ''}{iqd(x.amount_iqd)}</td></tr>)}</tbody></table>
+              <div className="moldatk-responsive-scroll overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead className="bg-slate-50 text-slate-500"><tr><th className="p-4 text-right">التاريخ</th><th className="p-4 text-right">المولدة</th><th className="p-4 text-right">النوع</th><th className="p-4 text-right">طريقة الدفع</th><th className="p-4 text-right">المبلغ</th></tr></thead><tbody>{transactions.map(x => <tr key={x.id} className="border-t"><td className="p-4">{dateText(x.received_at)}</td><td className="p-4 font-bold">{generatorName(x.generator_id)}</td><td className="p-4">{x.category}</td><td className="p-4">{x.payment_method || '—'}</td><td className="p-4 font-black text-emerald-700">{x.direction === 'refund' ? '-' : ''}{iqd(x.amount_iqd)}</td></tr>)}</tbody></table></div>
               {transactions.length === 0 && <div className="p-10 text-center text-slate-500 font-bold">لا توجد حركات مالية بعد</div>}
             </section>
           </>}
 
           {tab === 'managers' && isOwnerSuperAdmin && <section className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-            <div className="px-6 py-5 border-b border-slate-200 flex items-center justify-between">
+            <div className="px-4 sm:px-6 py-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div><h2 className="text-lg font-black flex items-center gap-2"><ShieldCheck className="w-5 h-5" />مدراء السوبر أدمن</h2><p className="text-xs text-slate-500 mt-1">إنشاء مدراء بصلاحيات محددة بدون صلاحية حذف أصحاب المولدات أو إنشاء مدراء آخرين.</p></div>
-              <button onClick={() => setManagerOpen(true)} className="bg-[#0B1F3B] hover:bg-[#142A45] text-white px-4 py-2.5 rounded-xl font-black text-sm flex items-center gap-2"><UserPlus className="w-4 h-4" />إضافة مدير</button>
+              <button onClick={() => setManagerOpen(true)} className="w-full sm:w-auto justify-center bg-[#0B1F3B] hover:bg-[#142A45] text-white px-4 py-2.5 rounded-xl font-black text-sm flex items-center gap-2"><UserPlus className="w-4 h-4" />إضافة مدير</button>
             </div>
-            {managerOpen && <form onSubmit={createManagerAccount} className="p-5 bg-slate-50 grid grid-cols-2 gap-4 border-b">
+            {managerOpen && <form onSubmit={createManagerAccount} className="p-4 sm:p-5 bg-slate-50 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 border-b">
               <input required placeholder="اسم المدير" value={managerForm.full_name} onChange={e=>setManagerForm(f=>({...f,full_name:e.target.value}))} className="border rounded-xl px-3 py-3 bg-white" />
               <input required type="email" placeholder="إيميل المدير" value={managerForm.email} onChange={e=>setManagerForm(f=>({...f,email:e.target.value}))} className="border rounded-xl px-3 py-3 bg-white" />
               <input required minLength={4} placeholder="رمز الدخول / 4 أرقام" value={managerForm.password} onChange={e=>setManagerForm(f=>({...f,password:e.target.value}))} className="border rounded-xl px-3 py-3 bg-white" />
-              <div className="flex items-center gap-4 text-xs font-black">
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs font-black">
                 <label><input type="checkbox" checked={managerForm.can_activate} onChange={e=>setManagerForm(f=>({...f,can_activate:e.target.checked}))}/> تفعيل وتجديد</label>
                 <label><input type="checkbox" checked={managerForm.can_edit} onChange={e=>setManagerForm(f=>({...f,can_edit:e.target.checked}))}/> تعديل معلومات</label>
                 <label><input type="checkbox" checked={managerForm.can_create_generator} onChange={e=>setManagerForm(f=>({...f,can_create_generator:e.target.checked}))}/> إنشاء حساب صاحب مولدة</label>
               </div>
-              <div className="col-span-2 flex justify-end gap-3"><button type="button" onClick={()=>setManagerOpen(false)} className="px-4 py-2.5 rounded-xl border font-black bg-white">إلغاء</button><button disabled={savingManager} className="px-5 py-2.5 rounded-xl bg-[#0B1F3B] text-white font-black disabled:opacity-50">حفظ المدير</button></div>
+              <div className="sm:col-span-2 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3"><button type="button" onClick={()=>setManagerOpen(false)} className="px-4 py-2.5 rounded-xl border font-black bg-white">إلغاء</button><button disabled={savingManager} className="px-5 py-2.5 rounded-xl bg-[#0B1F3B] text-white font-black disabled:opacity-50">حفظ المدير</button></div>
             </form>}
             <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead className="bg-slate-50 text-slate-500"><tr><th className="p-4 text-right">المدير</th><th className="p-4 text-right">الإيميل</th><th className="p-4 text-center">تفعيل</th><th className="p-4 text-center">تعديل</th><th className="p-4 text-center">إنشاء حساب</th><th className="p-4 text-center">الحالة</th></tr></thead><tbody>{managers.map(m => <tr key={m.id} className="border-t"><td className="p-4 font-black">{m.full_name}{m.is_owner ? ' — المدير الرئيسي' : ''}</td><td className="p-4">{m.email}</td>{(['can_activate','can_edit','can_create_generator'] as const).map(k => <td key={k} className="p-4 text-center"><input type="checkbox" disabled={m.is_owner || savingManager} checked={Boolean(m[k])} onChange={e=>void updateManagerPermissions(m,{[k]:e.target.checked} as any)} /></td>)}<td className="p-4 text-center"><button disabled={m.is_owner || savingManager} onClick={()=>void updateManagerPermissions(m,{is_active:!m.is_active})} className={`px-3 py-1.5 rounded-lg text-xs font-black ${m.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{m.is_active ? 'فعال' : 'موقوف'}</button></td></tr>)}</tbody></table></div>
           </section>}
@@ -1236,10 +1236,10 @@ export const SuperAdminDashboard: React.FC<Props> = ({ onLogout }) => {
         </main>
       </div>
 
-      {selectedGenerator && <div className="fixed inset-0 z-[115] bg-black/50 flex items-center justify-center p-6">
-        <div className="w-full max-w-5xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden max-h-[94vh] overflow-y-auto">
-          <div className="px-6 py-5 border-b flex items-center justify-between sticky top-0 bg-white z-10"><div><h2 className="text-xl font-black">{selectedGenerator.name}</h2><p className="text-xs text-slate-500 mt-1">تفاصيل الحساب والاشتراك</p></div><button onClick={() => { setSelectedGeneratorId(null); setRenewalOpen(false); setCredentialsOpen(false); setEditSubscriptionOpen(false); }} className="p-2 rounded-xl hover:bg-slate-100"><X className="w-5 h-5" /></button></div>
-          <div className="p-6 grid grid-cols-3 gap-4">
+      {selectedGenerator && <div className="moldatk-modal-viewport fixed inset-0 z-[115] bg-black/50 flex items-center justify-center p-2 sm:p-4 lg:p-6">
+        <div className="moldatk-modal-surface w-full max-w-5xl bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 overflow-hidden max-h-[94vh] overflow-y-auto">
+          <div className="px-4 sm:px-6 py-4 sm:py-5 border-b flex items-center justify-between gap-3 sticky top-0 bg-white z-10"><div className="min-w-0"><h2 className="text-lg sm:text-xl font-black break-words">{selectedGenerator.name}</h2><p className="text-xs text-slate-500 mt-1">تفاصيل الحساب والاشتراك</p></div><button onClick={() => { setSelectedGeneratorId(null); setRenewalOpen(false); setCredentialsOpen(false); setEditSubscriptionOpen(false); }} className="p-2 rounded-xl hover:bg-slate-100"><X className="w-5 h-5" /></button></div>
+          <div className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             <div className="bg-slate-50 rounded-2xl p-4"><p className="text-xs text-slate-500 font-bold">صاحب المولدة</p><p className="font-black mt-1">{selectedGenerator.owner_name}</p></div>
             <div className="bg-slate-50 rounded-2xl p-4"><p className="text-xs text-slate-500 font-bold">رقم الهاتف</p><p className="font-black mt-1">{selectedGenerator.phone || '—'}</p></div>
             <div className="bg-slate-50 rounded-2xl p-4"><p className="text-xs text-slate-500 font-bold">رمز الحساب الحالي</p><p className="font-black mt-1">{selectedGenerator.area || '—'}</p></div>
@@ -1252,53 +1252,53 @@ export const SuperAdminDashboard: React.FC<Props> = ({ onLogout }) => {
             <div className="bg-blue-50 rounded-2xl p-4"><p className="text-xs text-blue-600 font-bold">آخر مبلغ اشتراك</p><p className="font-black mt-1">{selectedSubscription ? iqd(selectedSubscription.price_iqd || 0) : '—'}</p></div>
           </div>
 
-          {credentialsOpen && <form onSubmit={saveCredentials} className="mx-6 mb-6 bg-violet-50/60 border border-violet-100 rounded-2xl p-5 grid grid-cols-2 gap-4">
-            <div className="col-span-2"><h3 className="font-black text-lg">تعديل بيانات الدخول</h3><p className="text-xs text-slate-500 mt-1">لأسباب أمنية لا يمكن عرض كلمة المرور الحالية؛ يمكنك استبدالها بكلمة جديدة.</p></div>
+          {credentialsOpen && <form onSubmit={saveCredentials} className="mx-4 sm:mx-6 mb-4 sm:mb-6 bg-violet-50/60 border border-violet-100 rounded-2xl p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="sm:col-span-2"><h3 className="font-black text-lg">تعديل بيانات الدخول</h3><p className="text-xs text-slate-500 mt-1">لأسباب أمنية لا يمكن عرض كلمة المرور الحالية؛ يمكنك استبدالها بكلمة جديدة.</p></div>
             <input required type="email" placeholder="إيميل تسجيل الدخول" value={credentialForm.email} onChange={e=>setCredentialForm(f=>({...f,email:e.target.value}))} className="border rounded-xl px-3 py-3 bg-white" />
             <input type="text" minLength={6} placeholder="كلمة مرور جديدة (اختياري)" value={credentialForm.password} onChange={e=>setCredentialForm(f=>({...f,password:e.target.value}))} className="border rounded-xl px-3 py-3 bg-white" />
-            <div className="col-span-2 flex justify-end gap-3"><button type="button" onClick={()=>setCredentialsOpen(false)} className="px-4 py-2.5 rounded-xl border font-black bg-white">إلغاء</button><button disabled={savingAccount} className="px-5 py-2.5 rounded-xl bg-violet-700 text-white font-black disabled:opacity-50 inline-flex items-center gap-2"><Save className="w-4 h-4"/>حفظ بيانات الدخول</button></div>
+            <div className="sm:col-span-2 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3"><button type="button" onClick={()=>setCredentialsOpen(false)} className="px-4 py-2.5 rounded-xl border font-black bg-white">إلغاء</button><button disabled={savingAccount} className="px-5 py-2.5 rounded-xl bg-violet-700 text-white font-black disabled:opacity-50 inline-flex items-center gap-2"><Save className="w-4 h-4"/>حفظ بيانات الدخول</button></div>
           </form>}
 
-          {renewalOpen && <form onSubmit={renewSubscription} className="mx-6 mb-6 bg-slate-50 border rounded-2xl p-5 grid grid-cols-2 gap-4">
-            <div className="col-span-2"><h3 className="font-black text-lg">تجديد الاشتراك</h3><p className="text-xs text-slate-500 mt-1">إذا الاشتراك فعال، التجديد يبدأ من تاريخ انتهائه الحالي. اشتراك الفحص يقبل أيام/ساعات/دقائق.</p></div>
+          {renewalOpen && <form onSubmit={renewSubscription} className="mx-4 sm:mx-6 mb-4 sm:mb-6 bg-slate-50 border rounded-2xl p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="sm:col-span-2"><h3 className="font-black text-lg">تجديد الاشتراك</h3><p className="text-xs text-slate-500 mt-1">إذا الاشتراك فعال، التجديد يبدأ من تاريخ انتهائه الحالي. اشتراك الفحص يقبل أيام/ساعات/دقائق.</p></div>
             <select required value={renewalForm.plan_id} onChange={e => { const id=e.target.value; const p=plans.find(x=>x.id===id); setRenewalForm(f=>({...f, plan_id:id, price_iqd:p?.price_iqd ? String(p.price_iqd) : f.price_iqd})) }} className="border rounded-xl px-3 py-3 bg-white"><option value="">اختر نوع الاشتراك</option>{plans.map(p => <option key={p.id} value={p.id}>{planLabel(p)}</option>)}</select>
             <input inputMode="numeric" placeholder="المبلغ المستحصل بالدينار" value={renewalForm.price_iqd} onChange={e=>setRenewalForm(f=>({...f,price_iqd:e.target.value.replace(/\D/g,'')}))} className="border rounded-xl px-3 py-3" />
-            {plans.find(p=>p.id===renewalForm.plan_id)?.is_custom_duration && <div className="col-span-2 grid grid-cols-3 gap-3 bg-amber-50 border border-amber-100 rounded-xl p-4"><label className="text-xs font-bold">الأيام<input inputMode="numeric" value={renewalForm.test_days} onChange={e=>setRenewalForm(f=>({...f,test_days:e.target.value.replace(/\D/g,'')}))} className="mt-1 w-full border rounded-xl px-3 py-2 bg-white"/></label><label className="text-xs font-bold">الساعات<input inputMode="numeric" value={renewalForm.test_hours} onChange={e=>setRenewalForm(f=>({...f,test_hours:e.target.value.replace(/\D/g,'')}))} className="mt-1 w-full border rounded-xl px-3 py-2 bg-white"/></label><label className="text-xs font-bold">الدقائق<input inputMode="numeric" value={renewalForm.test_minutes} onChange={e=>setRenewalForm(f=>({...f,test_minutes:e.target.value.replace(/\D/g,'')}))} className="mt-1 w-full border rounded-xl px-3 py-2 bg-white"/></label></div>}
+            {plans.find(p=>p.id===renewalForm.plan_id)?.is_custom_duration && <div className="sm:col-span-2 grid grid-cols-1 min-[360px]:grid-cols-3 gap-3 bg-amber-50 border border-amber-100 rounded-xl p-4"><label className="text-xs font-bold">الأيام<input inputMode="numeric" value={renewalForm.test_days} onChange={e=>setRenewalForm(f=>({...f,test_days:e.target.value.replace(/\D/g,'')}))} className="mt-1 w-full border rounded-xl px-3 py-2 bg-white"/></label><label className="text-xs font-bold">الساعات<input inputMode="numeric" value={renewalForm.test_hours} onChange={e=>setRenewalForm(f=>({...f,test_hours:e.target.value.replace(/\D/g,'')}))} className="mt-1 w-full border rounded-xl px-3 py-2 bg-white"/></label><label className="text-xs font-bold">الدقائق<input inputMode="numeric" value={renewalForm.test_minutes} onChange={e=>setRenewalForm(f=>({...f,test_minutes:e.target.value.replace(/\D/g,'')}))} className="mt-1 w-full border rounded-xl px-3 py-2 bg-white"/></label></div>}
             <input placeholder="طريقة الدفع" value={renewalForm.payment_method} onChange={e=>setRenewalForm(f=>({...f,payment_method:e.target.value}))} className="border rounded-xl px-3 py-3" />
             <input placeholder="ملاحظات اختيارية" value={renewalForm.notes} onChange={e=>setRenewalForm(f=>({...f,notes:e.target.value}))} className="border rounded-xl px-3 py-3" />
-            <div className="col-span-2 flex justify-end gap-3"><button type="button" onClick={() => setRenewalOpen(false)} className="px-4 py-2.5 rounded-xl border font-black">إلغاء</button><button disabled={renewing} className="px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-black disabled:opacity-50">{renewing ? 'جاري التجديد...' : 'تأكيد التجديد'}</button></div>
+            <div className="sm:col-span-2 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3"><button type="button" onClick={() => setRenewalOpen(false)} className="px-4 py-2.5 rounded-xl border font-black">إلغاء</button><button disabled={renewing} className="px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-black disabled:opacity-50">{renewing ? 'جاري التجديد...' : 'تأكيد التجديد'}</button></div>
           </form>}
 
-          {editSubscriptionOpen && selectedSubscription && <form onSubmit={saveSubscriptionEdit} className="mx-6 mb-6 bg-blue-50/50 border border-blue-100 rounded-2xl p-5 grid grid-cols-2 gap-4">
-            <div className="col-span-2"><h3 className="font-black text-lg">تعديل الاشتراك الحالي</h3><p className="text-xs text-slate-500 mt-1">يمكنك تغيير نوع الاشتراك أو تاريخ البداية والنهاية في أي وقت.</p></div>
+          {editSubscriptionOpen && selectedSubscription && <form onSubmit={saveSubscriptionEdit} className="mx-4 sm:mx-6 mb-4 sm:mb-6 bg-blue-50/50 border border-blue-100 rounded-2xl p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="sm:col-span-2"><h3 className="font-black text-lg">تعديل الاشتراك الحالي</h3><p className="text-xs text-slate-500 mt-1">يمكنك تغيير نوع الاشتراك أو تاريخ البداية والنهاية في أي وقت.</p></div>
             <select value={editSubscriptionForm.plan_id} onChange={e=>setEditSubscriptionForm(f=>({...f,plan_id:e.target.value}))} className="border rounded-xl px-3 py-3 bg-white"><option value="">بدون باقة</option>{plans.map(p=><option key={p.id} value={p.id}>{planLabel(p)}</option>)}</select>
             <input inputMode="numeric" placeholder="مبلغ الاشتراك" value={editSubscriptionForm.price_iqd} onChange={e=>setEditSubscriptionForm(f=>({...f,price_iqd:e.target.value.replace(/\D/g,'')}))} className="border rounded-xl px-3 py-3 bg-white" />
             <label className="text-xs font-black text-slate-600">تاريخ ووقت البداية<input type="datetime-local" value={editSubscriptionForm.starts_at} onChange={e=>setEditSubscriptionForm(f=>({...f,starts_at:e.target.value}))} className="mt-1 w-full border rounded-xl px-3 py-3 bg-white"/></label>
             <label className="text-xs font-black text-slate-600">تاريخ ووقت النهاية<input type="datetime-local" value={editSubscriptionForm.ends_at} onChange={e=>setEditSubscriptionForm(f=>({...f,ends_at:e.target.value}))} className="mt-1 w-full border rounded-xl px-3 py-3 bg-white"/></label>
-            <input className="col-span-2 border rounded-xl px-3 py-3 bg-white" placeholder="ملاحظات التعديل (اختياري)" value={editSubscriptionForm.notes} onChange={e=>setEditSubscriptionForm(f=>({...f,notes:e.target.value}))}/>
-            <div className="col-span-2 flex justify-end gap-3"><button type="button" onClick={()=>setEditSubscriptionOpen(false)} className="px-4 py-2.5 rounded-xl border font-black bg-white">إلغاء</button><button disabled={savingAccount} className="px-5 py-2.5 rounded-xl bg-[#0B1F3B] text-white font-black disabled:opacity-50 inline-flex items-center gap-2"><Save className="w-4 h-4"/>حفظ تعديل الاشتراك</button></div>
+            <input className="sm:col-span-2 border rounded-xl px-3 py-3 bg-white" placeholder="ملاحظات التعديل (اختياري)" value={editSubscriptionForm.notes} onChange={e=>setEditSubscriptionForm(f=>({...f,notes:e.target.value}))}/>
+            <div className="sm:col-span-2 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3"><button type="button" onClick={()=>setEditSubscriptionOpen(false)} className="px-4 py-2.5 rounded-xl border font-black bg-white">إلغاء</button><button disabled={savingAccount} className="px-5 py-2.5 rounded-xl bg-[#0B1F3B] text-white font-black disabled:opacity-50 inline-flex items-center gap-2"><Save className="w-4 h-4"/>حفظ تعديل الاشتراك</button></div>
           </form>}
 
-          <div className="px-6 py-4 border-t bg-slate-50 flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2 flex-wrap">
+          <div className="px-4 sm:px-6 py-4 border-t bg-slate-50 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap w-full lg:w-auto">
               <button disabled={savingAccount} onClick={() => void setGeneratorStatus(selectedGenerator.status === 'suspended' ? 'active' : 'suspended')} className={`px-4 py-2.5 rounded-xl font-black inline-flex items-center gap-2 ${selectedGenerator.status === 'suspended' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-800 border border-amber-200'}`}><PauseCircle className="w-4 h-4" />{selectedGenerator.status === 'suspended' ? 'رفع التقييد' : 'إيقاف مؤقت للحساب'}</button>
               <button disabled={savingAccount} onClick={() => void deleteGeneratorAccount()} className="px-4 py-2.5 rounded-xl font-black inline-flex items-center gap-2 bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 disabled:opacity-50"><Trash2 className="w-4 h-4" />حذف الحساب</button>
             </div>
-            <div className="flex gap-3"><button onClick={openEditSubscription} className="px-4 py-2.5 rounded-xl bg-white border border-blue-200 text-blue-700 font-black inline-flex items-center gap-2"><Pencil className="w-4 h-4"/>تعديل الاشتراك</button><button onClick={() => setRenewalOpen(true)} className="px-5 py-2.5 rounded-xl bg-[#0B1F3B] text-white font-black inline-flex items-center gap-2"><CreditCard className="w-4 h-4" />تجديد الاشتراك</button></div>
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full lg:w-auto"><button onClick={openEditSubscription} className="px-4 py-2.5 rounded-xl bg-white border border-blue-200 text-blue-700 font-black inline-flex items-center gap-2"><Pencil className="w-4 h-4"/>تعديل الاشتراك</button><button onClick={() => setRenewalOpen(true)} className="px-5 py-2.5 rounded-xl bg-[#0B1F3B] text-white font-black inline-flex items-center gap-2"><CreditCard className="w-4 h-4" />تجديد الاشتراك</button></div>
           </div>
         </div>
       </div>}
 
-      {excelImportOpen && <div className="fixed inset-0 z-[118] bg-black/50 flex items-center justify-center p-6">
-        <form onSubmit={importSubscribersFromExcel} className="w-full max-w-3xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden max-h-[92vh] overflow-y-auto">
-          <div className="px-6 py-5 border-b flex items-center justify-between bg-white">
+      {excelImportOpen && <div className="moldatk-modal-viewport fixed inset-0 z-[118] bg-black/50 flex items-center justify-center p-2 sm:p-4 lg:p-6">
+        <form onSubmit={importSubscribersFromExcel} className="moldatk-modal-surface w-full max-w-3xl bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 overflow-hidden max-h-[92vh] overflow-y-auto">
+          <div className="px-4 sm:px-6 py-4 sm:py-5 border-b flex items-start sm:items-center justify-between gap-3 bg-white">
             <div>
               <h2 className="text-xl font-black flex items-center gap-2"><FileSpreadsheet className="w-5 h-5 text-emerald-600" />رفع بيانات المشتركين من Excel</h2>
               <p className="text-xs text-slate-500 mt-1">اختر ملف Excel ثم حساب صاحب المولدة حتى تُضاف البيانات داخل حسابه فقط.</p>
             </div>
             <button type="button" onClick={() => setExcelImportOpen(false)} className="p-2 rounded-xl hover:bg-slate-100"><X className="w-5 h-5" /></button>
           </div>
-          <div className="p-6 grid grid-cols-1 gap-4">
+          <div className="p-4 sm:p-6 grid grid-cols-1 gap-4">
             <label className="text-sm font-black text-slate-700">ملف Excel الخاص بالمشتركين
               <input
                 required
@@ -1360,7 +1360,7 @@ export const SuperAdminDashboard: React.FC<Props> = ({ onLogout }) => {
               </div>}
             </div>}
           </div>
-          <div className="px-6 py-4 border-t bg-slate-50 flex justify-end gap-3">
+          <div className="px-4 sm:px-6 py-4 border-t bg-slate-50 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3">
             <button type="button" onClick={() => setExcelImportOpen(false)} className="px-5 py-2.5 rounded-xl border font-black bg-white">{excelImportReport.status === 'success' ? 'إغلاق' : 'إلغاء'}</button>
             <button disabled={excelImporting} className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black disabled:opacity-50 inline-flex items-center gap-2">
               <UploadCloud className="w-4 h-4" />{excelImporting ? 'جاري الرفع...' : 'رفع البيانات'}
@@ -1370,11 +1370,11 @@ export const SuperAdminDashboard: React.FC<Props> = ({ onLogout }) => {
       </div>}
 
 
-      {generatorOpen && <div className="fixed inset-0 z-[120] bg-black/50 flex items-center justify-center p-6">
-        <form onSubmit={createGeneratorAccount} className="w-full max-w-3xl bg-white text-slate-900 rounded-3xl shadow-2xl border border-slate-200 overflow-hidden max-h-[94vh] overflow-y-auto" style={{ colorScheme: 'light' }}>
-          <div className="px-6 py-5 border-b flex items-center justify-between sticky top-0 bg-white z-10"><div><h2 className="text-xl font-black">إضافة صاحب مولدة</h2><p className="text-xs text-slate-500 mt-1">إنشاء المولدة، حساب الدخول والاشتراك دفعة واحدة</p></div><button type="button" onClick={() => { setGeneratorFormError(null); setGeneratorOpen(false); }} className="p-2 rounded-xl hover:bg-slate-100"><X className="w-5 h-5" /></button></div>
+      {generatorOpen && <div className="moldatk-modal-viewport fixed inset-0 z-[120] bg-black/50 flex items-center justify-center p-2 sm:p-4 lg:p-6">
+        <form onSubmit={createGeneratorAccount} className="moldatk-modal-surface w-full max-w-3xl bg-white text-slate-900 rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 overflow-hidden max-h-[94vh] overflow-y-auto" style={{ colorScheme: 'light' }}>
+          <div className="px-4 sm:px-6 py-4 sm:py-5 border-b flex items-center justify-between gap-3 sticky top-0 bg-white z-10"><div className="min-w-0"><h2 className="text-lg sm:text-xl font-black">إضافة صاحب مولدة</h2><p className="text-xs text-slate-500 mt-1">إنشاء المولدة، حساب الدخول والاشتراك دفعة واحدة</p></div><button type="button" onClick={() => { setGeneratorFormError(null); setGeneratorOpen(false); }} className="p-2 rounded-xl hover:bg-slate-100"><X className="w-5 h-5" /></button></div>
           {generatorFormError && <div role="alert" className="mx-6 mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-black text-rose-700">{generatorFormError}</div>}
-          <div className="p-6 grid grid-cols-2 gap-4">
+          <div className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <input required placeholder="اسم المولدة" value={generatorForm.name} onChange={e=>setGeneratorForm(f=>({...f,name:e.target.value}))} className="border border-slate-300 rounded-xl px-3 py-3 bg-white text-slate-900 placeholder:text-slate-400 caret-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15" />
             <input required placeholder="اسم صاحب المولدة" value={generatorForm.owner_name} onChange={e=>setGeneratorForm(f=>({...f,owner_name:e.target.value}))} className="border border-slate-300 rounded-xl px-3 py-3 bg-white text-slate-900 placeholder:text-slate-400 caret-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15" />
             <input placeholder="رقم الهاتف" value={generatorForm.phone} onChange={e=>setGeneratorForm(f=>({...f,phone:e.target.value}))} className="border border-slate-300 rounded-xl px-3 py-3 bg-white text-slate-900 placeholder:text-slate-400 caret-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15" />
@@ -1383,11 +1383,11 @@ export const SuperAdminDashboard: React.FC<Props> = ({ onLogout }) => {
             <input required type="text" minLength={6} placeholder="كلمة المرور الأولية" value={generatorForm.password} onChange={e=>setGeneratorForm(f=>({...f,password:e.target.value}))} className="border border-slate-300 rounded-xl px-3 py-3 bg-white text-slate-900 placeholder:text-slate-400 caret-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15" />
             <select required value={generatorForm.plan_id} onChange={e=>{const id=e.target.value; const plan=plans.find(p=>p.id===id); setGeneratorForm(f=>({...f,plan_id:id,price_iqd:plan?.price_iqd ? String(plan.price_iqd) : f.price_iqd}))}} className="border border-slate-300 rounded-xl px-3 py-3 bg-white text-slate-900 placeholder:text-slate-400 caret-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"><option value="">اختر نوع الاشتراك</option>{plans.map(p=><option key={p.id} value={p.id}>{planLabel(p)}</option>)}</select>
             <label className="text-xs font-black text-slate-600">تاريخ ووقت التفعيل<input type="datetime-local" value={generatorForm.starts_at} onChange={e=>setGeneratorForm(f=>({...f,starts_at:e.target.value}))} className="mt-1 w-full border border-slate-300 rounded-xl px-3 py-3 bg-white text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15" /></label>
-            {plans.find(p=>p.id===generatorForm.plan_id)?.is_custom_duration && <div className="col-span-2 grid grid-cols-3 gap-3 bg-amber-50 border border-amber-100 rounded-xl p-4"><div className="col-span-3 text-xs font-black text-amber-800 flex items-center gap-2"><Clock3 className="w-4 h-4"/>مدة اشتراك الفحص — حددها بدقة</div><label className="text-xs font-bold">الأيام<input inputMode="numeric" value={generatorForm.test_days} onChange={e=>setGeneratorForm(f=>({...f,test_days:e.target.value.replace(/\D/g,'')}))} className="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2 bg-white text-slate-900 placeholder:text-slate-400 caret-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"/></label><label className="text-xs font-bold">الساعات<input inputMode="numeric" value={generatorForm.test_hours} onChange={e=>setGeneratorForm(f=>({...f,test_hours:e.target.value.replace(/\D/g,'')}))} className="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2 bg-white text-slate-900 placeholder:text-slate-400 caret-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"/></label><label className="text-xs font-bold">الدقائق<input inputMode="numeric" value={generatorForm.test_minutes} onChange={e=>setGeneratorForm(f=>({...f,test_minutes:e.target.value.replace(/\D/g,'')}))} className="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2 bg-white text-slate-900 placeholder:text-slate-400 caret-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"/></label></div>}
+            {plans.find(p=>p.id===generatorForm.plan_id)?.is_custom_duration && <div className="sm:col-span-2 grid grid-cols-1 min-[360px]:grid-cols-3 gap-3 bg-amber-50 border border-amber-100 rounded-xl p-4"><div className="min-[360px]:col-span-3 text-xs font-black text-amber-800 flex items-center gap-2"><Clock3 className="w-4 h-4"/>مدة اشتراك الفحص — حددها بدقة</div><label className="text-xs font-bold">الأيام<input inputMode="numeric" value={generatorForm.test_days} onChange={e=>setGeneratorForm(f=>({...f,test_days:e.target.value.replace(/\D/g,'')}))} className="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2 bg-white text-slate-900 placeholder:text-slate-400 caret-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"/></label><label className="text-xs font-bold">الساعات<input inputMode="numeric" value={generatorForm.test_hours} onChange={e=>setGeneratorForm(f=>({...f,test_hours:e.target.value.replace(/\D/g,'')}))} className="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2 bg-white text-slate-900 placeholder:text-slate-400 caret-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"/></label><label className="text-xs font-bold">الدقائق<input inputMode="numeric" value={generatorForm.test_minutes} onChange={e=>setGeneratorForm(f=>({...f,test_minutes:e.target.value.replace(/\D/g,'')}))} className="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2 bg-white text-slate-900 placeholder:text-slate-400 caret-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15"/></label></div>}
             <input inputMode="numeric" placeholder="المبلغ المستحصل بالدينار" value={generatorForm.price_iqd} onChange={e=>setGeneratorForm(f=>({...f,price_iqd:e.target.value.replace(/\D/g,'')}))} className="border border-slate-300 rounded-xl px-3 py-3 bg-white text-slate-900 placeholder:text-slate-400 caret-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15" />
             <div className="bg-blue-50 rounded-xl px-4 py-3 text-xs font-bold text-blue-800 flex items-center">الاشتراكات: فحص مخصص، أسبوعي 7 أيام، شهر، 3 شهور، 6 شهور، سنوي.</div>
           </div>
-          <div className="px-6 py-4 border-t bg-slate-50 flex justify-end gap-3"><button type="button" onClick={()=>setGeneratorOpen(false)} className="px-5 py-2.5 rounded-xl border font-black">إلغاء</button><button type="submit" disabled={creatingGenerator} className="px-6 py-2.5 rounded-xl bg-[#0B1F3B] text-white font-black disabled:opacity-50 disabled:cursor-not-allowed">{creatingGenerator ? 'جاري الإنشاء...' : 'إنشاء الحساب'}</button></div>
+          <div className="px-4 sm:px-6 py-4 border-t bg-slate-50 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3"><button type="button" onClick={()=>setGeneratorOpen(false)} className="px-5 py-2.5 rounded-xl border font-black">إلغاء</button><button type="submit" disabled={creatingGenerator} className="px-6 py-2.5 rounded-xl bg-[#0B1F3B] text-white font-black disabled:opacity-50 disabled:cursor-not-allowed">{creatingGenerator ? 'جاري الإنشاء...' : 'إنشاء الحساب'}</button></div>
         </form>
       </div>}
     </div>
