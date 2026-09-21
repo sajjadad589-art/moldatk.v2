@@ -390,18 +390,18 @@ export const InvoiceReceiptModal: React.FC<InvoiceReceiptModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm overflow-y-auto font-['Cairo']" dir="rtl">
-      <div className="relative w-full max-w-sm bg-white dark:bg-[#0f172a] rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col my-auto">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80">
-          <span className="text-xs font-black text-slate-800 dark:text-slate-200">معاينة إيصال التسديد — {template.paperSize === 'thermal_80' ? '80 مم' : template.paperSize === 'a5' ? 'A5' : template.paperSize === 'a4' ? 'A4' : '58 مم'}</span>
-          <div className="flex items-center gap-2">
+    <div className="moldatk-modal-viewport fixed inset-0 z-[170] flex items-start sm:items-center justify-center p-2 sm:p-4 bg-slate-950/75 backdrop-blur-sm overflow-y-auto font-['Cairo']" dir="rtl">
+      <div className="moldatk-modal-surface relative w-full max-w-sm bg-white dark:bg-[#0f172a] rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col my-auto max-h-[calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-1rem)]">
+        <div className="receipt-hide-print sticky top-0 z-30 flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 sm:px-4 py-2.5 sm:py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/95">
+          <span className="w-full sm:w-auto min-w-0 text-[11px] sm:text-xs leading-5 font-black text-slate-800 dark:text-slate-200 text-center sm:text-right">معاينة إيصال التسديد — {template.paperSize === 'thermal_80' ? '80 مم' : template.paperSize === 'a5' ? 'A5' : template.paperSize === 'a4' ? 'A4' : '58 مم'}</span>
+          <div className="flex items-center justify-center sm:justify-end gap-2 w-full sm:w-auto shrink-0">
             <button type="button" onClick={handleWhatsAppShare} disabled={!finalized} className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="مشاركة الوصل"><Share2 className="w-4 h-4" /></button>
             <button type="button" onClick={() => void handlePrint()} disabled={!finalized} className="px-3 py-2 rounded-lg bg-[#0B1F3B] text-white disabled:bg-slate-300 disabled:text-black text-xs font-black flex items-center gap-1.5"><Printer className="w-4 h-4" />طباعة</button>
             <button type="button" onClick={onClose} className="p-2 rounded-lg text-black hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="إغلاق"><X className="w-4 h-4" /></button>
           </div>
         </div>
 
-        <div className="p-5 bg-slate-100 dark:bg-[#080d1a] overflow-y-auto flex justify-center">
+        <div className="flex-1 min-h-0 p-3 sm:p-5 bg-slate-100 dark:bg-[#080d1a] overflow-y-auto overscroll-contain flex items-start justify-center">
           <div
             key={printAnimationKey}
             id="thermal-receipt-printable"
@@ -482,7 +482,7 @@ export const InvoiceReceiptModal: React.FC<InvoiceReceiptModalProps> = ({
           </div>
         </div>
 
-        <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 text-center">
+        <div className="receipt-hide-print shrink-0 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 text-center">
           <span className={`text-xs font-black ${finalized ? 'text-emerald-600' : 'text-amber-600'}`}>{finalized ? 'الوصل معتمد وجاهز للطباعة' : 'أكمل التسديد أولاً حتى تتفعل الطباعة'}</span>
         </div>
       </div>
