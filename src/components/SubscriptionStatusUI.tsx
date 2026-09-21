@@ -26,7 +26,7 @@ export const SubscriptionWarningBanner: React.FC<{ info: SubscriptionInfo }> = (
   const days = Math.max(0, daysUntilExpiry(info.endsAt));
   if (info.accountStatus === 'suspended' || days > 10 || days <= 0) return null;
   return (
-    <div dir="rtl" className="w-full bg-red-600 text-white px-4 py-2.5 text-center text-sm font-black shadow-lg z-[90] relative">
+    <div dir="rtl" role="status" className="relative z-0 w-full shrink-0 bg-red-600 text-white px-3 sm:px-4 py-2 text-center text-[11px] sm:text-sm leading-5 font-black shadow-md">
       سينتهي اشتراكك بعد {days} {days === 1 ? 'يوم' : 'أيام'} — يرجى التجديد لتجنب توقف الخدمة
     </div>
   );
