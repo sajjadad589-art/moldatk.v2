@@ -321,7 +321,7 @@ export const CustomerOrderAssistant: React.FC = () => {
   }
 
   return (
-    <div dir="rtl" className="min-h-screen bg-[#071126] text-white font-['Cairo',sans-serif]">
+    <div dir="rtl" className="moldatk-responsive-screen min-h-screen bg-[#071126] text-white font-['Cairo',sans-serif]">
       <div className="max-w-4xl mx-auto px-4 py-8 sm:py-12">
         <a href="/download" className="inline-flex items-center gap-2 text-sm text-slate-300 hover:text-white mb-5"><ArrowLeft className="w-4 h-4" /> رجوع للموقع</a>
 
