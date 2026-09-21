@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Capacitor, registerPlugin } from '@capacitor/core';
-import { Download, RefreshCw, X, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Download, RefreshCw, AlertTriangle } from 'lucide-react';
 import { loadActiveRelease } from '../lib/siteManagement';
 
 type VersionManifest = {
@@ -32,7 +32,6 @@ export const AndroidUpdateChecker: React.FC = () => {
   const [checking, setChecking] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [dismissed, setDismissed] = useState(false);
   const autoStartedRef = useRef<number | null>(null);
   const checkInFlightRef = useRef(false);
 
@@ -120,7 +119,6 @@ export const AndroidUpdateChecker: React.FC = () => {
       setCurrentVersionCode(installedCode);
       setCurrentVersionName(version.versionName || '');
       setManifest(latestManifest);
-      if (Number(latestManifest.versionCode) > installedCode) setDismissed(false);
 
       if (!latestManifest.enabled || Number(latestManifest.versionCode) <= installedCode) {
         autoStartedRef.current = null;
@@ -235,11 +233,6 @@ export const AndroidUpdateChecker: React.FC = () => {
             </button>
           )}
 
-          {!hasUpdate && !forceUpdate && !checking && !installing && (
-            <button type="button" onClick={() => setDismissed(true)} className="shrink-0 p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="إغلاق إشعار التحديث">
-              <X className="w-4 h-4" />
-            </button>
-          )}
         </div>
 
         {installing && (
