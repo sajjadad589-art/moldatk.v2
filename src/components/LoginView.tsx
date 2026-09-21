@@ -51,7 +51,7 @@ const cleanError = (error: unknown) => {
   return 'تعذر تسجيل الدخول. تحقق من الاتصال والبيانات ثم حاول مرة ثانية.';
 };
 
-const roleLabel = (role?: LoginAccountRole) => role === 'collector' ? 'جابي' : 'صاحب المولدة';
+const roleLabel = (role?: LoginAccountRole, collectorName?: string | null) => role === 'collector' ? `جابي${collectorName?.trim() ? ` — ${collectorName.trim()}` : ''}` : 'صاحب المولدة';
 
 export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, forceSuperAdmin = false }) => {
   // SUPER_ADMIN_ROUTE_FAILSAFE_V1
@@ -362,7 +362,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, forceSuper
                           ? 'bg-amber-500/20 text-amber-300'
                           : 'bg-blue-500/20 text-blue-300'
                       }`}>
-                        {roleLabel(account.role)}
+                        {roleLabel(account.role, account.collectorName)}
                       </span>
                     </div>
 
@@ -430,7 +430,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, forceSuper
                 <p className="text-xs text-slate-400 mt-2">
                   {step === 'identifier'
                     ? 'أدخل رقم الهاتف أو البريد الإلكتروني'
-                    : `${roleLabel(roleHint)} • أدخل رمز الحساب للمتابعة`}
+                    : `${roleLabel(roleHint, selectedAccount?.collectorName)} • أدخل رمز الحساب للمتابعة`}
                 </p>
               </div>
 
