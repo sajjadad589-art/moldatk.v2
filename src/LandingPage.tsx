@@ -65,7 +65,7 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div dir="rtl" className="min-h-screen bg-[#F7F9FC] text-[#0B1F3B] font-['Cairo',sans-serif] selection:bg-[#F2B544] selection:text-[#0B1F3B]">
+    <div dir="rtl" className="moldatk-responsive-screen min-h-screen bg-[#F7F9FC] text-[#0B1F3B] font-['Cairo',sans-serif] selection:bg-[#F2B544] selection:text-[#0B1F3B]">
       <header className="sticky top-0 z-40 border-b border-[#DCE4EC] bg-white/95 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-5 lg:px-8 h-[78px] flex items-center justify-between gap-6">
           <a href="#top" aria-label="مولدتك" className="shrink-0"><BrandLockup compact /></a>
