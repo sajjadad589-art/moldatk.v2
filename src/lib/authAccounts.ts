@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import type { ActiveUserSession, CollectorPermissions } from '../types';
 
-export type LoginAccountRole = 'generator_admin' | 'collector';
+export type LoginAccountRole = 'generator_admin' | 'collector' | 'super_admin' | 'super_admin_manager';
 
 export interface AuthAccountPayload {
   userId: string;
@@ -150,7 +150,14 @@ export async function loginWithIdentifier(identifier: string, secret: string) {
   if (error) throw error;
 
   const account = data.account as AuthAccountPayload;
-  const saved = saveLoginAccount(account, identifier, { lastUsedAt: new Date().toISOString() });
+  const isSuperAdmin = account.role === 'super_admin' || account.role === 'super_admin_manager';
+  const saved = saveLoginAccount(
+    account,
+    identifier,
+    isSuperAdmin
+      ? { passkeyEnabled: true, lastUsedAt: new Date().toISOString() }
+      : { lastUsedAt: new Date().toISOString() },
+  );
   return { account, saved, session: accountToSession(account, identifier) };
 }
 
