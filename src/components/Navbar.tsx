@@ -75,7 +75,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-[#0B1F3B] text-white shadow-md border-b border-[#1C3654] transition-colors duration-200">
+    <header className="relative w-full bg-[#0B1F3B] text-white shadow-md border-b border-[#1C3654] transition-colors duration-200">
       
       {/* شريط المعلومات العلوي (يتم إعادة ترتيبة وتصغيره حصرياً في منظور الهاتف) */}
       <div className={`px-3 py-1.5 bg-[#081521] text-slate-300 text-xs border-b border-white/10 flex items-center ${isMobileView ? 'flex-col gap-1.5 px-2' : 'justify-between'}`}>
