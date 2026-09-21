@@ -202,9 +202,18 @@ export const AndroidUpdateChecker: React.FC = () => {
     }
   };
 
-  // UPDATE_NOTICE_BACKGROUND_V2
-  // Do not auto-launch the Android installer. Checks are silent and the update card
-  // remains visible until the installed version catches up or the user taps "تحديث الآن".
+  // AUTO_UPDATE_BACKGROUND_V3
+  // Checks remain silent. When a newer APK is found, start the download/install flow
+  // automatically. On ordinary Android devices the OS may still require its own final
+  // install confirmation; managed/vendor devices can complete without that prompt.
+  useEffect(() => {
+    if (!hasUpdate || !manifest?.apkUrl || installing || checking) return;
+    const targetCode = Number(manifest.versionCode);
+    if (autoStartedRef.current === targetCode || wasAutoStartedRecently(targetCode)) return;
+
+    const timer = window.setTimeout(() => void install(true), 500);
+    return () => window.clearTimeout(timer);
+  }, [hasUpdate, manifest?.versionCode, manifest?.apkUrl, installing, checking]);
 
   if (!hasUpdate && !installing) return null;
 
