@@ -697,6 +697,22 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
               <span>واتساب</span>
             </button>
 
+            {/* PRIMARY_PAYMENT_ACTION_V2: keep payment visible immediately on entering subscriber page */}
+            {!hasPricing && <div className="mb-3 rounded-xl bg-slate-100 p-3 text-center text-sm font-bold text-slate-700">لا يوجد مبلغ مطلوب — لا توجد تسعيرة</div>}
+            {hasPricing && !isPaid && !isFree && (
+              <button
+                type="button"
+                onClick={handleQuickPayment}
+                className="w-full min-h-[64px] py-3.5 px-5 rounded-2xl text-white font-black shadow-xl transition-all active:scale-[0.985] flex items-center justify-center gap-3 mb-3 bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/30"
+              >
+                <CheckCircle2 className="w-6 h-6 shrink-0" />
+                <span className="flex flex-col items-center leading-tight">
+                  <span className="text-base">تسديد المشترك</span>
+                  <span className="text-xs mt-1 opacity-95">تسديد الآن: {formatCurrency(outstanding || currentCalc.total)}</span>
+                </span>
+              </button>
+            )}
+
             <div className="bg-white dark:bg-[#101a33] border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-sm">
               <DetailRow label="رقم الهاتف" value={subscriberToEdit.phone ? <span dir="ltr">{subscriberToEdit.phone}</span> : '—'} />
               <DetailRow label="الكابينة" value={subscriberToEdit.lineName || subscriberToEdit.line || '—'} strong />
@@ -704,27 +720,7 @@ export const SubscriberModal: React.FC<SubscriberModalProps> = ({
               <DetailRow label="المبلغ المستحق" value={formatCurrency(billedAmount)} strong />
               <DetailRow label="المبلغ المدفوع" value={formatCurrency(paid)} strong />
               <DetailRow label="المتبقي" value={formatCurrency(outstanding)} strong />
-              <DetailRow label="العنوان" value={subscriberToEdit.address || '—'} />
-              <DetailRow label="رقم الصندوق" value={subscriberToEdit.boxNumber || '—'} />
-              <DetailRow label="ملاحظات" value={subscriberToEdit.notes || '—'} />
             </div>
-
-
-            {/* PAYMENT_BUTTON_BELOW_DETAILS_V1 */}
-            {!hasPricing && <div className="mb-3 rounded-xl bg-slate-100 p-3 text-center text-sm font-bold text-slate-700">لا يوجد مبلغ مطلوب — لا توجد تسعيرة</div>}
-            {hasPricing && !isPaid && !isFree && (
-              <button
-                type="button"
-                onClick={handleQuickPayment}
-                className="w-full min-h-[72px] py-4 px-5 rounded-2xl text-white font-black shadow-xl transition-all active:scale-[0.985] flex items-center justify-center gap-3 mb-3 bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/30"
-              >
-                <CheckCircle2 className="w-7 h-7 shrink-0" />
-                <span className="flex flex-col items-center leading-tight">
-                  <span className="text-base">تسديد المشترك</span>
-                  <span className="text-xs mt-1 opacity-95">تسديد الآن: {formatCurrency(outstanding || currentCalc.total)}</span>
-                </span>
-              </button>
-            )}
 
             {/* LOWER_PAYMENT_ACTIONS_V1 */}
             <div className="mt-3 space-y-2">
