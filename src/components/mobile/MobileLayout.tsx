@@ -19,7 +19,7 @@ import {
   Collector,
   AuditLogEntry,
 } from '../../types';
-import { SubscriptionInfo } from '../SubscriptionStatusUI';
+import { SubscriptionInfo, SubscriptionWarningBanner } from '../SubscriptionStatusUI';
 import { reconciledCashbox, summarizeSubscribers } from '../../utils/authoritativeAccounting';
 import type { SecureResetResult } from '../SecureSystemReset';
 
@@ -106,16 +106,19 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
 
   return (
     <div data-moldatk-theme={__moldatkTheme} className="moldatk-responsive-screen moldatk-mobile-shell min-h-screen bg-[#F7F9FC] dark:bg-[#081521] text-slate-900 dark:text-slate-100 flex flex-col font-['Cairo',sans-serif] selection:bg-[#F2B544] selection:text-[#0B1F3B] pb-16">
-      <MobileHeader
-        generatorSpecs={generatorSpecs}
-        darkMode={darkMode}
-        onToggleTheme={onToggleTheme}
-        onLogout={onLogout}
-        onOpenPricingModal={onOpenPricingModal}
-        showSyncStatus={activeTab === 'dashboard'}
-      />
+      <div className="sticky top-0 z-40 w-full shrink-0">
+        <MobileHeader
+          generatorSpecs={generatorSpecs}
+          darkMode={darkMode}
+          onToggleTheme={onToggleTheme}
+          onLogout={onLogout}
+          onOpenPricingModal={onOpenPricingModal}
+          showSyncStatus={activeTab === 'dashboard'}
+        />
+        {subscriptionInfo && <SubscriptionWarningBanner info={subscriptionInfo} />}
+      </div>
 
-      <main className="flex-1 w-full max-w-lg mx-auto">
+      <main className="flex-1 w-full max-w-lg mx-auto min-w-0">
         {activeTab === 'dashboard' && (
           <MobileDashboard
             subscribers={subscribers}
