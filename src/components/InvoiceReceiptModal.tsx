@@ -178,6 +178,14 @@ export const InvoiceReceiptModal: React.FC<InvoiceReceiptModalProps> = ({
     totalOutstandingAfter,
   ]);
 
+  // AUTO_CLOSE_RECEIPT_AFTER_PRINT_V1
+  // Payment flows open the receipt with autoPrint=true. Once printing succeeds,
+  // close only that receipt preview automatically; manual receipt viewing stays unchanged.
+  const closeAfterAutomaticPrint = () => {
+    if (!autoPrint) return;
+    window.setTimeout(() => onClose(), 220);
+  };
+
   const handlePrint = async () => {
     if (!finalized) {
       window.alert(isFree ? 'الحساب المجاني لا يصدر له وصل تسديد.' : 'لا يمكن طباعة الوصل قبل إكمال عملية التسديد وحفظها.');
@@ -285,6 +293,7 @@ export const InvoiceReceiptModal: React.FC<InvoiceReceiptModalProps> = ({
           qrCaption: template.qrCaption,
           footerSystemText: template.footerSystemText,
         });
+        closeAfterAutomaticPrint();
         return;
       } catch (error) {
         console.error('تعذر استخدام طابعة SUNMI، سيتم استخدام طباعة المتصفح:', error);
@@ -339,6 +348,7 @@ export const InvoiceReceiptModal: React.FC<InvoiceReceiptModalProps> = ({
         iframe.style.height = `${pxHeight}px`;
         frameWindow.focus();
         frameWindow.print();
+        closeAfterAutomaticPrint();
         window.setTimeout(() => iframe.remove(), 1200);
       }, 180);
     } catch (error) {
