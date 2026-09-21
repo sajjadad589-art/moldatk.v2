@@ -1205,7 +1205,7 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
   if (subscriptionAccessControlled && !subscriptionInfo) {
     if (subscriptionLoading) {
       return (
-        <div dir="rtl" className="min-h-screen bg-[#F7F9FC] dark:bg-[#081521] flex items-center justify-center p-5 font-['Cairo',sans-serif]">
+        <div dir="rtl" className="moldatk-responsive-screen min-h-screen bg-[#F7F9FC] dark:bg-[#081521] flex items-center justify-center p-3 sm:p-5 font-['Cairo',sans-serif]">
           <div className="w-full max-w-md bg-white dark:bg-[#111c38] rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl p-8 text-center">
             <div className="w-10 h-10 mx-auto rounded-full border-4 border-slate-200 border-t-blue-600 animate-spin mb-4" />
             <div className="font-black text-slate-900 dark:text-white">جاري التحقق من حالة الاشتراك...</div>
@@ -1353,7 +1353,7 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
   // إذا كان المستخدم جابي (collector) تفتح واجهة الكادر/POS الميدانية
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-[#070d1e] text-white">
+      <div className="moldatk-responsive-screen min-h-screen bg-[#070d1e] text-white">
         {toastMessage && (
           <div className="fixed bottom-20 left-5 z-50 bg-blue-600 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-xs font-bold">
             <Sparkles className="w-4 h-4 text-amber-400" />
@@ -1621,7 +1621,7 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
 
   // واجهة لوحة تحكم المدير الكاملة (شاشات واسعة: حاسوب / تابلت)
   return (
-    <div className="min-h-screen bg-[#F7F9FC] dark:bg-[#081521] text-slate-900 dark:text-slate-100 flex flex-col font-['Cairo',sans-serif]" dir="rtl">
+    <div className="moldatk-responsive-screen min-h-screen bg-[#F7F9FC] dark:bg-[#081521] text-slate-900 dark:text-slate-100 flex flex-col font-['Cairo',sans-serif]" dir="rtl">
       {subscriptionInfo && <SubscriptionWarningBanner info={subscriptionInfo} />}
         {userSession.role === 'generator_admin' && <GeneratorNotifications hideFloatingTriggers={activeTab === 'settings'} />}
         {userSession.role === 'generator_admin' && <OwnerAIWatcher onOpenAssistant={() => { setActiveTab('settings'); window.setTimeout(() => window.dispatchEvent(new Event('moldatk-open-owner-ai')), 220); }} />}
