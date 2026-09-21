@@ -259,7 +259,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, forceSuper
 
   if (isSuperAdminPortal) {
     return (
-      <div className="moldatk-safe-screen min-h-screen bg-[#050b16] text-white flex items-center justify-center font-['Cairo',sans-serif]" dir="rtl">
+      <div className="moldatk-responsive-screen moldatk-safe-screen min-h-screen bg-[#050b16] text-white flex items-center justify-center font-['Cairo',sans-serif]" dir="rtl">
         <div className="w-full max-w-md rounded-[32px] border border-blue-900/60 bg-[#0a1629] p-6 sm:p-8 shadow-2xl">
           <div className="text-center mb-7">
             <img src="/brand/moldatk-mark.svg" alt="مولدتك" className="w-20 h-20 mx-auto object-contain bg-white rounded-3xl p-2 shadow-lg" />
@@ -310,7 +310,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, forceSuper
   }
 
   return (
-    <div className="moldatk-safe-screen min-h-screen bg-[#030a14] text-white font-['Cairo',sans-serif] overflow-x-hidden" dir="rtl">
+    <div className="moldatk-responsive-screen moldatk-safe-screen min-h-screen bg-[#030a14] text-white font-['Cairo',sans-serif] overflow-x-hidden" dir="rtl">
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute -top-40 -left-40 w-[420px] h-[420px] rounded-full bg-blue-600/20 blur-3xl" />
         <div className="absolute bottom-[-220px] right-[-120px] w-[480px] h-[480px] rounded-full bg-[#123a73]/25 blur-3xl" />
