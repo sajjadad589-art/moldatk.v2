@@ -1,4 +1,4 @@
-name: Build Signed Android Release 1.3.13
+name: Build Signed Android Release 1.3.30
 
 on:
   push:
@@ -17,8 +17,8 @@ jobs:
     env:
       VITE_SUPABASE_URL: https://adluynhkikoodjljoxeu.supabase.co
       VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_CObjK2Uua18kVkXCkxdRog_keQLIDiE
-      CURRENT_VERSION: 1.3.13
-      CURRENT_VERSION_CODE: 17
+      CURRENT_VERSION: 1.3.30
+      CURRENT_VERSION_CODE: 34
 
     steps:
       - name: Checkout latest main
@@ -86,7 +86,7 @@ jobs:
       - name: Upload signed release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Moldatk-Android-Signed-Release-1.3.13
+          name: Moldatk-Android-Signed-Release-1.3.30
           path: |
             release/Moldatk-Android-Release.apk
             release/Moldatk-Android-Release.aab
@@ -115,10 +115,10 @@ jobs:
             enabled: true,
             versionCode,
             versionName: version,
-            minimumVersionCode: 5,
-            force: false,
+            minimumVersionCode: 34,
+            force: true,
             apkUrl: `https://github.com/sajjadad589-art/moldatk.v2/releases/download/v${version}/Moldatk-Android-Release.apk`,
-            notes: 'نسخة 1.3.13: آخر تحديثات الإعدادات، الذكاء الاصطناعي، مركز المساعدات، الطلبات والتقارير.'
+            notes: 'تحديث 1.3.30: تحسين توافق الشاشات، إصلاحات تسجيل الدخول والسوبر أدمن، تحسين الإيصالات والطباعة، تثبيت تنبيه الاشتراك، تحديثات واجهة الجابي وصاحب المولدة، وفحص وتحديث Android تلقائياً.'
           };
           fs.writeFileSync('public/app-version.json', JSON.stringify(manifest, null, 2) + '\n');
           NODE
