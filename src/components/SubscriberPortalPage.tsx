@@ -185,7 +185,7 @@ export default function SubscriberPortalPage({ token }: { token: string }) {
 
   if (loading) {
     return (
-      <div dir="rtl" className="min-h-screen bg-[#eef4fb] flex items-center justify-center p-6 font-['Cairo']">
+      <div dir="rtl" className="moldatk-responsive-screen min-h-screen bg-[#eef4fb] flex items-center justify-center p-3 sm:p-6 font-['Cairo']">
         <div className="bg-white rounded-3xl shadow-sm border border-slate-200 px-8 py-10 text-center w-full max-w-sm">
           <Loader2 className="w-9 h-9 animate-spin mx-auto text-blue-600 mb-4" />
           <div className="font-black text-slate-900">جاري تحميل حسابك</div>
@@ -197,7 +197,7 @@ export default function SubscriberPortalPage({ token }: { token: string }) {
 
   if (error || !data) {
     return (
-      <div dir="rtl" className="min-h-screen bg-[#eef4fb] flex items-center justify-center p-6 font-['Cairo']">
+      <div dir="rtl" className="moldatk-responsive-screen min-h-screen bg-[#eef4fb] flex items-center justify-center p-3 sm:p-6 font-['Cairo']">
         <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-7 text-center w-full max-w-md">
           <img src="/brand/moldatk-mark.svg" alt="مولدتك" className="w-16 h-16 mx-auto mb-3" />
           <h1 className="font-black text-xl text-slate-950">مولدتك</h1>
@@ -211,7 +211,7 @@ export default function SubscriberPortalPage({ token }: { token: string }) {
   }
 
   return (
-    <div dir="rtl" className="min-h-screen bg-[#eef4fb] text-slate-950 font-['Cairo']">
+    <div dir="rtl" className="moldatk-responsive-screen min-h-screen bg-[#eef4fb] text-slate-950 font-['Cairo']">
       <header className="bg-gradient-to-l from-[#0B1F3B] to-[#1267b8] text-white">
         <div className="max-w-3xl mx-auto px-4 pt-5 pb-20">
           <div className="flex items-center justify-between">
