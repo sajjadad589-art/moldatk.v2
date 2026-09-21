@@ -1432,7 +1432,6 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
   if (shouldShowMobileLayout) {
     return (
       <div dir="rtl">
-        {subscriptionInfo && <SubscriptionWarningBanner info={subscriptionInfo} />}
         {userSession.role === 'generator_admin' && <GeneratorNotifications hideFloatingTriggers={activeTab === 'settings'} />}
         {userSession.role === 'generator_admin' && <OwnerAIWatcher onOpenAssistant={() => { setActiveTab('settings'); window.setTimeout(() => window.dispatchEvent(new Event('moldatk-open-owner-ai')), 220); }} />}
         {toastMessage && (
@@ -1622,7 +1621,6 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
   // واجهة لوحة تحكم المدير الكاملة (شاشات واسعة: حاسوب / تابلت)
   return (
     <div className="moldatk-responsive-screen min-h-screen bg-[#F7F9FC] dark:bg-[#081521] text-slate-900 dark:text-slate-100 flex flex-col font-['Cairo',sans-serif]" dir="rtl">
-      {subscriptionInfo && <SubscriptionWarningBanner info={subscriptionInfo} />}
         {userSession.role === 'generator_admin' && <GeneratorNotifications hideFloatingTriggers={activeTab === 'settings'} />}
         {userSession.role === 'generator_admin' && <OwnerAIWatcher onOpenAssistant={() => { setActiveTab('settings'); window.setTimeout(() => window.dispatchEvent(new Event('moldatk-open-owner-ai')), 220); }} />}
       {toastMessage && (
@@ -1632,14 +1630,17 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
         </div>
       )}
 
-      <Navbar
-        darkMode={darkMode}
-        onToggleTheme={() => setDarkMode(!darkMode)}
-        generatorSpecs={generatorSpecs}
-        onOpenPricingModal={handleOpenPricingModal}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-      />
+      <div className="sticky top-0 z-40 w-full shrink-0">
+        <Navbar
+          darkMode={darkMode}
+          onToggleTheme={() => setDarkMode(!darkMode)}
+          generatorSpecs={generatorSpecs}
+          onOpenPricingModal={handleOpenPricingModal}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+        />
+        {subscriptionInfo && <SubscriptionWarningBanner info={subscriptionInfo} />}
+      </div>
 
       <div className="flex-1 flex max-w-[1700px] w-full mx-auto">
         <Sidebar
