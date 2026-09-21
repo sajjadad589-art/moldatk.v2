@@ -22,7 +22,7 @@ const AppUpdater = registerPlugin<AppUpdaterPlugin>('AppUpdater');
 const AUTO_UPDATE_KEY_PREFIX = 'moldatk_auto_update_started_';
 const REMOTE_MANIFEST_URL = 'https://raw.githubusercontent.com/sajjadad589-art/moldatk.v2/main/public/app-version.json';
 const WEB_MANIFEST_URL = 'https://moldatk-v2-beta.vercel.app/app-version.json';
-const UPDATE_CHECK_INTERVAL_MS = 60 * 1000;
+const UPDATE_CHECK_INTERVAL_MS = 2 * 60 * 1000;
 const AUTO_UPDATE_COOLDOWN_MS = 2 * 60 * 1000;
 
 export const AndroidUpdateChecker: React.FC = () => {
@@ -33,7 +33,6 @@ export const AndroidUpdateChecker: React.FC = () => {
   const [installing, setInstalling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState(false);
-  const [showUpToDate, setShowUpToDate] = useState(false);
   const autoStartedRef = useRef<number | null>(null);
   const checkInFlightRef = useRef(false);
 
@@ -125,11 +124,13 @@ export const AndroidUpdateChecker: React.FC = () => {
 
       if (!latestManifest.enabled || Number(latestManifest.versionCode) <= installedCode) {
         autoStartedRef.current = null;
-        setShowUpToDate(true);
-        window.setTimeout(() => setShowUpToDate(false), 3200);
       }
     } catch (e: any) {
-      setError(e?.message || 'تعذر التحقق من التحديث');
+      // Background checks stay silent. If an update is already known, keep its card visible
+      // and preserve any install-related message only when relevant.
+      if (manifest && currentVersionCode !== null && Number(manifest.versionCode) > currentVersionCode) {
+        console.warn('Background update check failed:', e);
+      }
     } finally {
       checkInFlightRef.current = false;
       setChecking(false);
@@ -203,17 +204,11 @@ export const AndroidUpdateChecker: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    if (!hasUpdate || !manifest?.apkUrl || installing || checking) return;
-    const targetCode = Number(manifest.versionCode);
-    if (autoStartedRef.current === targetCode || wasAutoStartedRecently(targetCode)) return;
+  // UPDATE_NOTICE_BACKGROUND_V2
+  // Do not auto-launch the Android installer. Checks are silent and the update card
+  // remains visible until the installed version catches up or the user taps "تحديث الآن".
 
-    const timer = window.setTimeout(() => void install(true), 700);
-    return () => window.clearTimeout(timer);
-  }, [hasUpdate, manifest?.versionCode, manifest?.apkUrl, installing, checking]);
-
-  if (dismissed && !forceUpdate) return null;
-  if (!checking && !installing && !error && !hasUpdate && !showUpToDate) return null;
+  if (!hasUpdate && !installing) return null;
 
   const waitingForInstall = Boolean(hasUpdate && manifest && wasAutoStartedRecently(Number(manifest.versionCode)) && !installing && !error);
 
@@ -222,15 +217,15 @@ export const AndroidUpdateChecker: React.FC = () => {
       <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl shadow-xl px-3.5 py-3">
         <div className="flex items-center gap-3">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${error ? 'bg-rose-50 text-rose-600' : hasUpdate ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'}`}>
-            {checking || installing ? <RefreshCw className="w-5 h-5 animate-spin" /> : error ? <AlertTriangle className="w-5 h-5" /> : hasUpdate ? <Download className="w-5 h-5" /> : <CheckCircle2 className="w-5 h-5" />}
+            {installing ? <RefreshCw className="w-5 h-5 animate-spin" /> : error ? <AlertTriangle className="w-5 h-5" /> : <Download className="w-5 h-5" />}
           </div>
 
           <div className="min-w-0 flex-1">
             <div className="text-xs font-black text-slate-900 dark:text-white">
-              {checking ? 'جاري التحقق من التحديثات...' : installing ? 'جاري تنزيل التحديث...' : error ? 'تعذر التحديث' : waitingForInstall ? 'التحديث جاهز للتثبيت' : hasUpdate ? `تحديث ${manifest?.versionName || ''} متوفر` : 'أنت تستخدم أحدث إصدار'}
+              {installing ? 'جاري تنزيل التحديث...' : error ? 'تعذر التحديث' : waitingForInstall ? 'التحديث جاهز للتثبيت' : `تحديث ${manifest?.versionName || ''} متوفر`}
             </div>
             <div className="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400 truncate">
-              {error || (waitingForInstall ? 'إذا أغلقت شاشة تثبيت أندرويد، اضغط تحديث الآن لإعادة فتحها.' : hasUpdate ? (manifest?.notes || `الإصدار الحالي ${currentVersionName || currentVersionCode}`) : `الإصدار الحالي ${currentVersionName || currentVersionCode || ''}`)}
+              {error || (waitingForInstall ? 'إذا أغلقت شاشة تثبيت أندرويد، اضغط تحديث الآن لإعادة فتحها.' : (manifest?.notes || `الإصدار الحالي ${currentVersionName || currentVersionCode}`))}
             </div>
           </div>
 
@@ -240,14 +235,14 @@ export const AndroidUpdateChecker: React.FC = () => {
             </button>
           )}
 
-          {!forceUpdate && !checking && !installing && (
+          {!hasUpdate && !forceUpdate && !checking && !installing && (
             <button type="button" onClick={() => setDismissed(true)} className="shrink-0 p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="إغلاق إشعار التحديث">
               <X className="w-4 h-4" />
             </button>
           )}
         </div>
 
-        {(checking || installing) && (
+        {installing && (
           <div className="mt-2 h-1 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
             <div className="h-full w-2/3 rounded-full bg-blue-600 animate-pulse" />
           </div>
