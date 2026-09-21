@@ -105,7 +105,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   ));
 
   return (
-    <div data-moldatk-theme={__moldatkTheme} className="moldatk-mobile-shell min-h-screen bg-[#F7F9FC] dark:bg-[#081521] text-slate-900 dark:text-slate-100 flex flex-col font-['Cairo',sans-serif] selection:bg-[#F2B544] selection:text-[#0B1F3B] pb-16">
+    <div data-moldatk-theme={__moldatkTheme} className="moldatk-responsive-screen moldatk-mobile-shell min-h-screen bg-[#F7F9FC] dark:bg-[#081521] text-slate-900 dark:text-slate-100 flex flex-col font-['Cairo',sans-serif] selection:bg-[#F2B544] selection:text-[#0B1F3B] pb-16">
       <MobileHeader
         generatorSpecs={generatorSpecs}
         darkMode={darkMode}
