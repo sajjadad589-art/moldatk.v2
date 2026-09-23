@@ -23,6 +23,47 @@ const normalizeIdentifier = (value: unknown) => String(value ?? "").trim().toLow
 const collectorEmail = (phone: string) => `c_${normalizePhone(phone)}@collector.molidatk.app`;
 const collectorPassword = (pin: string) => `Md!${String(pin || "").trim()}`;
 
+const sha256Hex = async (value: string) => {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, "0")).join("");
+};
+
+const requestIp = (req: Request) => {
+  const forwarded = String(req.headers.get("x-forwarded-for") || "").split(",")[0].trim();
+  return String(
+    req.headers.get("cf-connecting-ip")
+    || req.headers.get("x-real-ip")
+    || forwarded
+    || "unknown"
+  ).slice(0, 96);
+};
+
+async function rateAllowed(
+  admin: any,
+  rawKey: string,
+  limit: number,
+  windowSeconds: number,
+  blockSeconds: number,
+  increment = true,
+) {
+  try {
+    const keyHash = await sha256Hex(rawKey);
+    const { data, error } = await admin.rpc("consume_moldatk_auth_rate_limit", {
+      p_key_hash: keyHash,
+      p_limit: limit,
+      p_window_seconds: windowSeconds,
+      p_block_seconds: blockSeconds,
+      p_increment: increment,
+    });
+    if (error) throw error;
+    return data !== false;
+  } catch (error) {
+    // Availability must not depend on the throttle table. Fail open, but log server-side.
+    console.warn("auth rate-limit check unavailable:", error);
+    return true;
+  }
+}
+
 const fromBase64Url = (value: string) => {
   const base64 = value.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (value.length % 4)) % 4);
   const raw = atob(base64);
@@ -194,6 +235,11 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 
+  const contentLength = Number(req.headers.get("content-length") || "0");
+  if (Number.isFinite(contentLength) && contentLength > 64 * 1024) {
+    return json({ error: "request_too_large" }, 413);
+  }
+
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -202,10 +248,27 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
     const action = String(body?.action || "");
+    const ip = requestIp(req);
+
+    if (["discover", "password-login", "passkey-auth-options", "passkey-auth-verify"].includes(action)) {
+      const publicBurstAllowed = await rateAllowed(admin, `public-auth-ip:${ip}`, 180, 600, 900, true);
+      if (!publicBurstAllowed) {
+        return action === "discover"
+          ? json({ found: false })
+          : json({ error: "invalid_credentials" }, 401);
+      }
+    }
 
     if (action === "discover") {
       const identifier = normalizeIdentifier(body?.identifier);
-      if (identifier.length < 5) return json({ found: false });
+      if (identifier.length < 5 || identifier.length > 254) return json({ found: false });
+
+      const [ipAllowed, identifierAllowed] = await Promise.all([
+        rateAllowed(admin, `discover-ip:${ip}`, 100, 600, 900, true),
+        rateAllowed(admin, `discover-id:${identifier}`, 30, 600, 900, true),
+      ]);
+      if (!ipAllowed || !identifierAllowed) return json({ found: false });
+
       const role = await discoverRole(admin, identifier);
       return json({ found: Boolean(role), roleHint: role });
     }
@@ -213,7 +276,15 @@ Deno.serve(async (req) => {
     if (action === "password-login") {
       const identifier = normalizeIdentifier(body?.identifier);
       const secret = String(body?.secret || "").trim();
-      if (!identifier || secret.length < 4) return json({ error: "invalid_credentials" }, 401);
+      if (!identifier || identifier.length > 254 || secret.length < 4 || secret.length > 256) {
+        return json({ error: "invalid_credentials" }, 401);
+      }
+
+      const [ipNotBlocked, identifierNotBlocked] = await Promise.all([
+        rateAllowed(admin, `login-fail-ip:${ip}`, 40, 900, 900, false),
+        rateAllowed(admin, `login-fail-id:${identifier}`, 8, 900, 1800, false),
+      ]);
+      if (!ipNotBlocked || !identifierNotBlocked) return json({ error: "invalid_credentials" }, 401);
 
       let grant: any = null;
       let sourceUserId = "";
@@ -256,7 +327,13 @@ Deno.serve(async (req) => {
         }
       }
 
-      if (!grant || !sourceUserId) return json({ error: "invalid_credentials" }, 401);
+      if (!grant || !sourceUserId) {
+        await Promise.all([
+          rateAllowed(admin, `login-fail-ip:${ip}`, 40, 900, 900, true),
+          rateAllowed(admin, `login-fail-id:${identifier}`, 8, 900, 1800, true),
+        ]);
+        return json({ error: "invalid_credentials" }, 401);
+      }
       const account = await loadAccount(admin, sourceUserId);
 
       return json({
@@ -366,6 +443,8 @@ Deno.serve(async (req) => {
     if (action === "passkey-auth-options") {
       const userId = String(body?.userId || "");
       if (!/^[0-9a-f-]{36}$/i.test(userId)) return json({ error: "invalid_account" }, 400);
+      const passkeyAllowed = await rateAllowed(admin, `passkey-options:${ip}:${userId}`, 30, 600, 900, true);
+      if (!passkeyAllowed) return json({ error: "invalid_account" }, 400);
       await loadAccount(admin, userId);
       const { origin, rpID } = resolveOrigin(req, body);
 
