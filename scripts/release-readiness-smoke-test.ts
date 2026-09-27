@@ -44,6 +44,8 @@ assert(
   'cloud invoice dedupe is not wired'
 );
 assert(sync.includes('moldatk_factory_reset_in_progress'), 'cloud sync is not frozen during factory reset');
+assert(sync.includes('SYNC_TARIFF_SERVER_FIRST_V1'), 'tariffs are not guaranteed to sync before subscriber/invoice projections');
+assert(sync.includes("session?.role === 'generator_admin'\n          ? localTariffs.filter"), 'collector tariff cache is not server-authoritative');
 
 const app = read('src/App.tsx');
 assert(app.includes('SUBSCRIPTION_LOCK_STABILITY_V1'), 'subscription lock stability marker missing');
@@ -66,8 +68,8 @@ assert(subscriberModal.includes('applyPaymentOldestFirst('), 'quick payment no l
 assert(subscriberModal.includes('onSaveSubscriber(updated);'), 'subscriber payment does not persist updated ledger state');
 
 const gradle = read('android/app/build.gradle');
-assert(/versionCode\\s+35\\b/.test(gradle), 'Android versionCode is not 33');
-assert(/versionName\s+"1\\.3\\.31"/.test(gradle), 'Android versionName is not 1.3.31');
+assert(/versionCode\s+35\b/.test(gradle), 'Android versionCode is not 35');
+assert(/versionName\s+"1\.3\.31"/.test(gradle), 'Android versionName is not 1.3.31');
 
 const mobileDashboard = read('src/components/mobile/MobileDashboard.tsx');
 assert(mobileDashboard.includes('const totalSubscribers = paidSubs.length + unpaidSubs.length;'), 'mobile dashboard total is not aligned with paid + unpaid classified subscribers');
