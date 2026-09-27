@@ -47,7 +47,11 @@ for (const sub of zeroed) {
   assert.equal(sub.amountPaid, 0, 'Empty tariff list must zero the live paid counter');
   assert.equal(sub.paymentStatus, 'unpaid', 'Empty tariff list must reset billable subscribers to unpaid');
   assert.equal((sub.invoicesHistory || []).some(inv => inv.status === 'unpaid' || inv.status === 'partial'), false, 'Empty tariff list must remove every collectible unpaid/partial liability');
-  assert.equal((sub.invoicesHistory || []).some(inv => Number(inv.paidAmount || 0) > 0 && inv.status === 'paid'), true, 'Paid history must remain available after tariff deletion');
+  if (sub.id === 'paid' || sub.id === 'partial') {
+    assert.equal((sub.invoicesHistory || []).some(inv => Number(inv.paidAmount || 0) > 0 && inv.status === 'paid'), true, 'Existing paid value must remain as settled history after tariff deletion');
+  } else {
+    assert.equal((sub.invoicesHistory || []).length, 0, 'A subscriber with only unpaid liabilities must have no collectible history after tariff deletion');
+  }
 }
 
 const pricing = fs.readFileSync('src/components/PricingModal.tsx', 'utf8');
