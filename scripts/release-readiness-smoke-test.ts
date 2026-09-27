@@ -45,6 +45,9 @@ assert(
 );
 assert(sync.includes('moldatk_factory_reset_in_progress'), 'cloud sync is not frozen during factory reset');
 assert(sync.includes('SYNC_TARIFF_SERVER_FIRST_V1'), 'tariffs are not guaranteed to sync before subscriber/invoice projections');
+assert(sync.includes('COLLECTOR_SERVER_TARIFF_AUTHORITY_V2'), 'collector does not verify server tariff authority before financial writes');
+assert(sync.includes('COLLECTOR_NO_TARIFF_DIRTY_DROP_V2'), 'collector stale dirty state is not discarded when server has no tariff');
+assert(sync.includes('zeroLiveMonthlyCycle(pulledSubscribers)'), 'no-tariff pull does not clear stale local liabilities');
 assert(sync.includes("session?.role === 'generator_admin'\n          ? localTariffs.filter"), 'collector tariff cache is not server-authoritative');
 
 const app = read('src/App.tsx');
@@ -68,8 +71,8 @@ assert(subscriberModal.includes('applyPaymentOldestFirst('), 'quick payment no l
 assert(subscriberModal.includes('onSaveSubscriber(updated);'), 'subscriber payment does not persist updated ledger state');
 
 const gradle = read('android/app/build.gradle');
-assert(/versionCode\s+35\b/.test(gradle), 'Android versionCode is not 35');
-assert(/versionName\s+"1\.3\.31"/.test(gradle), 'Android versionName is not 1.3.31');
+assert(/versionCode\\s+36\\b/.test(gradle), 'Android versionCode is not 36');
+assert(/versionName\s+"1\\.3\\.32"/.test(gradle), 'Android versionName is not 1.3.32');
 
 const mobileDashboard = read('src/components/mobile/MobileDashboard.tsx');
 assert(mobileDashboard.includes('const totalSubscribers = paidSubs.length + unpaidSubs.length;'), 'mobile dashboard total is not aligned with paid + unpaid classified subscribers');
@@ -79,7 +82,7 @@ assert(updaterFinalizer.includes('candidates.sort((a, b) => Number(b.versionCode
 
 const sw = read('public/sw.js');
 const main = read('src/main.tsx');
-assert(sw.includes('moldatk-shell-v4-1.3.31'), '1.3.31 service-worker cache marker missing');
-assert(main.includes('/sw.js?v=1.3.31'), '1.3.31 service-worker registration missing');
+assert(sw.includes('moldatk-shell-v4-1.3.32'), '1.3.32 service-worker cache marker missing');
+assert(main.includes('/sw.js?v=1.3.32'), '1.3.32 service-worker registration missing');
 
-console.log('Release readiness regression passed: Super Admin status/UI, permanent data purge, dashboard count, versioning, update selection, Web Push, permissions, cloud debt, subscription locks, and onboarding payments are wired for 1.3.31.');
+console.log('Release readiness regression passed: Super Admin status/UI, permanent data purge, dashboard count, versioning, update selection, Web Push, permissions, cloud debt, subscription locks, and onboarding payments are wired for 1.3.32.');
