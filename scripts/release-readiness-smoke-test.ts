@@ -48,7 +48,7 @@ assert(sync.includes('SYNC_TARIFF_SERVER_FIRST_V1'), 'tariffs are not guaranteed
 assert(sync.includes('COLLECTOR_SERVER_TARIFF_AUTHORITY_V2'), 'collector does not verify server tariff authority before financial writes');
 assert(sync.includes('COLLECTOR_NO_TARIFF_DIRTY_DROP_V2'), 'collector stale dirty state is not discarded when server has no tariff');
 assert(sync.includes('zeroLiveMonthlyCycle(pulledSubscribers)'), 'no-tariff pull does not clear stale local liabilities');
-assert(sync.includes("session?.role === 'generator_admin'\n          ? localTariffs.filter"), 'collector tariff cache is not server-authoritative');
+assert(sync.includes("session?.role === 'generator_admin' && hasPendingLocalChanges()"), 'owner-only pending tariffs are not gated by an explicit local dirty state');
 
 const app = read('src/App.tsx');
 assert(app.includes('SUBSCRIPTION_LOCK_STABILITY_V1'), 'subscription lock stability marker missing');
