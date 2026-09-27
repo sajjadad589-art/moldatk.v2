@@ -71,8 +71,8 @@ assert(subscriberModal.includes('applyPaymentOldestFirst('), 'quick payment no l
 assert(subscriberModal.includes('onSaveSubscriber(updated);'), 'subscriber payment does not persist updated ledger state');
 
 const gradle = read('android/app/build.gradle');
-assert(/versionCode\\s+36\\b/.test(gradle), 'Android versionCode is not 36');
-assert(/versionName\s+"1\\.3\\.32"/.test(gradle), 'Android versionName is not 1.3.32');
+assert(/versionCode\s+36\b/.test(gradle), 'Android versionCode is not 36');
+assert(/versionName\s+"1\.3\.32"/.test(gradle), 'Android versionName is not 1.3.32');
 
 const mobileDashboard = read('src/components/mobile/MobileDashboard.tsx');
 assert(mobileDashboard.includes('const totalSubscribers = paidSubs.length + unpaidSubs.length;'), 'mobile dashboard total is not aligned with paid + unpaid classified subscribers');
