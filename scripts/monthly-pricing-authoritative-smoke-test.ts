@@ -35,7 +35,8 @@ assert.equal(freshOct.paymentStatus, 'unpaid');
 const zeroed = zeroLiveMonthlyCycle([freshOct])[0];
 assert.equal(zeroed.amountDue, 0);
 assert.equal(zeroed.amountPaid, 0);
-assert.equal(zeroed.invoicesHistory?.length, freshOct.invoicesHistory?.length);
+assert.equal((zeroed.invoicesHistory || []).some(i => i.status === 'unpaid' || i.status === 'partial'), false);
+assert.equal((zeroed.invoicesHistory || []).every(i => i.status === 'paid' || i.status === 'cancelled' || i.status === 'free'), true);
 
 // Regression: an active monthly tariff with an empty tiers array must still show
 // all four pricing cards instead of rendering a blank pricing section.
