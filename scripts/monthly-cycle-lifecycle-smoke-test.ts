@@ -46,7 +46,8 @@ for (const sub of zeroed) {
   assert.equal(sub.amountDue, 0, 'Empty tariff list must zero the live due amount');
   assert.equal(sub.amountPaid, 0, 'Empty tariff list must zero the live paid counter');
   assert.equal(sub.paymentStatus, 'unpaid', 'Empty tariff list must reset billable subscribers to unpaid');
-  assert((sub.invoicesHistory || []).length > 0, 'Empty tariff list must preserve historical invoices');
+  assert.equal((sub.invoicesHistory || []).some(inv => inv.status === 'unpaid' || inv.status === 'partial'), false, 'Empty tariff list must remove every collectible unpaid/partial liability');
+  assert.equal((sub.invoicesHistory || []).some(inv => Number(inv.paidAmount || 0) > 0 && inv.status === 'paid'), true, 'Paid history must remain available after tariff deletion');
 }
 
 const pricing = fs.readFileSync('src/components/PricingModal.tsx', 'utf8');
@@ -103,4 +104,4 @@ assert(!sync.includes("remove('generator_monthly_tariffs', sent.deletedTariffs)"
 assert((sync.includes('if (pending()) await push(snapshot());') || (sync.includes('const hadPending = pending();') && sync.includes('if (hadPending)') && sync.includes('await push(snapshot());'))), 'Pending local tariff deletion must be pushed before any cloud pull');
 assert((sync.includes('if (!disposed && !pending()) await pull();') || (sync.includes('if (!disposed && !pending()) {') && sync.includes('await pull();'))), 'Cloud pull must not run while a local tariff deletion is still unsynced');
 
-console.log('Monthly cycle lifecycle suite passed: explicit-save activation, carried debt, accounting-safe tariff deletion, zero live state, dashboard zero state and sync tombstones.');
+console.log('Monthly cycle lifecycle suite passed: explicit-save activation, carried debt, accounting-safe tariff deletion, zero-liability state, paid-history preservation, dashboard zero state and sync tombstones.');
