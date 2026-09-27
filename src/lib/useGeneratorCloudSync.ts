@@ -584,7 +584,7 @@ export function useGeneratorCloudSync(session: ActiveUserSession | null) {
           list.push(item);
           invoiceMap.set(item.subscriberId, list);
         }
-        const pulledSubscribers = (subs.data || []).filter((row: any) => !deletedSubscriberIds.has(row.id)).map((row: any) => {
+        const pulledSubscribers: Subscriber[] = (subs.data || []).filter((row: any) => !deletedSubscriberIds.has(row.id)).map((row: any): Subscriber => {
           const subscriber = rowToSubscriber(row);
           const history = (invoiceMap.get(subscriber.id) || []).map(inv => normalizeInvoiceForSubscriber(subscriber, inv));
           if (isPermanentFreeSubscriber(subscriber)) {
