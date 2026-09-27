@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from './supabase';
 
 type CashboxResponse = { reset_at?: string | null; balance?: number | string | null } | null;
@@ -35,6 +35,7 @@ const readCachedBalance = (): number | null => {
  * just-completed payment appears immediately instead of briefly reverting to stale 0.
  */
 export function useCashboxBalance(fallback: number) {
+  const requestVersion = useRef(0);
   const [serverBalance, setServerBalance] = useState<number | null>(() => readCachedBalance());
   const [preferLocalPending, setPreferLocalPending] = useState<boolean>(() => {
     const { pendingKey } = sessionContext();
@@ -42,14 +43,19 @@ export function useCashboxBalance(fallback: number) {
   });
 
   const refresh = useCallback(async () => {
+    const version = ++requestVersion.current;
     const { generatorId, cacheKey } = sessionContext();
     if (!generatorId) return;
     try {
       const { data, error } = await supabase.rpc('get_generator_cashbox', { p_generator_id: generatorId });
       if (error) throw error;
+      if (version !== requestVersion.current || sessionContext().generatorId !== generatorId) return;
       const value = Number((data as CashboxResponse)?.balance);
       if ((data as CashboxResponse)?.balance != null && Number.isFinite(value)) {
         setServerBalance(value);
+        if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(data));
+      } else {
+        setServerBalance(null);
         if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(data));
       }
     } catch (error) {
@@ -64,7 +70,7 @@ export function useCashboxBalance(fallback: number) {
       const detail = (event as CustomEvent)?.detail;
       if (detail?.source === 'cloud') {
         const cached = readCachedBalance();
-        if (cached != null) setServerBalance(cached);
+        setServerBalance(cached);
         setPreferLocalPending(false);
       } else {
         setPreferLocalPending(true);
@@ -74,7 +80,7 @@ export function useCashboxBalance(fallback: number) {
 
     const onCashboxChanged = () => {
       const cached = readCachedBalance();
-      if (cached != null) setServerBalance(cached);
+      setServerBalance(cached);
       setPreferLocalPending(false);
       void refresh();
     };
@@ -83,7 +89,7 @@ export function useCashboxBalance(fallback: number) {
       const { cacheKey, pendingKey } = sessionContext();
       if (cacheKey && event.key === cacheKey) {
         const cached = readCachedBalance();
-        if (cached != null) setServerBalance(cached);
+        setServerBalance(cached);
       }
       if (pendingKey && event.key === pendingKey) setPreferLocalPending(event.newValue === '1');
     };
@@ -94,6 +100,7 @@ export function useCashboxBalance(fallback: number) {
     window.addEventListener('moldatk-sync-now', onCashboxChanged);
     window.addEventListener('online', onCashboxChanged);
     return () => {
+      requestVersion.current++;
       window.removeEventListener('moldatk-local-sync', onLocalSync);
       window.removeEventListener('moldatk-cashbox-changed', onCashboxChanged);
       window.removeEventListener('storage', onStorage);

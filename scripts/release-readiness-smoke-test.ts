@@ -71,8 +71,8 @@ assert(subscriberModal.includes('applyPaymentOldestFirst('), 'quick payment no l
 assert(subscriberModal.includes('onSaveSubscriber(updated);'), 'subscriber payment does not persist updated ledger state');
 
 const gradle = read('android/app/build.gradle');
-assert(/versionCode\s+36\b/.test(gradle), 'Android versionCode is not 36');
-assert(/versionName\s+"1\.3\.32"/.test(gradle), 'Android versionName is not 1.3.32');
+assert(/versionCode\s+37\b/.test(gradle), 'Android versionCode is not 37');
+assert(/versionName\s+"1\.3\.33"/.test(gradle), 'Android versionName is not 1.3.33');
 
 const mobileDashboard = read('src/components/mobile/MobileDashboard.tsx');
 assert(mobileDashboard.includes('const totalSubscribers = paidSubs.length + unpaidSubs.length;'), 'mobile dashboard total is not aligned with paid + unpaid classified subscribers');
@@ -82,7 +82,7 @@ assert(updaterFinalizer.includes('candidates.sort((a, b) => Number(b.versionCode
 
 const sw = read('public/sw.js');
 const main = read('src/main.tsx');
-assert(sw.includes('moldatk-shell-v4-1.3.32'), '1.3.32 service-worker cache marker missing');
-assert(main.includes('/sw.js?v=1.3.32'), '1.3.32 service-worker registration missing');
+assert(sw.includes('moldatk-shell-v4-1.3.33'), '1.3.33 service-worker cache marker missing');
+assert(main.includes('/sw.js?v=1.3.33'), '1.3.33 service-worker registration missing');
 
-console.log('Release readiness regression passed: Super Admin status/UI, permanent data purge, dashboard count, versioning, update selection, Web Push, permissions, cloud debt, subscription locks, and onboarding payments are wired for 1.3.32.');
+console.log('Release readiness regression passed: Super Admin status/UI, permanent data purge, dashboard count, versioning, update selection, Web Push, permissions, cloud debt, subscription locks, and onboarding payments are wired for 1.3.33.');

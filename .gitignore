@@ -2,6 +2,8 @@ node_modules/
 build/
 dist/
 coverage/
+.test-output/
+supabase/.temp/
 .DS_Store
 *.log
 .env*

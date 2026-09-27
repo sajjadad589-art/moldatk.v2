@@ -27,6 +27,7 @@ jobs:
         run: npm run test:portal
       - run: node scripts/sync-conflict-resolution-regression.mjs
       - run: npm run test:sync-cashbox
+      - run: node scripts/reset-sync-database-regression.mjs
       - run: node scripts/live-sync-receipt-cashbox-parity-regression.mjs
       - run: node scripts/financial-integrity-static-regression.mjs
       - run: npx tsx scripts/financial-integrity-runtime-test.ts

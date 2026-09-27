@@ -28,7 +28,7 @@ async function callReset(id: string, requestId: string) {
   const result = await supabase.rpc('reset_generator_cashbox', {
     p_generator_id: id,
     p_request_id: requestId,
-  });
+  }).setHeader('x-moldatk-sync-epoch', localStorage.getItem(`moldatk_sync_epoch_${id}`) || '0');
   return result;
 }
 

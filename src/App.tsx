@@ -51,7 +51,6 @@ import { hasPaymentsInMonth, removeUnpaidMonthLedger, extinguishDeletedTariffLia
 const SuperAdminDashboard = lazy(() => import('./components/SuperAdminDashboard').then(module => ({ default: module.SuperAdminDashboard })));
 import { supabase } from './lib/supabase';
 import { loadCloudCollectors, syncCloudCollectorRoster } from './lib/collectorCloud';
-import { persistCollectorSubscriber } from './lib/subscriberCloud';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { ExpiredSubscriptionScreen, SuspendedAccountScreen, SubscriptionUnavailableScreen, SubscriptionWarningBanner, SubscriptionInfo, daysUntilExpiry } from './components/SubscriptionStatusUI';
@@ -408,7 +407,18 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
     const handleStorage = (e: StorageEvent) => {
       if (!e.key || e.key.endsWith(`_${userSession.generatorId}`)) refreshScopedData();
     };
-    const handleLocalSync = () => refreshScopedData();
+    const handleLocalSync = (event: Event) => {
+      const detail = (event as CustomEvent)?.detail;
+      if (detail?.generatorId && detail.generatorId !== userSession.generatorId) return;
+      refreshScopedData();
+      if (detail?.reset) {
+        setSubscriberToEdit(null);
+        setSelectedReceiptSubscriber(null);
+        setSelectedReceiptInvoice(null);
+        setIsSubscriberModalOpen(false);
+        setIsReceiptModalOpen(false);
+      }
+    };
 
     window.addEventListener('storage', handleStorage);
     window.addEventListener('moldatk-local-sync', handleLocalSync);
@@ -1061,15 +1071,13 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
     };
 
     // Local-first: payment/status changes become visible immediately and never wait for network.
-    setSubscribers(prev => {
-      const exists = prev.some(s => s.id === normalizedSub.id);
-      const updated = exists ? prev.map(s => (s.id === normalizedSub.id ? normalizedSub : s)) : [normalizedSub, ...prev];
-      try {
-        localStorage.setItem(getStorageKey('moldatk_subscribers'), JSON.stringify(updated));
-        window.dispatchEvent(new Event('moldatk-local-sync'));
-      } catch (e) {}
-      return updated;
-    });
+    const latest = readLocalJson<Subscriber[]>('moldatk_subscribers', subscribers, userSession);
+    const exists = latest.some(s => s.id === normalizedSub.id);
+    const updated = exists ? latest.map(s => s.id === normalizedSub.id ? normalizedSub : s) : [normalizedSub, ...latest];
+    // Persist before starting the async flush; React may defer state updater callbacks.
+    localStorage.setItem(getStorageKey('moldatk_subscribers'), JSON.stringify(updated));
+    setSubscribers(updated);
+    window.dispatchEvent(new Event('moldatk-local-sync'));
     setSubscriberToEdit(normalizedSub);
 
     const shouldSyncCloud = (userSession?.role === 'generator_admin' || userSession?.role === 'collector') && Boolean(userSession.generatorId);
@@ -1078,7 +1086,8 @@ export default function App({ forceSuperAdmin = false }: AppProps) {
 
     if (shouldSyncCloud && onlineNow && userSession?.generatorId) {
       try {
-        await persistCollectorSubscriber(userSession.generatorId, normalizedSub);
+        // One ordered writer persists subscriber + invoices + audit before acknowledging.
+        await flushGeneratorSync(userSession.generatorId);
         cloudSynced = true;
       } catch (error: any) {
         console.error('Subscriber cloud save deferred:', error);

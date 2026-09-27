@@ -29,10 +29,13 @@ function fixture(role = 'generator_admin') {
   const db = Object.fromEntries(tables.map(t=>[t,[]]));
   db.generator_settings = [{ generator_id:id, specs:{}, invoice_settings:{} }];
   let writes=0, reads=0, reconciles=0, active=0, maxActive=0;
-  let fail=false, pause, onWrite, cashbox={ reset_id:null,reset_at:null,balance:null };
+  let fail=false, pause, onWrite, epoch=0, authorized=true, stateError=null, cashbox={ reset_id:null,reset_at:null,balance:null };
   const client = {
     auth: { async getSession() { active++; maxActive=Math.max(maxActive,active); await sleep(1); active--; return {data:{session:{}}}; } },
-    async rpc(name, args = {}) {
+    rpc(name, args = {}) {
+      const q = { setHeader(){return q;}, then(resolve,reject){return run().then(resolve,reject);} };
+      async function run() {
+      if (name === 'get_generator_sync_state') return {data:{authorized,epoch},error:stateError};
       if (name.startsWith('reconcile_generator_')) { reconciles++; onWrite?.(); return {data:{ok:true}}; }
       if (name === 'delete_generator_tariff_month') {
         writes++;
@@ -46,10 +49,12 @@ function fixture(role = 'generator_admin') {
         return {data:{ok:true,tariff_id:tariffId},error:null};
       }
       assert.equal(name, 'get_generator_cashbox'); return {data:cashbox};
+      }
+      return q;
     },
     from(table) {
       let kind='select', rows, lo=0,hi=499,ids,filterColumn;
-      const q={ select(){return q;}, eq(){return q;}, order(){return q;}, range(a,b){lo=a;hi=b;return q;}, maybeSingle(){kind='single';return q;},
+      const q={ setHeader(){return q;}, select(){return q;}, eq(){return q;}, order(){return q;}, range(a,b){lo=a;hi=b;return q;}, maybeSingle(){kind='single';return q;},
         upsert(r){kind='upsert';rows=r;return q;}, delete(){kind='delete';return q;}, in(k,v){filterColumn=k;ids=v;return q;},
         async then(resolve,reject) {
           try {
@@ -70,6 +75,7 @@ function fixture(role = 'generator_admin') {
   const sync=createGeneratorSync({...session, role},client,localStorage);
   const listener=e=>sync.local(e); window.addEventListener('moldatk-local-sync',listener);
   return {sync,db,set cashbox(v){cashbox=v;},set fail(v){fail=v;},set pause(v){pause=v;},set onWrite(v){onWrite=v;},
+    set epoch(v){epoch=v;},set authorized(v){authorized=v;},set stateError(v){stateError=v;},
     get writes(){return writes;},get reads(){return reads;},get reconciles(){return reconciles;},get maxActive(){return maxActive;},
     close(){sync.dispose();window.removeEventListener('moldatk-local-sync',listener);}};
 }
@@ -174,5 +180,78 @@ await test('collector pull masks stale debt without rewriting historical invoice
   await f.sync.flush();
   assert.equal(f.writes,0); assert.equal(f.reconciles,0);
   f.close();
+});
+const cached = base => JSON.parse(localStorage.getItem(`moldatk_${base}_${id}`));
+for (const role of ['generator_admin','collector']) {
+  await test(`${role}: divergent pending cache, full reset, reconnect matches empty server without replay`, async () => {
+    const f=fixture(role); await f.sync.flush();
+    local('subscribers',[{...sub,amountDue:90000,amountPaid:10000}]);
+    local('audit_logs',[{id:'offline-payment',category:'payment',amount:10000}]);
+    local('deleted_subscribers',['deleted-before-reset']);
+    f.epoch=1; f.cashbox={reset_id:null,reset_at:null,balance:0};
+    f.sync.remote({table:'generator_sync_state'}); await f.sync.flush();
+    assert.deepEqual(cached('subscribers'),[]);
+    assert.deepEqual(cached('audit_logs'),[]);
+    assert.deepEqual(cached('deleted_subscribers'),[]);
+    assert.deepEqual(cached('monthly_tariffs'),[]);
+    assert.equal(cached('cashbox_server').balance,0);
+    assert.equal(f.writes,0);
+    const recovery=[...localStorage.map.entries()].find(([k])=>k.endsWith('_SAFE'));
+    assert.equal(JSON.parse(recovery[1]).snapshot.audit[0].amount,10000);
+    await f.sync.flush(); assert.equal(f.writes,0); f.close();
+  });
+}
+await test('offline reset then reconnect converges; network failure never discards local work', async () => {
+  const f=fixture('collector'); await f.sync.flush();
+  navigator.onLine=false; local('subscribers',[sub]);
+  const log=console.error; console.error=()=>{};
+  await assert.rejects(f.sync.flush(),/offline/);
+  assert.equal(cached('subscribers').length,1);
+  f.epoch=2; navigator.onLine=true; f.stateError=new Error('network unavailable');
+  await assert.rejects(f.sync.flush(),/network unavailable/);
+  assert.equal(cached('subscribers').length,1);
+  f.stateError=null; await f.sync.flush(); console.error=log;
+  assert.deepEqual(cached('subscribers'),[]); assert.equal(f.writes,0); f.close();
+});
+await test('reset revokes collector: clear old financial cache and require login, never upload', async () => {
+  const f=fixture('collector'); await f.sync.flush(); local('subscribers',[sub]); f.authorized=false;
+  let expired=0; const handler=()=>expired++; window.addEventListener('moldatk-auth-expired',handler);
+  const log=console.error; console.error=()=>{};
+  await assert.rejects(f.sync.flush(),/generator_access_revoked/); console.error=log;
+  assert.deepEqual(cached('subscribers'),[]); assert.equal(cached('cashbox_server').balance,0);
+  assert.equal(expired,1); assert.equal(f.writes,0);
+  window.removeEventListener('moldatk-auth-expired',handler); f.close();
+});
+await test('reset during pull cannot publish a mixed pre/post-reset snapshot', async () => {
+  const f=fixture(); await f.sync.flush();
+  f.db.generator_subscribers=[{id:'old',full_name:'Old',tier:'normal'}];
+  let release; const gate=new Promise(r=>release=r); let paused=false;
+  f.pause=async()=>{paused=true;await gate;};
+  const flight=f.sync.flush(); while(!paused) await sleep(1);
+  f.epoch=1; f.db.generator_subscribers=[]; release(); await flight; f.pause=null;
+  await f.sync.flush(); assert.deepEqual(cached('subscribers'),[]); assert.equal(f.writes,0); f.close();
+});
+await test('offline edit without a reset is preserved and uploaded exactly once on reconnect', async () => {
+  const f=fixture('collector'); await f.sync.flush(); navigator.onLine=false;
+  local('subscribers',[sub]); navigator.onLine=true; await f.sync.flush();
+  assert.equal(f.db.generator_subscribers.length,1); const writes=f.writes;
+  await f.sync.flush(); assert.equal(f.writes,writes); f.close();
+});
+await test('owner and collector read byte-identical authoritative data after reset and new billing', async () => {
+  const results=[];
+  for(const role of ['generator_admin','collector']) {
+    const f=fixture(role); await f.sync.flush();
+    local('subscribers',[{...sub,amountDue:role==='collector'?123456:98765}]);
+    f.epoch=1;
+    f.db.generator_subscribers=[{id:'new',code:'2',full_name:'New',tier:'normal',amperes:5,payment_status:'partial',amount_due:8000,amount_paid:2000}];
+    f.db.generator_monthly_tariffs=[{id:'2026-09',year:2026,month:9,is_current_active:true,tiers:[]}];
+    f.db.generator_invoices=[{id:'new-invoice',subscriber_id:'new',month_id:'2026-09',status:'partial',total_amount:10000,paid_amount:2000,remaining_amount:8000}];
+    f.cashbox={reset_id:null,reset_at:null,balance:2000};
+    await f.sync.flush();
+    results.push(stableSnapshot({subscribers:cached('subscribers'),tariffs:cached('monthly_tariffs'),cashbox:cached('cashbox_server')}));
+    assert.equal(cached('subscribers')[0].amountDue,8000);
+    assert.equal(f.writes,0); f.close();
+  }
+  assert.equal(results[0],results[1]);
 });
 console.log(`Event sync regression: ${passed} PASS, 0 FAIL`);
