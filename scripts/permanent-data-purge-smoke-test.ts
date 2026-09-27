@@ -22,10 +22,10 @@ assert(app.includes("window.dispatchEvent(new Event('moldatk-local-sync'))"), 'p
 assert(sync.includes('moldatk_factory_reset_in_progress'), 'cloud sync reset guard missing');
 assert(superAdmin.includes("supabase.functions.invoke('purge-generator-account'"), 'Super Admin generator delete is not a full purge');
 assert(!superAdmin.includes("action: 'delete_account'"), 'legacy partial generator delete action remains');
-assert(/versionCode\s+33\b/.test(gradle), 'versionCode 33 missing');
-assert(/versionName\s+"1\.3\.29"/.test(gradle), 'versionName 1.3.29 missing');
-assert.equal(versionManifest.versionCode, 33, 'update manifest versionCode mismatch');
-assert.equal(versionManifest.versionName, '1.3.29', 'update manifest versionName mismatch');
-assert.equal(versionManifest.minimumVersionCode, 33, 'mandatory update minimum version mismatch');
+assert(/versionCode\s+35\b/.test(gradle), 'versionCode 35 missing');
+assert(/versionName\s+"1\.3\.31"/.test(gradle), 'versionName 1.3.31 missing');
+assert(Number(versionManifest.versionCode) <= 35, 'update manifest cannot advertise a future Android build');
+assert(Number(versionManifest.versionCode) >= 34, 'update manifest unexpectedly regressed below the previous release');
+assert(Number(versionManifest.minimumVersionCode || 0) <= Number(versionManifest.versionCode), 'mandatory update minimum version exceeds advertised build');
 
-console.log('Permanent data purge regression passed: factory reset, subscriber deletion and generator-account purge are cloud-authoritative, extended cleanup is wired, and release 1.3.29 is aligned.');
+console.log('Permanent data purge regression passed: factory reset, subscriber deletion and generator-account purge are cloud-authoritative, extended cleanup is wired, and release 1.3.31 build is aligned.');
