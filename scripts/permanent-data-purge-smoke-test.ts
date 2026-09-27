@@ -22,8 +22,8 @@ assert(app.includes("window.dispatchEvent(new Event('moldatk-local-sync'))"), 'p
 assert(sync.includes('moldatk_factory_reset_in_progress'), 'cloud sync reset guard missing');
 assert(superAdmin.includes("supabase.functions.invoke('purge-generator-account'"), 'Super Admin generator delete is not a full purge');
 assert(!superAdmin.includes("action: 'delete_account'"), 'legacy partial generator delete action remains');
-assert(/versionCode\\s+36\\b/.test(gradle), 'versionCode 36 missing');
-assert(/versionName\s+"1\\.3\\.32"/.test(gradle), 'versionName 1.3.32 missing');
+assert(/versionCode\s+36\b/.test(gradle), 'versionCode 36 missing');
+assert(/versionName\s+"1\.3\.32"/.test(gradle), 'versionName 1.3.32 missing');
 assert(Number(versionManifest.versionCode) <= 36, 'update manifest cannot advertise a future Android build');
 assert(Number(versionManifest.versionCode) >= 34, 'update manifest unexpectedly regressed below the previous release');
 assert(Number(versionManifest.minimumVersionCode || 0) <= Number(versionManifest.versionCode), 'mandatory update minimum version exceeds advertised build');
