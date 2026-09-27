@@ -87,11 +87,18 @@ for (const status of ['unpaid', 'partial', 'paid', 'free']) {
   assert.doesNotMatch(pos, /196,000|92,000/);
   const cleared = actual.zeroLiveMonthlyCycle([subscriber])[0];
   assert.deepEqual([cleared.amountDue, cleared.amountPaid], [0, 0]);
-  assert.deepEqual(cleared.invoicesHistory, before.invoicesHistory);
+  assert.equal(cleared.invoicesHistory.length, 1, 'paid history must remain available');
+  assert.equal(cleared.invoicesHistory[0].status, 'paid');
+  assert.equal(cleared.invoicesHistory[0].remainingAmount, 0);
+  assert.match(String(cleared.invoicesHistory[0].notes || ''), /MOLDATK_NO_TARIFF_SETTLED_HISTORY/);
   assert.deepEqual(subscriber, before, 'rendering and clearing must not mutate original history');
   rendered += 5;
 }
 const unpaid = { ...historical, paymentStatus: 'unpaid', amountDue: 196000, amountPaid: 0 };
+const unpaidNoTariffCleared = actual.zeroLiveMonthlyCycle([{ ...unpaid, invoicesHistory: [
+  { ...historical.invoicesHistory[0], paidAmount: 0, remainingAmount: 120000, status: 'unpaid' }
+]}])[0];
+assert.equal(unpaidNoTariffCleared.invoicesHistory.length, 0, 'unpaid liability must disappear when all tariffs are removed');
 const dashboard = actual.getAmpereDiscountDashboardSummary([{ ...unpaid, invoicesHistory: [
   { ...historical.invoicesHistory[0], paidAmount: 0, remainingAmount: 120000, status: 'unpaid' }
 ]}], [], '2026-09');
@@ -104,4 +111,4 @@ assert.match(render(actual.MobileSubscribers, { subscribers: [unpaid], pricingTi
 assert.match(render(actual.SubscriberModal, { isOpen: true, subscriberToEdit: unpaid, pricingTiers: tariffs }), /تسديد المشترك/);
 assert.match(render(actual.PaymentMethodModal, { isOpen: true, subscriber: unpaid, pricingTiers: tariffs }), /<form/);
 assert.throws(() => actual.applyPaymentOldestFirst(unpaid, [], 1000), /NO_MONTHLY_TARIFF/);
-console.log(`No-tariff regression: PASS (${rendered} actual UI renders, active tariff controls, payment engine blocked, history preserved).`);
+console.log(`No-tariff regression: PASS (${rendered} actual UI renders, active tariff controls, payment engine blocked, paid history preserved and unpaid liability removed).`);
