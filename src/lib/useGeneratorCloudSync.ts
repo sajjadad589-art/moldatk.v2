@@ -352,6 +352,8 @@ export function useGeneratorCloudSync(session: ActiveUserSession | null) {
           writeLocal(localKeys.tariffs, tariffs);
         }
         const deletedTariffIds = readLocal<string[]>(localKeys.deletedTariffs, []);
+        const ownerPush = session?.role === 'generator_admin';
+        const activeTariff = tariffs.find(t => t.isCurrentActive) || tariffs[0];
         const specs = readLocal<GeneratorSpecs | null>(localKeys.specs, null);
         const invoiceTemplate = readLocal<InvoiceTemplateSettings | null>(localKeys.invoice, null);
         const invoiceCustom = readLocal<any>(localKeys.invoiceCustom, null);
@@ -359,6 +361,30 @@ export function useGeneratorCloudSync(session: ActiveUserSession | null) {
         const walletResetTimestamp = localStorage.getItem(localKeys.walletReset) || '';
         const deletedSubscribers = readLocal<string[]>(localKeys.deletedSubscribers, []);
         const invoices = dedupeInvoicesForCloud(writableSubscribers.flatMap(sub => (sub.invoicesHistory || []).map(inv => normalizeInvoiceForSubscriber(sub, inv))));
+
+        // SYNC_TARIFF_SERVER_FIRST_V1
+        // Pricing is an upstream dependency for subscriber/invoice writes. Push tariff deletions
+        // and the replacement tariff before any financial projection so the database guard never
+        // sees a paid invoice while the generator temporarily has no tariff.
+        if (ownerPush) {
+          for (const tariffId of deletedTariffIds) {
+            const { error } = await supabase.rpc('delete_generator_tariff_month', {
+              p_generator_id: generatorId,
+              p_tariff_id: tariffId,
+            });
+            if (error) throw error;
+          }
+
+          if (tariffs.length) {
+            const uniqueTariffs = Array.from(new Map(tariffs.map(t => [t.id, t] as const)).values());
+            const { error } = await supabase
+              .from('generator_monthly_tariffs')
+              .upsert(uniqueTariffs.map(t => tariffToRow(generatorId, t)), { onConflict: 'generator_id,id' });
+            if (error) throw error;
+          }
+
+          emitSyncProgress({ active: true, progress: 18, message: 'مزامنة التسعيرة' });
+        }
 
         if (deletedSubscribers.length) {
           const { error: invoiceDeleteError } = await supabase.from('generator_invoices').delete().eq('generator_id', generatorId).in('subscriber_id', deletedSubscribers);
@@ -368,17 +394,31 @@ export function useGeneratorCloudSync(session: ActiveUserSession | null) {
           writeLocal(localKeys.deletedSubscribers, []);
         }
 
-        if (writableSubscribers.length) {
+        // With no active tariff, historical paid invoices are already preserved by the tariff
+        // deletion RPC. Do not replay stale paid projections back into the no-tariff guard.
+        const canPushFinancialProjection = !ownerPush || tariffs.length > 0;
+
+        if (canPushFinancialProjection && writableSubscribers.length) {
           const { error } = await supabase.from('generator_subscribers').upsert(writableSubscribers.map(s => subscriberToRow(generatorId, s)), { onConflict: 'generator_id,id' });
           if (error) throw error;
         }
         emitSyncProgress({ active: true, progress: 30, message: 'مزامنة المشتركين' });
 
-        if (invoices.length) {
+        if (canPushFinancialProjection && invoices.length) {
           const { error } = await supabase.from('generator_invoices').upsert(invoices.map(i => invoiceToRow(generatorId, i)), { onConflict: 'generator_id,id' });
           if (error) throw error;
         }
         emitSyncProgress({ active: true, progress: 55, message: 'مزامنة التسديدات' });
+
+        // Final server-authoritative projection after a tariff save. Realtime listeners on
+        // subscribers/invoices then wake collector devices immediately with the reconciled amounts.
+        if (ownerPush && activeTariff?.id) {
+          const { error: reconcileError } = await supabase.rpc('reconcile_generator_monthly_cycle', {
+            p_generator_id: generatorId,
+            p_tariff_id: activeTariff.id,
+          });
+          if (reconcileError) throw reconcileError;
+        }
 
         // الجابي يحتاج مزامنة المشتركين والفواتير فقط. إعدادات المولدة تبقى بيد الإدارة.
         if (session?.role === 'generator_admin') {
@@ -393,17 +433,6 @@ export function useGeneratorCloudSync(session: ActiveUserSession | null) {
           }
           if (lines.length) {
             const { error } = await supabase.from('generator_lines').upsert(lines.map((l, index) => lineToRow(generatorId, l, index)), { onConflict: 'generator_id,id' });
-            if (error) throw error;
-          }
-
-          if (deletedTariffIds.length) {
-            const { error } = await supabase.from('generator_monthly_tariffs').delete().eq('generator_id', generatorId).in('id', deletedTariffIds);
-            if (error) throw error;
-          }
-
-          if (tariffs.length) {
-            const uniqueTariffs = Array.from(new Map(tariffs.map(t => [t.id, t] as const)).values());
-            const { error } = await supabase.from('generator_monthly_tariffs').upsert(uniqueTariffs.map(t => tariffToRow(generatorId, t)), { onConflict: 'generator_id,id' });
             if (error) throw error;
           }
 
@@ -533,7 +562,11 @@ export function useGeneratorCloudSync(session: ActiveUserSession | null) {
         const deletedTariffSet = new Set(readLocal<string[]>(localKeys.deletedTariffs, []));
         const remoteTariffs = (tariffs.data || []).map(rowToTariff).filter(t => !deletedTariffSet.has(t.id));
         const remoteTariffIds = new Set(remoteTariffs.map(t => t.id));
-        const pendingLocalTariffs = localTariffs.filter(t => !remoteTariffIds.has(t.id));
+        // Collectors never author tariffs. Their local tariff cache must mirror the server
+        // exactly so a deleted/replaced owner tariff cannot survive forever on a SUNMI device.
+        const pendingLocalTariffs = session?.role === 'generator_admin'
+          ? localTariffs.filter(t => !remoteTariffIds.has(t.id))
+          : [];
         const hasPendingLocalTariffs = pendingLocalTariffs.length > 0;
         const localPendingActive = pendingLocalTariffs.some(t => t.isCurrentActive);
         const mergedTariffMap = new Map<string, MonthlyTariffRecord>();
@@ -676,7 +709,9 @@ export function useGeneratorCloudSync(session: ActiveUserSession | null) {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     // Safety reconciliation only; realtime + moldatk-local-sync handle normal changes immediately.
-    const timer = window.setInterval(onLocalChange, 60 * 1000);
+    // Realtime is the primary path; this short watchdog only catches a local event that
+    // happened while a pull was in flight. It keeps owner/collector convergence near-instant.
+    const timer = window.setInterval(onLocalChange, 5 * 1000);
     const visibility = () => { if (document.visibilityState === 'visible') void pull(); };
     document.addEventListener('visibilitychange', visibility);
 
