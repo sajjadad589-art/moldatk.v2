@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { supabase } from './supabase';
 import { Capacitor } from '@capacitor/core';
 import type { ActiveUserSession, Subscriber, SubscriberInvoice, LineDistribution, MonthlyTariffRecord, GeneratorSpecs, InvoiceTemplateSettings, AuditLogEntry } from '../types';
+import { zeroLiveMonthlyCycle } from '../utils/monthlyCycleEngine';
 
 const key = (base: string, generatorId: string) => `${base}_${generatorId}`;
 const recentWriteKey = (generatorId: string) => key('moldatk_last_local_write', generatorId);
@@ -326,7 +327,7 @@ export function useGeneratorCloudSync(session: ActiveUserSession | null) {
       if (!ready.current || disposed) return;
       if (pushing.current) { pendingPush.current = true; return; }
       if (!(await ensureValidAuth())) return;
-      if (!Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && typeof navigator !== 'undefined' && !navigator.onLine) {
+      if (!Capacitor.isNativePlatform() && typeof navigator !== 'undefined' && !navigator.onLine) {
         emitSyncProgress({ active: false, progress: 0, pending: true, message: 'بانتظار رجوع الإنترنت للمزامنة' });
         return;
       }
@@ -362,6 +363,26 @@ export function useGeneratorCloudSync(session: ActiveUserSession | null) {
         const deletedSubscribers = readLocal<string[]>(localKeys.deletedSubscribers, []);
         const invoices = dedupeInvoicesForCloud(writableSubscribers.flatMap(sub => (sub.invoicesHistory || []).map(inv => normalizeInvoiceForSubscriber(sub, inv))));
 
+        // COLLECTOR_SERVER_TARIFF_AUTHORITY_V2
+        // A collector must never upload stale local debt after the owner removed all tariffs.
+        // Check the server tariff state before any subscriber/invoice write.
+        let collectorServerHasTariff = true;
+        let forceAuthoritativePull = false;
+        if (collectorPush) {
+          const { data: serverTariffRows, error: serverTariffError } = await supabase
+            .from('generator_monthly_tariffs')
+            .select('id')
+            .eq('generator_id', generatorId)
+            .limit(1);
+          if (serverTariffError) throw serverTariffError;
+          collectorServerHasTariff = Boolean(serverTariffRows?.length);
+          if (!collectorServerHasTariff) {
+            writeLocal(localKeys.tariffs, []);
+            writeLocal(localKeys.deletedTariffs, []);
+            forceAuthoritativePull = true;
+          }
+        }
+
         // SYNC_TARIFF_SERVER_FIRST_V1
         // Pricing is an upstream dependency for subscriber/invoice writes. Push tariff deletions
         // and the replacement tariff before any financial projection so the database guard never
@@ -396,7 +417,7 @@ export function useGeneratorCloudSync(session: ActiveUserSession | null) {
 
         // With no active tariff, historical paid invoices are already preserved by the tariff
         // deletion RPC. Do not replay stale paid projections back into the no-tariff guard.
-        const canPushFinancialProjection = !ownerPush || tariffs.length > 0;
+        const canPushFinancialProjection = tariffs.length > 0 && (!collectorPush || collectorServerHasTariff);
 
         if (canPushFinancialProjection && writableSubscribers.length) {
           const { error } = await supabase.from('generator_subscribers').upsert(writableSubscribers.map(s => subscriberToRow(generatorId, s)), { onConflict: 'generator_id,id' });
@@ -464,7 +485,7 @@ export function useGeneratorCloudSync(session: ActiveUserSession | null) {
           writeLocal(localKeys.deletedTariffs, []);
         }
         clearPendingLocalChanges();
-        lastSnapshot.current = pushedSnapshot;
+        lastSnapshot.current = forceAuthoritativePull ? snapshot() : pushedSnapshot;
         pushSucceeded = true;
         retryAfter.current = 0;
         emitSyncProgress({ active: false, progress: 100, message: 'اكتملت المزامنة', pending: false });
@@ -475,7 +496,10 @@ export function useGeneratorCloudSync(session: ActiveUserSession | null) {
         emitSyncProgress({ active: false, progress: 0, pending: !Capacitor.isNativePlatform(), message: 'تعذر مزامنة السحابة — ستتم إعادة المحاولة تلقائياً' });
       } finally {
         pushing.current = false;
-        if (pushSucceeded && !disposed && ready.current && (pendingPush.current || snapshot() !== lastSnapshot.current)) {
+        if (pushSucceeded && forceAuthoritativePull && !disposed && ready.current) {
+          pendingPush.current = false;
+          queueMicrotask(() => { void pull(); });
+        } else if (pushSucceeded && !disposed && ready.current && (pendingPush.current || snapshot() !== lastSnapshot.current)) {
           pendingPush.current = false;
           queueMicrotask(() => { void push(); });
         }
@@ -485,7 +509,7 @@ export function useGeneratorCloudSync(session: ActiveUserSession | null) {
     const pull = async (bootstrap = false) => {
       if (refreshing.current || authBlocked.current) return;
       if (!(await ensureValidAuth())) return;
-      if (!Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && !Capacitor.isNativePlatform() && typeof navigator !== 'undefined' && !navigator.onLine) {
+      if (!Capacitor.isNativePlatform() && typeof navigator !== 'undefined' && !navigator.onLine) {
         ready.current = true;
         emitSyncProgress({ active: false, progress: 0, pending: true, message: 'وضع بدون إنترنت — التغييرات محفوظة للمزامنة' });
         return;
@@ -507,6 +531,17 @@ export function useGeneratorCloudSync(session: ActiveUserSession | null) {
         const localLines = readLocal<LineDistribution[]>(localKeys.lines, []);
         const localTariffs = readLocal<MonthlyTariffRecord[]>(localKeys.tariffs, []);
         const localAudit = readLocal<AuditLogEntry[]>(localKeys.audit, []);
+
+        const remoteHasTariff = Boolean((tariffs.data || []).length);
+
+        // COLLECTOR_NO_TARIFF_DIRTY_DROP_V2
+        // If the owner removed all tariffs, the server wins immediately. A stale collector
+        // payment/debt snapshot must never block the pull or recreate old debt.
+        if (session?.role === 'collector' && !remoteHasTariff && hasPendingLocalChanges()) {
+          clearPendingLocalChanges();
+          writeLocal(localKeys.tariffs, []);
+          try { localStorage.removeItem(key('moldatk_active_monthly_cycle', generatorId)); } catch {}
+        }
 
         // COLLECTOR_STALE_PENDING_RECONCILIATION_V1
         if (session?.role === 'collector' && hasPendingLocalChanges()) {
@@ -549,14 +584,19 @@ export function useGeneratorCloudSync(session: ActiveUserSession | null) {
           list.push(item);
           invoiceMap.set(item.subscriberId, list);
         }
-        writeLocal(localKeys.subscribers, (subs.data || []).filter((row: any) => !deletedSubscriberIds.has(row.id)).map((row: any) => {
+        const pulledSubscribers = (subs.data || []).filter((row: any) => !deletedSubscriberIds.has(row.id)).map((row: any) => {
           const subscriber = rowToSubscriber(row);
           const history = (invoiceMap.get(subscriber.id) || []).map(inv => normalizeInvoiceForSubscriber(subscriber, inv));
           if (isPermanentFreeSubscriber(subscriber)) {
             return { ...subscriber, paymentStatus: 'free', amountDue: 0, amountPaid: 0, invoicesHistory: history };
           }
           return { ...subscriber, invoicesHistory: history };
-        }));
+        });
+        const authoritativeSubscribers = remoteHasTariff ? pulledSubscribers : zeroLiveMonthlyCycle(pulledSubscribers);
+        writeLocal(localKeys.subscribers, authoritativeSubscribers);
+        if (!remoteHasTariff) {
+          try { localStorage.removeItem(key('moldatk_active_monthly_cycle', generatorId)); } catch {}
+        }
         const lineTombstones = new Set(readLocal<string[]>(localKeys.deletedLines, []));
         writeLocal(localKeys.lines, (lines.data || []).filter((row: any) => !lineTombstones.has(String(row.id))).map(rowToLine));
         const deletedTariffSet = new Set(readLocal<string[]>(localKeys.deletedTariffs, []));
@@ -564,7 +604,7 @@ export function useGeneratorCloudSync(session: ActiveUserSession | null) {
         const remoteTariffIds = new Set(remoteTariffs.map(t => t.id));
         // Collectors never author tariffs. Their local tariff cache must mirror the server
         // exactly so a deleted/replaced owner tariff cannot survive forever on a SUNMI device.
-        const pendingLocalTariffs = session?.role === 'generator_admin'
+        const pendingLocalTariffs = session?.role === 'generator_admin' && hasPendingLocalChanges()
           ? localTariffs.filter(t => !remoteTariffIds.has(t.id))
           : [];
         const hasPendingLocalTariffs = pendingLocalTariffs.length > 0;
@@ -670,7 +710,10 @@ export function useGeneratorCloudSync(session: ActiveUserSession | null) {
       }
 
       const next = snapshot();
-      if (next !== lastSnapshot.current) void push();
+      if (next !== lastSnapshot.current) {
+        markPendingLocalChanges();
+        void push();
+      }
     };
 
     if (hasPendingLocalChanges()) {
