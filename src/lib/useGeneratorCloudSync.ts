@@ -335,6 +335,7 @@ export function useGeneratorCloudSync(session: ActiveUserSession | null) {
       pendingPush.current = false;
       const pushedSnapshot = snapshot();
       let pushSucceeded = false;
+      let forceAuthoritativePull = false;
       emitSyncProgress({ active: true, progress: 5, message: 'جاري المزامنة' });
       try {
         const subscribers = readLocal<Subscriber[]>(localKeys.subscribers, []);
@@ -367,7 +368,6 @@ export function useGeneratorCloudSync(session: ActiveUserSession | null) {
         // A collector must never upload stale local debt after the owner removed all tariffs.
         // Check the server tariff state before any subscriber/invoice write.
         let collectorServerHasTariff = true;
-        let forceAuthoritativePull = false;
         if (collectorPush) {
           const { data: serverTariffRows, error: serverTariffError } = await supabase
             .from('generator_monthly_tariffs')
