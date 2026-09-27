@@ -257,10 +257,34 @@ export function summarizeExistingMonthlyCycle(
 }
 
 export function zeroLiveMonthlyCycle(subscribers: Subscriber[]): Subscriber[] {
-  return subscribers.map(subscriber => ({
-    ...subscriber,
-    amountDue: 0,
-    amountPaid: 0,
-    paymentStatus: subscriber.tier === 'free' || Boolean(subscriber.isExempted) ? 'free' : 'unpaid',
-  }));
+  return subscribers.map(subscriber => {
+    // NO_TARIFF_ZERO_LIABILITY_V2
+    // No tariff means no collectible debt. Keep paid/cancelled/free history for reporting,
+    // remove unpaid/partial liability rows, and settle any paid history at the amount actually paid.
+    const invoicesHistory = (subscriber.invoicesHistory || []).flatMap(source => {
+      const inv = { ...source };
+      if (inv.status === 'cancelled' || inv.status === 'free') return [inv];
+
+      const paid = Math.max(0, Number(inv.paidAmount || 0));
+      if (paid <= 0) return [];
+
+      return [{
+        ...inv,
+        totalAmount: paid,
+        paidAmount: paid,
+        remainingAmount: 0,
+        remainingAfterPayment: 0,
+        status: 'paid' as const,
+        notes: [String(inv.notes || ''), 'MOLDATK_NO_TARIFF_SETTLED_HISTORY'].filter(Boolean).join(' | '),
+      }];
+    });
+
+    return {
+      ...subscriber,
+      invoicesHistory: invoicesHistory.sort((a, b) => b.monthId.localeCompare(a.monthId)),
+      amountDue: 0,
+      amountPaid: 0,
+      paymentStatus: subscriber.tier === 'free' || Boolean(subscriber.isExempted) ? 'free' : 'unpaid',
+    };
+  });
 }
