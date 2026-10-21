@@ -42,11 +42,6 @@ const stableHandler = String.raw`  // SUPER_ADMIN_EXCEL_IMPORT_STABILITY_V4
       .replace(/[ـ_\-.\/\:،,()\[\]]/g, '')
       .replace(/\s+/g, '')
       .toLowerCase();
-    const cellValue = (sheet: XLSX.WorkSheet, rowIndex: number, colIndex: number) => {
-      const cell = sheet[XLSX.utils.encode_cell({ r: rowIndex, c: colIndex })];
-      return cell?.w ?? cell?.v ?? '';
-    };
-
     setExcelImporting(true);
     setExcelImportProgress(3);
     setExcelImportReport({ ...EMPTY_EXCEL_REPORT, status: 'processing', title: 'جاري تجهيز ملف Excel...', fileName: excelImportForm.file.name });
@@ -54,6 +49,7 @@ const stableHandler = String.raw`  // SUPER_ADMIN_EXCEL_IMPORT_STABILITY_V4
 
     try {
       const generator = generators.find(g => g.id === excelImportForm.generator_id);
+      const XLSX = await import('xlsx');
       await idle();
       const buffer = await excelImportForm.file.arrayBuffer();
       setExcelImportProgress(10);
@@ -67,6 +63,10 @@ const stableHandler = String.raw`  // SUPER_ADMIN_EXCEL_IMPORT_STABILITY_V4
       const ref = sheet['!ref'];
       if (!ref) throw new Error('لا توجد بيانات مشتركين داخل الملف');
       const range = XLSX.utils.decode_range(ref);
+      const cellValue = (sheet: XLSX.WorkSheet, rowIndex: number, colIndex: number) => {
+        const cell = sheet[XLSX.utils.encode_cell({ r: rowIndex, c: colIndex })];
+        return cell?.w ?? cell?.v ?? '';
+      };
 
       const headers = Array.from({ length: range.e.c - range.s.c + 1 }, (_, index) => normalizeText(cellValue(sheet, range.s.r, range.s.c + index)));
       const visibleHeaders = headers.filter(Boolean);

@@ -3,6 +3,7 @@ import { Search, LogOut, UserPlus, Zap, MapPin, Wifi, WifiOff, Smartphone, Monit
 import { PaymentMethodModal, PaymentExecutionData } from './PaymentMethodModal';
 import { Subscriber, SubscriptionTierPricing, GeneratorSpecs, Collector, SubscriberInvoice } from '../types';
 import { calculateSubscriberBill } from '../utils/formatters';
+import { getInvoiceRemaining } from '../utils/monthlyAccounting';
 
 interface POSQuickViewProps {
   subscribers: Subscriber[];
@@ -203,7 +204,7 @@ export const POSQuickView: React.FC<POSQuickViewProps> = ({
 
   const totalUnpaid = subscribers.reduce((acc, sub) => {
     const unpaidInvoices = (sub.invoicesHistory || []).filter(inv => inv.status === 'unpaid' || inv.status === 'partial');
-    return acc + unpaidInvoices.reduce((s, inv) => s + Math.max(0, inv.amount - (inv.paidAmount || 0)), 0);
+    return acc + unpaidInvoices.reduce((sum, invoice) => sum + getInvoiceRemaining(invoice), 0);
   }, 0);
 
   const paidSubscribersList = filteredSubs.filter(sub => sub.paymentStatus === 'paid');

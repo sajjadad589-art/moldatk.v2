@@ -15,6 +15,7 @@ const types = read('src/types.ts');
 const gradle = read('android/app/build.gradle');
 const index = read('index.html');
 const manifest = read('public/manifest.webmanifest');
+const releaseWorkflow = read('.github/workflows/android-apk.yml');
 
 expect(main.includes("<LegalPage kind=\"privacy\" />"), 'Privacy route missing');
 expect(main.includes("<LegalPage kind=\"terms\" />"), 'Terms route missing');
@@ -45,6 +46,15 @@ expect(fs.statSync('public/icons/moldatk-apple-touch-v6.png').size > 1000, 'Gene
 
 expect(gradle.includes('androidxEspressoCoreVersion'), 'Android Gradle Espresso variable mismatch remains');
 expect(!gradle.includes('androidxTestEspressoCoreVersion'), 'Broken Android Gradle variable remains');
-expect(gradle.includes('versionCode 25') && gradle.includes('versionName "1.3.21"'), 'Android release version is not 1.3.21/25');
+expect(gradle.includes("System.getenv('CURRENT_VERSION_CODE')") && gradle.includes("System.getenv('CURRENT_VERSION')"), 'Android Gradle version must be driven by release workflow environment');
+const releaseVersion = releaseWorkflow.match(/^\s+CURRENT_VERSION:\s*([^\s]+)$/m)?.[1];
+const releaseVersionCode = Number(releaseWorkflow.match(/^\s+CURRENT_VERSION_CODE:\s*(\d+)$/m)?.[1]);
+const publishedManifest = JSON.parse(read('public/app-version.json'));
+const gradleDefaultVersion = gradle.match(/versionName System\.getenv\('CURRENT_VERSION'\) \?: "([^"]+)"/)?.[1];
+const gradleDefaultVersionCode = Number(gradle.match(/versionCode \(System\.getenv\('CURRENT_VERSION_CODE'\) \?: '(\d+)'\)\.toInteger\(\)/)?.[1]);
+expect(Boolean(releaseVersion) && Number.isInteger(releaseVersionCode), 'Android release workflow version metadata is missing');
+expect(gradleDefaultVersion === releaseVersion && gradleDefaultVersionCode === releaseVersionCode, 'Android Gradle defaults must match the release workflow version');
+expect(publishedManifest.versionName !== releaseVersion && publishedManifest.versionCode < releaseVersionCode, 'Upcoming Android release must advance beyond the currently published version');
+expect(publishedManifest.apkUrl.includes(`/v${publishedManifest.versionName}/`), 'Current update manifest APK URL does not match its published version');
 
 console.log('Google Play legal pages, actual multi-cabinet collector picker/scope, cabinet deletion/order sync, iPhone/PWA v6 icon and Android build regression: OK');

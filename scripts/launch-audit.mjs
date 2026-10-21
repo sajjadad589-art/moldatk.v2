@@ -7,17 +7,22 @@ const assert = (condition, message) => { if (!condition) failures.push(message);
 const main = read('src/main.tsx');
 const login = read('src/components/LoginView.tsx');
 const app = read('src/App.tsx');
+const superAdmin = read('src/components/SuperAdminDashboard.tsx');
 const mobileSubscribers = read('src/components/mobile/MobileSubscribers.tsx');
 const pos = read('src/components/POSQuickView.tsx');
 const cloud = read('src/lib/useGeneratorCloudSync.ts');
 const updaterManifest = JSON.parse(read('public/app-version.json'));
 const androidGradle = read('android/app/build.gradle');
 const workflow = read('.github/workflows/android-apk.yml');
+const releaseVersion = workflow.match(/^\s+CURRENT_VERSION:\s*([^\s]+)$/m)?.[1];
+const releaseVersionCode = Number(workflow.match(/^\s+CURRENT_VERSION_CODE:\s*(\d+)$/m)?.[1]);
 
 assert(!main.includes("return <CollectorApp"), 'Legacy CollectorApp route is still reachable.');
 assert(!main.includes("route.includes('col')"), 'Unsafe broad collector route alias is still enabled.');
 assert(login.includes('loginCollectorWithCloud'), 'Collector login is not using Supabase cloud authentication.');
 assert(!login.includes("c.passcode || '1234'"), 'Collector login still contains the default 1234 PIN fallback.');
+assert(!superAdmin.includes("import * as XLSX from 'xlsx';"), 'Super Admin must not eagerly load the Excel parser.');
+assert(superAdmin.includes("const XLSX = await import('xlsx');"), 'Super Admin Excel parser must load on demand.');
 assert(app.includes("VITE_ENABLE_NATIVE_PUSH === 'true'"), 'Native push feature flag is missing.');
 assert(app.includes('!ENABLE_NATIVE_PUSH'), 'Native push is not guarded and may crash Android without Firebase.');
 assert(!mobileSubscribers.includes('onTogglePaymentStatus(sub.id);'), 'Mobile payment button is still wired to the old no-op handler.');
@@ -38,8 +43,11 @@ const buildsSignedRelease = workflow.includes('assembleRelease') && workflow.inc
 if (buildsDebug && !buildsSignedRelease) {
   assert(updaterManifest.enabled === false, 'Automatic public updates must stay disabled while CI publishes debug-signed APKs only.');
 }
-assert(/versionCode\s+\d+/.test(androidGradle), 'Android versionCode is missing.');
-assert(/versionName\s+"[^"]+"/.test(androidGradle), 'Android versionName is missing.');
+assert(androidGradle.includes("System.getenv('CURRENT_VERSION_CODE')"), 'Android versionCode is not wired to release CI.');
+assert(androidGradle.includes("System.getenv('CURRENT_VERSION')"), 'Android versionName is not wired to release CI.');
+assert(Boolean(releaseVersion) && Number.isInteger(releaseVersionCode), 'Android release version metadata is missing.');
+assert(updaterManifest.versionName !== releaseVersion && updaterManifest.versionCode < releaseVersionCode, 'Android release must advance beyond the currently published update manifest.');
+assert(updaterManifest.apkUrl.includes(`/v${updaterManifest.versionName}/`), 'Android update manifest URL does not match its published version.');
 
 if (failures.length) {
   console.error('\nPRE-LAUNCH AUDIT FAILED:\n');

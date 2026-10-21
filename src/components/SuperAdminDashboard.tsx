@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import * as XLSX from 'xlsx';
+import type * as XLSXTypes from 'xlsx';
 import {
   Bell, Building2, CalendarClock, CircleDollarSign, LogOut, Megaphone,
   Plus, RefreshCw, ShieldCheck, Users, WalletCards, Wrench, X, UserPlus, Eye, CreditCard, Power, Pencil, KeyRound, PauseCircle, Save, Clock3, Trash2, FileSpreadsheet, UploadCloud
@@ -430,6 +430,7 @@ export const SuperAdminDashboard: React.FC<Props> = ({ onLogout }) => {
 
     try {
       const generator = generators.find(g => g.id === excelImportForm.generator_id);
+      const XLSX = await import('xlsx');
       const buffer = await excelImportForm.file.arrayBuffer();
       setExcelImportProgress(15);
 

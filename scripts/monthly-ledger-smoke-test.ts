@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import type { MonthlyTariffRecord, Subscriber, SubscriptionTierPricing } from '../src/types';
 import {
   activateMonthlyTariffForSubscribers,
@@ -261,3 +262,10 @@ assert.equal(duplicateReport.unpaidCount, 0, 'Stale duplicate must not inflate u
 assert.equal(getMonthNameAr(new Date(2026, 8, 1)), '9-2026', 'Month labels must be numeric: 9-2026');
 
 console.log('Accountant monthly regression suite passed: rollover reset, carried debt, oldest-first payments, repricing protection, reports, duplicates, free accounts, and numeric month labels.');
+
+const posSource = fs.readFileSync('src/components/POSQuickView.tsx', 'utf8');
+assert(
+  posSource.includes('getInvoiceRemaining(invoice)') || posSource.includes('row.outstanding'),
+  'Collector debt total must use canonical invoice balances',
+);
+assert(!/inv\.amount\b/.test(posSource), 'Collector debt total must not read the nonexistent invoice.amount field');

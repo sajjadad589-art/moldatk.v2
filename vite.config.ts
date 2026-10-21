@@ -15,6 +15,31 @@ export default defineConfig(() => {
       // صيغ الجافاسكربت الحديثة (مثل ?. و ??) بشكل أصلي. استهداف es2015 يجعل Vite
       // يحوّل هذه الصيغ لكود متوافق بدل الاعتماد على دعم المتصفح المباشر.
       target: 'es2015',
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.endsWith('/src/components/SuperAdminDashboard.tsx')) return 'super-admin';
+            if (id.includes('/src/components/mobile/')) return 'mobile-ui';
+            if (
+              id.endsWith('/src/components/SettingsFolderView.tsx')
+              || id.endsWith('/src/components/FolderDetailModal.tsx')
+            ) return 'settings-ui';
+            if (
+              id.endsWith('/src/components/DashboardView.tsx')
+              || id.endsWith('/src/components/WalletView.tsx')
+              || id.endsWith('/src/components/DonutChartWidget.tsx')
+            ) return 'dashboard-ui';
+            if (!id.includes('/node_modules/')) return;
+            if (id.includes('/node_modules/xlsx/')) return 'xlsx';
+            if (id.includes('/node_modules/recharts/')) return 'charts';
+            if (id.includes('/node_modules/@google/genai/')) return 'google-genai';
+            if (id.includes('/node_modules/@supabase/')) return 'supabase';
+            if (id.includes('/node_modules/motion/')) return 'motion';
+            if (/\/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'react-vendor';
+            return 'vendor';
+          },
+        },
+      },
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
