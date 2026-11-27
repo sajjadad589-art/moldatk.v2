@@ -1,0 +1,3 @@
+# M02 session UI integration
+
+Staging app now uses the in-memory session controller rather than a one-shot sign-in screen. It shows active, denied, unavailable and checking states and provides logout and retry. It rechecks server access every 15 seconds while foregrounded and signs out on pause/hidden/detach as a conservative temporary policy until encrypted persistence and resume rules are implemented. No operator dashboard, business data, offline authorization or production connection. A regression test covers logout during in-flight revalidation. CI verification and real staging testing remain required. No persistent token storage yet.

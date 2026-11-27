@@ -3,9 +3,9 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/config/app_config.dart';
-import '../features/auth/data/staging_auth_gateway.dart';
+import '../features/auth/data/staging_session_gateway.dart';
 import '../features/auth/data/staging_config.dart';
-import '../features/auth/presentation/staging_sign_in_screen.dart';
+import '../features/auth/presentation/staging_session_screen.dart';
 import '../features/bootstrap/presentation/bootstrap_screen.dart';
 
 class MoldatkApp extends ConsumerWidget {
@@ -33,9 +33,7 @@ class MoldatkApp extends ConsumerWidget {
     }
     try {
       final config = StagingConfig.fromBuild();
-      return StagingSignInScreen(
-        verify: StagingAuthGateway(config).verifySignIn,
-      );
+      return StagingSessionScreen(config: config);
     } on FormatException {
       return const BootstrapScreen();
     }

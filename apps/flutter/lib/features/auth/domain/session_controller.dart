@@ -43,6 +43,10 @@ class SessionController extends ChangeNotifier {
 
   SubscriptionAccess? get denial => _denial;
 
+  bool get busy => _busy;
+
+  bool get hasSession => _account != null;
+
   Future<void> signIn({
     required String identifier,
     required String secret,
@@ -56,20 +60,21 @@ class SessionController extends ChangeNotifier {
         identifier: identifier,
         secret: secret,
       );
-      if (!_current(generation)) {
-        await _gateway.close();
-        return;
-      }
+      if (!_current(generation)) return;
       _account = account;
       await _check(generation);
     } catch (_) {
-      await _closeSafely();
+      if (_current(generation)) {
+        await _closeSafely();
+      }
       if (_current(generation)) {
         _account = null;
         _setPhase(SessionPhase.signedOut);
       }
     } finally {
+      if (!_current(generation)) await _closeSafely();
       _busy = false;
+      if (!_disposed) notifyListeners();
     }
   }
 
@@ -83,7 +88,9 @@ class SessionController extends ChangeNotifier {
     } catch (_) {
       if (_current(generation)) _setPhase(SessionPhase.unavailable);
     } finally {
+      if (!_current(generation)) await _closeSafely();
       _busy = false;
+      if (!_disposed) notifyListeners();
     }
   }
 
@@ -127,6 +134,7 @@ class SessionController extends ChangeNotifier {
         await _closeSafely();
       } finally {
         _busy = false;
+        if (!_disposed) notifyListeners();
       }
     }
   }
@@ -151,7 +159,7 @@ class SessionController extends ChangeNotifier {
     _disposed = true;
     ++_generation;
     _account = null;
-    _closeSafely();
+    if (!_busy) _closeSafely();
     super.dispose();
   }
 }

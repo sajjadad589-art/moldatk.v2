@@ -33,6 +33,7 @@ SubscriptionDecision decision({bool active = true}) {
 class FakeGateway implements SessionGateway {
   SubscriptionDecision result = decision();
   Completer<OperatorAccount>? pending;
+  Completer<SubscriptionDecision>? pendingCheck;
   bool fail = false;
   int closes = 0;
 
@@ -49,6 +50,7 @@ class FakeGateway implements SessionGateway {
   @override
   Future<SubscriptionDecision> checkAccess(OperatorAccount account) async {
     if (fail) throw StateError('fixture failure');
+    if (pendingCheck != null) return pendingCheck!.future;
     return result;
   }
 
@@ -104,6 +106,22 @@ void main() {
     final operation = login(controller);
     await controller.signOut();
     gateway.pending!.complete(fixture);
+    await operation;
+    expect(controller.phase, SessionPhase.signedOut);
+    expect(controller.account, isNull);
+    expect(gateway.closes, 1);
+  });
+
+  test('sign out during revalidation closes the old transport', () async {
+    final gateway = FakeGateway();
+    final controller = SessionController(gateway);
+    addTearDown(controller.dispose);
+    await login(controller);
+    gateway.pendingCheck = Completer<SubscriptionDecision>();
+    final operation = controller.revalidate();
+    await controller.signOut();
+    expect(controller.account, isNull);
+    gateway.pendingCheck!.complete(decision());
     await operation;
     expect(controller.phase, SessionPhase.signedOut);
     expect(controller.account, isNull);
