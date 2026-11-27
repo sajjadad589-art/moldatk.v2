@@ -29,10 +29,7 @@ class StagingConfig {
         !RegExp(r'^sb_publishable_[A-Za-z0-9_-]+$').hasMatch(publishableKey)) {
       throw const FormatException('Invalid staging configuration');
     }
-    return StagingConfig._(
-      'https://$projectRef.supabase.co',
-      publishableKey,
-    );
+    return StagingConfig._('https://$projectRef.supabase.co', publishableKey);
   }
 
   factory StagingConfig.fromBuild() => StagingConfig.validate(

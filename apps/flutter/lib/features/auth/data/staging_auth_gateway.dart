@@ -56,9 +56,7 @@ class StagingAuthGateway {
       }
 
       final timer = Stopwatch()..start();
-      final subscription = await client.rpc(
-        'get_my_subscription_access_state',
-      );
+      final subscription = await client.rpc('get_my_subscription_access_state');
       timer.stop();
       final decision = SubscriptionDecision.evaluate(
         response: subscription,

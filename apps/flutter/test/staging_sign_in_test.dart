@@ -41,9 +41,7 @@ void main() {
     expect(calls, 1);
     expect(find.text('تعذر التحقق من الاشتراك.'), findsOneWidget);
     expect(find.text('نجح فحص الحساب والاشتراك.'), findsNothing);
-    final field = tester.widget<TextFormField>(
-      find.byKey(const Key('secret')),
-    );
+    final field = tester.widget<TextFormField>(find.byKey(const Key('secret')));
     expect(field.controller?.text, isEmpty);
   });
 }

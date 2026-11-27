@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 import '../data/staging_auth_gateway.dart';
 import '../domain/subscription_access.dart';
 
-typedef VerifySignIn = Future<OperatorAccess> Function({
-  required String identifier,
-  required String secret,
-});
+typedef VerifySignIn =
+    Future<OperatorAccess> Function({
+      required String identifier,
+      required String secret,
+    });
 
 /// Internal staging-only account check. Does not grant a persistent session.
 class StagingSignInScreen extends StatefulWidget {
@@ -89,9 +90,7 @@ class _StagingSignInScreenState extends State<StagingSignInScreen> {
                       style: Theme.of(context).textTheme.headlineMedium,
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'بيئة الاختبار فقط — فحص مؤقت دون حفظ الجلسة.',
-                    ),
+                    const Text('بيئة الاختبار فقط — فحص مؤقت دون حفظ الجلسة.'),
                     const SizedBox(height: 24),
                     TextFormField(
                       key: const Key('identifier'),

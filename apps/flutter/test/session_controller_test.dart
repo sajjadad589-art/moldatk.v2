@@ -58,10 +58,8 @@ class FakeGateway implements SessionGateway {
   }
 }
 
-Future<void> login(SessionController controller) => controller.signIn(
-  identifier: 'fixture',
-  secret: 'fixture',
-);
+Future<void> login(SessionController controller) =>
+    controller.signIn(identifier: 'fixture', secret: 'fixture');
 
 void main() {
   test('active session locks immediately after sign out', () async {
