@@ -38,10 +38,10 @@ jobs:
             python3 tool/bootstrap_android.py
           fi
       - run: flutter pub get
-      - name: Check Dart formatting (show exact diff)
+      - name: Normalize Dart formatting and show diff
         run: |
           dart format lib test
-          git diff --exit-code -- lib test
+          git diff -- lib test
       - run: flutter analyze
       - run: flutter test
       - run: flutter build apk --debug --dart-define=APP_ENV=development
@@ -50,3 +50,6 @@ jobs:
           name: moldatk-flutter-m01-debug
           path: apps/flutter/build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
+      - name: Verify committed formatting
+        if: always()
+        run: git diff --exit-code -- lib test

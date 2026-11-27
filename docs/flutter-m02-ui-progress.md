@@ -1,0 +1,5 @@
+# M02 staging sign-in UI
+
+The internal staging screen is now wired to the one-shot auth verifier only when build-time staging configuration validates. Development and invalid staging configurations still show the bootstrap screen. The form validates empty fields, disables repeated submissions, clears the password field on submission, and renders generic errors and subscription outcomes. It does not navigate into operator features or retain a session. Mocked widget test added; actual staging sign-in remains untested.
+
+Corrected a malformed timestamp regex introduced during the last formatter fix. CI now formats source and prints its diff before analyzing/testing/building, then enforces committed formatting at the end. A formatter-only discrepancy should not mask compiler and test failures. No production access enabled or database writes performed.

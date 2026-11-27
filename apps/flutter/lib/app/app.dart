@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/config/app_config.dart';
+import '../features/auth/data/staging_auth_gateway.dart';
+import '../features/auth/data/staging_config.dart';
+import '../features/auth/presentation/staging_sign_in_screen.dart';
 import '../features/bootstrap/presentation/bootstrap_screen.dart';
 
 class MoldatkApp extends ConsumerWidget {
@@ -19,7 +23,21 @@ class MoldatkApp extends ConsumerWidget {
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF126A65)),
       ),
-      home: const BootstrapScreen(),
+      home: _home(ref.watch(appConfigProvider).environment),
     );
+  }
+
+  Widget _home(AppEnvironment environment) {
+    if (environment != AppEnvironment.staging) {
+      return const BootstrapScreen();
+    }
+    try {
+      final config = StagingConfig.fromBuild();
+      return StagingSignInScreen(
+        verify: StagingAuthGateway(config).verifySignIn,
+      );
+    } on FormatException {
+      return const BootstrapScreen();
+    }
   }
 }

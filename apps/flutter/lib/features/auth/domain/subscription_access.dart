@@ -65,15 +65,8 @@ class SubscriptionDecision {
   }
 
   static DateTime? _timestamp(Object? value) {
-    if (value is! String || !RegExp(r'(Z|[+-]\d{2}:\d{2})
-      return null;
-    }
-    return DateTime.tryParse(value)?.toUtc();
-  }
-}
-).hasMatch(value)) {
-      return null;
-    }
+    if (value is! String) return null;
+    if (!RegExp(r'(Z|[+-]\d{2}:\d{2})$').hasMatch(value)) return null;
     return DateTime.tryParse(value)?.toUtc();
   }
 }
