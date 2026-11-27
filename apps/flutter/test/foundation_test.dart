@@ -10,9 +10,7 @@ void main() {
     expect(AppConfig.parse('staging').environment, AppEnvironment.staging);
   });
 
-  testWidgets('Arabic bootstrap is RTL and reports the configured environment', (
-    tester,
-  ) async {
+  testWidgets('Arabic RTL and staging environment', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [

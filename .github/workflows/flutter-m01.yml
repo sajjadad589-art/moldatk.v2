@@ -26,6 +26,10 @@ jobs:
         run: |
           git clone --depth 1 --branch 3.38.5 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
           echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+      - name: Accept Android SDK licenses
+        run: |
+          set +o pipefail
+          yes | flutter doctor --android-licenses
       - name: Inspect environment
         run: flutter doctor -v
       - name: Generate Android project
