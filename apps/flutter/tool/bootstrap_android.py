@@ -34,5 +34,11 @@ with tempfile.TemporaryDirectory() as temp:
         raise SystemExit("Unexpected Android build types; review manually.")
     source = source.replace(marker, marker + '\n        getByName("debug") {\n            applicationIdSuffix = ".dev"\n        }', 1)
     gradle.write_text(source, encoding="utf-8")
+    manifest = android / "app" / "src" / "main" / "AndroidManifest.xml"
+    xml = manifest.read_text(encoding="utf-8")
+    if xml.count("<application") != 1:
+        raise SystemExit("Unexpected Android manifest; review manually.")
+    xml = xml.replace("<application", '<application android:allowBackup="false"', 1)
+    manifest.write_text(xml, encoding="utf-8")
     shutil.copytree(android, DEST)
 print("Generated Android platform. Debug ID: com.mwaldatk.app.dev.")

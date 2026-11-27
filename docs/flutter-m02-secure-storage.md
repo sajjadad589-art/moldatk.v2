@@ -1,0 +1,5 @@
+# M02 — encrypted refresh credential storage
+
+Added flutter_secure_storage 10.0.0, a platform-backed secure storage adapter and a typed project-scoped refresh credential vault. Android bootstrap disables automatic app backup; verify manifest merge and device-to-device transfer exclusion before release. Storage tests use a memory double, not Android Keystore. The vault rejects corrupt and foreign-project data, supports explicit deletion, and contains no password, access token, role or subscription grant.
+
+The vault is deliberately not yet connected to the current in-memory UI/session gateway. Before enabling persistence, implement a serialized restore path using the SDK refresh session API, require server-verified user identity, current profile/collector role and tenant match, recheck subscription, persist rotated refresh tokens, and delete on logout or revoked session. Test actual Android storage and restart, background/resume, revoked access, and account switching. No production credentials or data changes. No claim of completed persistence or runtime authentication.
