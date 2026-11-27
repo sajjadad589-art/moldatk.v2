@@ -49,7 +49,9 @@ void main() {
       throwsFormatException,
     );
     expect(
-      () => OperatorAccount.fromJson(account('collector')..remove('generatorId')),
+      () => OperatorAccount.fromJson(
+        account('collector')..remove('generatorId'),
+      ),
       throwsFormatException,
     );
   });

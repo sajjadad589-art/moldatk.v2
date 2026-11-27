@@ -38,7 +38,10 @@ jobs:
             python3 tool/bootstrap_android.py
           fi
       - run: flutter pub get
-      - run: dart format --output=none --set-exit-if-changed lib test
+      - name: Check Dart formatting (show exact diff)
+        run: |
+          dart format lib test
+          git diff --exit-code -- lib test
       - run: flutter analyze
       - run: flutter test
       - run: flutter build apk --debug --dart-define=APP_ENV=development

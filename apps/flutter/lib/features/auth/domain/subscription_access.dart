@@ -35,10 +35,7 @@ class SubscriptionDecision {
     }
     final status = generator['status'];
     if (status == 'suspended' && response['accessActive'] == false) {
-      return const SubscriptionDecision._(
-        SubscriptionAccess.suspended,
-        null,
-      );
+      return const SubscriptionDecision._(SubscriptionAccess.suspended, null);
     }
     if (status != 'active') return unavailable;
 
@@ -68,8 +65,13 @@ class SubscriptionDecision {
   }
 
   static DateTime? _timestamp(Object? value) {
-    if (value is! String ||
-        !RegExp(r'(Z|[+-]\d{2}:\d{2})$').hasMatch(value)) {
+    if (value is! String || !RegExp(r'(Z|[+-]\d{2}:\d{2})
+      return null;
+    }
+    return DateTime.tryParse(value)?.toUtc();
+  }
+}
+).hasMatch(value)) {
       return null;
     }
     return DateTime.tryParse(value)?.toUtc();
