@@ -125,7 +125,9 @@ class _StagingSessionScreenState extends State<StagingSessionScreen>
         if (account == null) {
           return _status('تعذر التحقق من الاشتراك', retry: true);
         }
-        final role = account.role == OperatorRole.owner ? 'صاحب المولدة' : 'جابي';
+        final role = account.role == OperatorRole.owner
+            ? 'صاحب المولدة'
+            : 'جابي';
         return _status(
           'جلسة اختبار فعالة\n${account.generatorName}\n$role',
           retry: true,
@@ -197,7 +199,8 @@ class _StagingSessionScreenState extends State<StagingSessionScreen>
             onPressed: _session.busy ? null : _submit,
             child: const Text('دخول'),
           ),
-          if (_failed) const Text('تعذر تسجيل الدخول. تحقق من البيانات والاتصال.'),
+          if (_failed)
+            const Text('تعذر تسجيل الدخول. تحقق من البيانات والاتصال.'),
         ],
       ),
     );
