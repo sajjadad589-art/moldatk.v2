@@ -1,0 +1,5 @@
+# M02 — staging auth transport
+
+Added the official Supabase Flutter SDK, pinned at 2.18.3, a staging-only URL/public-key configuration validator and a one-shot server sign-in/subscription verification adapter. The adapter calls moldatk-auth then establishes an in-memory session and checks identity plus the server subscription RPC. It signs out the current session locally and disposes of the client in a finally block. No passwords or tokens are persisted by the app, no production credentials are supplied, and the known production project reference is rejected.
+
+This is an initial staging adapter, not a persistent login flow or an enabled UI. Do not treat a returned account as access unless subscription.access is active and the actual server enforces authorization. A dedicated staging project, synthetic identities, timeout/error handling, a persistent encrypted session controller, UI integration and runtime RLS tests remain necessary. Existing GitHub Actions will check compilation and unit tests; results are not yet known. Never run a live probe against production.

@@ -10,6 +10,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   flutter_riverpod: 2.6.1
+  supabase_flutter: 2.18.3
 dev_dependencies:
   flutter_test:
     sdk: flutter
