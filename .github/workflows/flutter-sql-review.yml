@@ -44,5 +44,9 @@ jobs:
         run: psql -X -v ON_ERROR_STOP=1 -f docs/flutter-staging/sql/subscriber_profile_v1.review.sql
       - name: Profile edit regression
         run: psql -X -v ON_ERROR_STOP=1 -f docs/flutter-staging/sql/subscriber_profile_regression.sql
+      - name: Compile private line move candidate
+        run: psql -X -v ON_ERROR_STOP=1 -f docs/flutter-staging/sql/subscriber_line_v1.review.sql
+      - name: Line move regression
+        run: psql -X -v ON_ERROR_STOP=1 -f docs/flutter-staging/sql/subscriber_line_regression.sql
       - name: Concurrent idempotency check
         run: bash docs/flutter-staging/sql/subscriber_create_concurrency.sh
