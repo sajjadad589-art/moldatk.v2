@@ -18,27 +18,27 @@ OperatorAccount account({
 
 SubscriberCreateCommand command({int epoch = 0}) =>
     SubscriberCreateCommand.prepare(
-  context: SubscriberDraftContext(
-    currentMonth: '2026-11',
-    syncEpoch: epoch,
-    hasPricing: true,
-    canAdd: true,
-    canApplyFree: false,
-    tiers: const [
-      SubscriberTierOption(id: 'normal', type: 'normal', name: 'Normal'),
-    ],
-    lines: const [SubscriberLineOption('line', 'Line')],
-    history: const [],
-  ),
-  name: 'Test',
-  code: '',
-  phone: '',
-  tierId: 'normal',
-  lineId: 'line',
-  amperes: 5,
-  discountAmperes: 0,
-  mode: OnboardingDebtMode.none,
-);
+      context: SubscriberDraftContext(
+        currentMonth: '2026-11',
+        syncEpoch: epoch,
+        hasPricing: true,
+        canAdd: true,
+        canApplyFree: false,
+        tiers: const [
+          SubscriberTierOption(id: 'normal', type: 'normal', name: 'Normal'),
+        ],
+        lines: const [SubscriberLineOption('line', 'Line')],
+        history: const [],
+      ),
+      name: 'Test',
+      code: '',
+      phone: '',
+      tierId: 'normal',
+      lineId: 'line',
+      amperes: 5,
+      discountAmperes: 0,
+      mode: OnboardingDebtMode.none,
+    );
 
 void main() {
   test('intent captures one epoch and stable request for retries', () async {
@@ -56,8 +56,10 @@ void main() {
     expect(intent.arguments['p_expected_epoch'], 7);
     expect(intent.arguments['p_command'], intent.command.payload);
     expect(reads, 1);
-    expect(() => intent.headers['x-moldatk-sync-epoch'] = '8',
-        throwsUnsupportedError);
+    expect(
+      () => intent.headers['x-moldatk-sync-epoch'] = '8',
+      throwsUnsupportedError,
+    );
   });
 
   test('old draft cannot adopt a new epoch after reset', () async {
@@ -104,8 +106,17 @@ void main() {
       readState: (_) async => {'authorized': true, 'epoch': 0},
     );
     intent.assertAccount(account());
-    expect(() => intent.assertAccount(account(collector: true)), throwsStateError);
-    expect(() => intent.assertAccount(account(user: 'other')), throwsStateError);
-    expect(() => intent.assertAccount(account(tenant: 'other')), throwsStateError);
+    expect(
+      () => intent.assertAccount(account(collector: true)),
+      throwsStateError,
+    );
+    expect(
+      () => intent.assertAccount(account(user: 'other')),
+      throwsStateError,
+    );
+    expect(
+      () => intent.assertAccount(account(tenant: 'other')),
+      throwsStateError,
+    );
   });
 }

@@ -36,11 +36,13 @@ void main() {
       7,
     );
     expect(
-      () => SubscriberDraftReader.decodeEpoch({'authorized': false, 'epoch': 7}),
+      () =>
+          SubscriberDraftReader.decodeEpoch({'authorized': false, 'epoch': 7}),
       throwsFormatException,
     );
     expect(
-      () => SubscriberDraftReader.decodeEpoch({'authorized': true, 'epoch': -1}),
+      () =>
+          SubscriberDraftReader.decodeEpoch({'authorized': true, 'epoch': -1}),
       throwsFormatException,
     );
   });
