@@ -1,0 +1,42 @@
+name: Flutter isolated SQL review
+on:
+  push:
+    branches: ['flutter/m01-foundation']
+    paths:
+      - 'docs/flutter-staging/sql/**'
+      - '.github/workflows/flutter-sql-review.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolated-sql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: fixture_admin
+          POSTGRES_PASSWORD: fixture_only
+          POSTGRES_DB: moldatk_fixture
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fixture_admin -d moldatk_fixture"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGUSER: fixture_admin
+      PGPASSWORD: fixture_only
+      PGDATABASE: moldatk_fixture
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install fixture schema
+        run: psql -X -v ON_ERROR_STOP=1 -f docs/flutter-staging/sql/subscriber_create_fixture.sql
+      - name: Compile private SQL candidate
+        run: psql -X -v ON_ERROR_STOP=1 -f docs/flutter-staging/sql/subscriber_create_v1.review.sql
+      - name: Execute transaction regression checks
+        run: psql -X -v ON_ERROR_STOP=1 -f docs/flutter-staging/sql/subscriber_create_regression.sql

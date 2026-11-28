@@ -1,0 +1,3 @@
+# Isolated SQL regression
+
+This GitHub Actions job starts a disposable PostgreSQL 17 service. It compiles the exact private SQL review candidate and tests synthetic subscriber onboarding, historical debt, free status, zero markers, replay, conflicts, injected rollback, line recount, expired access and stale reset epoch. No Supabase project or production credentials are used. The fixture approximates only required tables and helpers; it is not a full clone of production triggers, policies, auth or accounting. Passing does not authorize a rollout. Remaining work includes real staging RLS/trigger checks, concurrent calls, collector policy, reset/delete race and legacy compatibility.
