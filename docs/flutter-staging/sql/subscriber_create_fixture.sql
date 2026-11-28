@@ -4,7 +4,8 @@ create role authenticated nologin;
 create role service_role nologin;
 create schema auth;
 create function auth.uid() returns uuid language sql stable as $$
-  select nullif(current_setting('fixture.actor',true),'')::uuid
+  select coalesce(nullif(current_setting('fixture.actor',true),''),
+    coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb->>'sub')::uuid
 $$;
 create table public.generators(id uuid primary key);
 create table public.profiles(
@@ -59,7 +60,8 @@ $$;
 create function public.get_my_subscription_access_state() returns jsonb
 language sql stable as $$
   select jsonb_build_object('ok',true,
-    'accessActive',coalesce(current_setting('fixture.access',true),'')='active',
+    'accessActive',coalesce(nullif(current_setting('fixture.access',true),''),
+      coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb->>'fixtureAccess','')='active',
     'generator',jsonb_build_object('id',generator_id))
   from public.profiles where id=auth.uid()
 $$;

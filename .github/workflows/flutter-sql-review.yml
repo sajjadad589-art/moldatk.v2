@@ -64,3 +64,18 @@ jobs:
         run: psql -X -v ON_ERROR_STOP=1 -f docs/flutter-staging/sql/fixture_rpc_regression.sql
       - name: Concurrent idempotency check
         run: bash docs/flutter-staging/sql/subscriber_create_concurrency.sh
+      - name: Seed isolated HTTP integration
+        run: psql -X -v ON_ERROR_STOP=1 -f docs/flutter-staging/sql/fixture_http_seed.sql
+      - name: Exercise JWT-authenticated HTTP integration
+        env:
+          FIXTURE_JWT_SECRET: disposable-fixture-jwt-secret-not-production
+        run: |
+          set -euo pipefail
+          trap 'docker logs moldatk-fixture-rest || true; docker rm -f moldatk-fixture-rest || true' EXIT
+          docker run -d --name moldatk-fixture-rest --network host \
+            -e PGRST_DB_URI=postgres://fixture_http:fixture_http_only@127.0.0.1:5432/moldatk_fixture \
+            -e PGRST_DB_SCHEMAS=public -e PGRST_DB_ANON_ROLE=anon \
+            -e PGRST_SERVER_HOST=127.0.0.1 -e PGRST_SERVER_PORT=3100 \
+            -e PGRST_JWT_SECRET="$FIXTURE_JWT_SECRET" \
+            postgrest/postgrest:v12.2.12
+          python3 docs/flutter-staging/sql/fixture_http_regression.py
