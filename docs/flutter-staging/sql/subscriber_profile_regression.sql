@@ -7,7 +7,7 @@ insert into generator_sync_state values ('11111111-1111-4111-8111-111111111111',
 insert into generator_lines(generator_id,id,name) values
  ('11111111-1111-4111-8111-111111111111','line-a','A'),
  ('22222222-2222-4222-8222-222222222222','foreign','B');
-insert into generator_monthly_tariffs values
+insert into generator_monthly_tariffs(generator_id,id,month_name_ar,is_current_active,tiers) values
  ('11111111-1111-4111-8111-111111111111','2026-10','October',false,
  '[{"id":"normal","type":"normal","pricePerAmpere":10000,"fixedFee":5000}]'),
  ('11111111-1111-4111-8111-111111111111','2026-11','November',true,

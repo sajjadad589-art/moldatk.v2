@@ -22,6 +22,7 @@ create table public.generator_lines(
 create table public.generator_monthly_tariffs(
   generator_id uuid references generators(id), id text, month_name_ar text not null,
   is_current_active boolean not null, tiers jsonb not null,
+  created_at timestamptz not null default clock_timestamp(),
   primary key(generator_id,id)
 );
 create table public.generator_subscribers(

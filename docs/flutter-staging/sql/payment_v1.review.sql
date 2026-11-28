@@ -33,7 +33,7 @@ begin
  perform pg_advisory_xact_lock(hashtextextended(gid::text,89144));
  select coalesce((select epoch from public.generator_sync_state where generator_id=gid),0) into epoch_now;
  if p_expected_epoch is distinct from epoch_now or
-   coalesce(coalesce(nullif(current_setting('request.headers',true),''),'{}')::jsonb->>'x-moldatk-sync-epoch','0')<>epoch_now::text then
+   (coalesce(nullif(current_setting('request.headers',true),''),'{}')::jsonb->>'x-moldatk-sync-epoch') is distinct from epoch_now::text then
    raise exception 'MOLDATK_STALE_SYNC_EPOCH';
  end if;
  access_state:=public.get_my_subscription_access_state();
@@ -95,7 +95,22 @@ begin
  select paid_amount,total_amount,issue_date into strict current_paid,current_charge,current_issue_date from public.generator_invoices
    where generator_id=gid and subscriber_id=sid and month_id=month_now and status<>'cancelled';
  if due is distinct from sub.amount_due or amount_value>due or due<=0 then raise exception 'payment_amount_or_ledger_mismatch'; end if;
+ -- Never guess chronology or resurrect a debt whose tariff was removed.
+ if exists(select 1 from public.generator_invoices i
+   where i.generator_id=gid and i.subscriber_id=sid and i.status not in ('cancelled','free')
+     and i.remaining_amount>0 and not exists(select 1 from public.generator_monthly_tariffs t
+       where t.generator_id=gid and t.id=i.month_id))
+   then raise exception 'missing_debt_tariff'; end if;
  -- Legacy repair calculates carried debt from earlier tariff creation order.
+ -- Both calendar month order and tariff creation order must agree for existing
+ -- live invoice months. Equal creation times are ambiguous and fail closed.
+ if exists(
+   select 1 from public.generator_monthly_tariffs t1
+   join public.generator_monthly_tariffs t2 on t2.generator_id=t1.generator_id and t1.id<t2.id
+   where t1.generator_id=gid and t1.created_at>=t2.created_at
+     and exists(select 1 from public.generator_invoices i where i.generator_id=gid and i.subscriber_id=sid and i.month_id=t1.id and i.status<>'cancelled')
+     and exists(select 1 from public.generator_invoices i where i.generator_id=gid and i.subscriber_id=sid and i.month_id=t2.id and i.status<>'cancelled')
+ ) then raise exception 'tariff_chronology_mismatch'; end if;
  -- Require every affected live month to be canonical before applying a payment.
  -- Existing archived/deleted-tariff account rows are not silently rewritten.
  if exists(
