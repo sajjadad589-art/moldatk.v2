@@ -1,0 +1,3 @@
+# M03 transaction safety expansion
+
+The client write boundary serializes with session checks and distinguishes pre-dispatch denial from an ambiguous outcome after dispatch. It does not retry or claim rollback when a response is lost; the caller must retain and reconcile the immutable request. No live write transport is installed. Added four session tests. The SQL fixture now tests cross-tenant line denial, stale price confirmation, collector denial, deleted subscriber replay and parallel duplicate calls from two PostgreSQL sessions. Real staging RLS, triggers, pending-intent persistence and rollout remain pending. No production write.

@@ -22,6 +22,12 @@ abstract interface class SessionGateway {
 
 enum SessionPhase { signedOut, checking, active, denied, unavailable }
 
+/// A dispatched request may have committed despite a missing or rejected
+/// response. Reconcile the original request before creating another.
+class WriteOutcomeUnknown implements Exception {
+  const WriteOutcomeUnknown();
+}
+
 /// A single-account session. No offline authorization.
 class SessionController extends ChangeNotifier {
   SessionController(this._gateway);
@@ -163,6 +169,29 @@ class SessionController extends ChangeNotifier {
       if (!_current(generation)) await _closeSafely();
       _busy = false;
       if (!_disposed) notifyListeners();
+    }
+  }
+
+  /// Owner-only staging write boundary. No transport is enabled by this method.
+  /// The caller must retain its immutable idempotent intent until reconciled.
+  Future<T> writeAuthorized<T>(
+    Future<T> Function(OperatorAccount account) dispatch,
+  ) async {
+    if (account?.role != OperatorRole.owner) {
+      throw StateError('Owner authorization required');
+    }
+    var dispatched = false;
+    try {
+      return await readAuthorized((verified) {
+        if (verified.role != OperatorRole.owner) {
+          throw StateError('Owner authorization required');
+        }
+        dispatched = true;
+        return dispatch(verified);
+      });
+    } catch (_) {
+      if (dispatched) throw const WriteOutcomeUnknown();
+      rethrow;
     }
   }
 

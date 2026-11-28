@@ -74,6 +74,39 @@ begin
     and payment_status='free' and ampere_discount=0) then raise exception 'free subscriber mismatch'; end if;
   if not exists(select 1 from generator_lines where id='line-a' and subscribers_count=3
     and current_load_amperes=30) then raise exception 'line recount mismatch'; end if;
+  other := base||'{"requestId":"55555555-0000-4000-8000-555555555555","lineId":"foreign"}';
+  caught := false;
+  begin
+    perform moldatk_private.flutter_create_subscriber_v1(other,0);
+  exception when no_data_found then caught := true;
+  end;
+  if not caught then raise exception 'cross tenant line accepted'; end if;
+  other := base||'{"requestId":"66666666-0000-4000-8000-666666666666","expectedDebtIqd":1}';
+  caught := false;
+  begin
+    perform moldatk_private.flutter_create_subscriber_v1(other,0);
+  exception when others then
+    if sqlerrm<>'stale_debt_confirmation' then raise; end if;
+    caught := true;
+  end;
+  if not caught then raise exception 'stale debt accepted'; end if;
+  perform set_config('fixture.actor','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',true);
+  caught := false;
+  begin
+    perform moldatk_private.flutter_create_subscriber_v1(base,0);
+  exception when no_data_found or insufficient_privilege then caught := true;
+  end;
+  if not caught then raise exception 'collector write accepted'; end if;
+  perform set_config('fixture.actor','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
+  delete from generator_subscribers where id=sid;
+  caught := false;
+  begin
+    perform moldatk_private.flutter_create_subscriber_v1(base,0);
+  exception when others then
+    if sqlerrm<>'request_conflict_or_reset' then raise; end if;
+    caught := true;
+  end;
+  if not caught then raise exception 'deleted subscriber resurrected'; end if;
   perform set_config('fixture.access','expired',true);
   caught := false;
   begin

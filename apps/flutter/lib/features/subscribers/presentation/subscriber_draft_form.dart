@@ -103,6 +103,7 @@ class _SubscriberDraftFormState extends State<SubscriberDraftForm> {
     return TextField(
       controller: controller,
       keyboardType: keyboard,
+      enabled: widget.enabled && !_checking,
       onChanged: (_) => _change(() {}),
       decoration: InputDecoration(labelText: label),
     );

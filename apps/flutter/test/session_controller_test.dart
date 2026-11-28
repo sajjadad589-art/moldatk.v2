@@ -230,6 +230,71 @@ void main() {
     expect(gateway.closes, 1);
   });
 
+  test('write is never dispatched without active authorization', () async {
+    final gateway = FakeGateway();
+    final controller = SessionController(gateway);
+    addTearDown(controller.dispose);
+    await login(controller);
+    gateway.result = decision(active: false);
+    var called = false;
+    await expectLater(
+      controller.writeAuthorized((_) async {
+        called = true;
+        return 1;
+      }),
+      throwsStateError,
+    );
+    expect(called, isFalse);
+  });
+
+  test('verified write returns the result exactly once', () async {
+    final controller = SessionController(FakeGateway());
+    addTearDown(controller.dispose);
+    await login(controller);
+    var calls = 0;
+    final result = await controller.writeAuthorized((account) async {
+      expect(account.userId, fixture.userId);
+      calls++;
+      return 42;
+    });
+    expect(result, 42);
+    expect(calls, 1);
+  });
+
+  test('transport failure after dispatch has unknown outcome', () async {
+    final controller = SessionController(FakeGateway());
+    addTearDown(controller.dispose);
+    await login(controller);
+    var calls = 0;
+    await expectLater(
+      controller.writeAuthorized<int>((_) async {
+        calls++;
+        throw StateError('Lost response');
+      }),
+      throwsA(isA<WriteOutcomeUnknown>()),
+    );
+    expect(calls, 1);
+    expect(controller.account, isNull);
+  });
+
+  test('logout during dispatch is not reported as a failed write', () async {
+    final controller = SessionController(FakeGateway());
+    addTearDown(controller.dispose);
+    await login(controller);
+    final started = Completer<void>();
+    final pending = Completer<int>();
+    final operation = controller.writeAuthorized((_) {
+      started.complete();
+      return pending.future;
+    });
+    final rejected = expectLater(operation, throwsA(isA<WriteOutcomeUnknown>()));
+    await started.future;
+    await controller.signOut();
+    pending.complete(42);
+    await rejected;
+    expect(controller.account, isNull);
+  });
+
   test('missing stored credentials stays signed out', () async {
     final controller = SessionController(FakeGateway());
     addTearDown(controller.dispose);
