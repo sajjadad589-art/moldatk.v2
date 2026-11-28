@@ -58,5 +58,9 @@ jobs:
         run: psql -X -v ON_ERROR_STOP=1 -f docs/flutter-staging/sql/payment_status_v1.review.sql
       - name: Payment reversal regression
         run: psql -X -v ON_ERROR_STOP=1 -f docs/flutter-staging/sql/payment_reversal_regression.sql
+      - name: Compile fixture-only authenticated RPC wrappers
+        run: psql -X -v ON_ERROR_STOP=1 -f docs/flutter-staging/sql/fixture_rpc_wrappers.sql
+      - name: Authenticated RPC permission regression
+        run: psql -X -v ON_ERROR_STOP=1 -f docs/flutter-staging/sql/fixture_rpc_regression.sql
       - name: Concurrent idempotency check
         run: bash docs/flutter-staging/sql/subscriber_create_concurrency.sh
