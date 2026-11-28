@@ -7,9 +7,10 @@ typedef LoadSubscriberPage = Future<SubscriberPage> Function(String? afterId);
 /// Read-only staging component. No mutations, local cache or financial totals.
 /// The parent must unmount it when the session is no longer authorized.
 class SubscribersScreen extends StatefulWidget {
-  const SubscribersScreen({required this.load, super.key});
+  const SubscribersScreen({required this.load, this.onOpen, super.key});
 
   final LoadSubscriberPage load;
+  final ValueChanged<String>? onOpen;
 
   @override
   State<SubscribersScreen> createState() => _SubscribersScreenState();
@@ -112,6 +113,7 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
         for (final item in visible)
           Card(
             child: ListTile(
+              onTap: _busy || widget.onOpen == null ? null : () => widget.onOpen!(item.id),
               title: Text(item.name.isEmpty ? item.code : item.name),
               subtitle: Text(
                 '${item.code} • ${item.lineName ?? 'بدون خط'}\n${item.phone}',

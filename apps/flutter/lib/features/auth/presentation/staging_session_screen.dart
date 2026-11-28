@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../subscribers/domain/subscriber_draft.dart';
+import '../../subscribers/presentation/subscriber_detail_screen.dart';
 import '../../subscribers/presentation/subscriber_draft_form.dart';
 import '../../subscribers/presentation/subscribers_screen.dart';
 import '../data/staging_config.dart';
@@ -32,6 +33,7 @@ class _StagingSessionScreenState extends State<StagingSessionScreen>
   bool _failed = false;
   bool _foreground = true;
   bool _showSubscribers = false;
+  String? _selectedSubscriberId;
   bool _showDraft = false;
   int _draftRequest = 0;
   SubscriberDraftContext? _draftOptions;
@@ -63,6 +65,7 @@ class _StagingSessionScreenState extends State<StagingSessionScreen>
       if (_session.phase != SessionPhase.active &&
           _session.phase != SessionPhase.checking) {
         _showSubscribers = false;
+        _selectedSubscriberId = null;
         _clearDraft();
       }
     });
@@ -116,6 +119,7 @@ class _StagingSessionScreenState extends State<StagingSessionScreen>
       setState(() {
         _foreground = false;
         _showSubscribers = false;
+        _selectedSubscriberId = null;
         _clearDraft();
       });
       _password.clear();
@@ -217,6 +221,21 @@ class _StagingSessionScreenState extends State<StagingSessionScreen>
                   verify: _loadDraft,
                   enabled: !_session.busy,
                 ),
+            ] else if (_selectedSubscriberId != null &&
+                account.role == OperatorRole.owner) ...[
+              OutlinedButton(
+                onPressed: () => setState(() => _selectedSubscriberId = null),
+                child: const Text('الرجوع للمشتركين'),
+              ),
+              SubscriberDetailScreen(
+                key: ValueKey('${account.userId}:${_selectedSubscriberId!}'),
+                load: () {
+                  final id = _selectedSubscriberId!;
+                  return _session.readAuthorized(
+                    (verified) => _gateway.readSubscriberDetail(verified, id),
+                  );
+                },
+              ),
             ] else if (_showSubscribers) ...[
               OutlinedButton(
                 onPressed: () => setState(() => _showSubscribers = false),
@@ -224,6 +243,9 @@ class _StagingSessionScreenState extends State<StagingSessionScreen>
               ),
               SubscribersScreen(
                 key: ValueKey('${account.userId}:${account.generatorId}'),
+                onOpen: account.role == OperatorRole.owner && !_session.busy
+                    ? (id) => setState(() => _selectedSubscriberId = id)
+                    : null,
                 load: (afterId) => _session.readAuthorized(
                   (verified) => _gateway.readSubscribers(verified, afterId),
                 ),
