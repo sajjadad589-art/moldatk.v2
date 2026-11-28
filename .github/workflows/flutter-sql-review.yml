@@ -54,6 +54,8 @@ jobs:
         run: psql -X -v ON_ERROR_STOP=1 -f docs/flutter-staging/sql/payment_regression.sql
       - name: Compile private payment reversal candidate
         run: psql -X -v ON_ERROR_STOP=1 -f docs/flutter-staging/sql/payment_reversal_v1.review.sql
+      - name: Compile private payment recovery candidate
+        run: psql -X -v ON_ERROR_STOP=1 -f docs/flutter-staging/sql/payment_status_v1.review.sql
       - name: Payment reversal regression
         run: psql -X -v ON_ERROR_STOP=1 -f docs/flutter-staging/sql/payment_reversal_regression.sql
       - name: Concurrent idempotency check

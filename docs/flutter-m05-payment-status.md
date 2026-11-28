@@ -1,0 +1,3 @@
+# M05 authoritative recovery lookup
+
+Private, read-only status function reuses owner, active subscription, epoch and exact original command fingerprint checks. It never calls the collection function. Returns unconfirmed, committed with the original validated receipt, or reversed without an active receipt. Unknown is not proof of failure and cannot automatically release a pending slot. Tests extend the reversal fixture with pre-payment absence, post-payment recovery, changed payload refusal and post-reversal status. No public API, no production migration, no live dispatch. Next gate: authenticated staging wrapper, durable receipt retention before clearing a pending slot, cross-device concurrency, offline database, and full legacy integration.

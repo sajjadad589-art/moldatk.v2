@@ -18,7 +18,7 @@ select set_config('fixture.access','active',true);
 select set_config('request.headers','{"x-moldatk-sync-epoch":"0"}',true);
 
 do $$
-declare sid text; command jsonb; response jsonb; ledger jsonb; caught boolean; reversal jsonb; pid text;
+declare sid text; command jsonb; response jsonb; ledger jsonb; caught boolean; reversal jsonb; pid text; recovery jsonb;
 begin
  response:=moldatk_private.flutter_create_subscriber_v1(
  '{"requestId":"11111111-0000-4000-8000-111111111111","fullName":"Fixture","code":null,"phone":"","tierId":"normal","lineId":"line-a","amperes":10,"discountAmperes":2,"debtMode":"prior","priorMonth":"2026-10","expectedCurrentMonth":"2026-11","expectedDebtIqd":85000}',0);
@@ -27,6 +27,8 @@ begin
  into ledger from generator_invoices where subscriber_id=sid;
  command:=jsonb_build_object('requestId','99999999-0000-4000-8000-999999999999','subscriberId',sid,
  'expectedUpdatedAt',(select updated_at from generator_subscribers where id=sid),'expectedMonth','2026-11','expectedLedger',ledger,'amountIqd',45000);
+ recovery:=moldatk_private.flutter_payment_status_v1(command,0);
+ if recovery->>'state' is distinct from 'unconfirmed' then raise exception 'unknown request reported committed'; end if;
  perform set_config('request.headers','{}',true);
  caught:=false;
  begin
@@ -105,6 +107,19 @@ begin
    or (select sum(amount) from generator_cashbox_entries)<>45000 then raise exception 'duplicate collection'; end if;
  if has_function_privilege('authenticated','moldatk_private.flutter_collect_payment_v1(jsonb,bigint)','EXECUTE') then
   raise exception 'unexpected direct access'; end if;
+ recovery:=moldatk_private.flutter_payment_status_v1(command,0);
+ if recovery->>'state' is distinct from 'committed'
+   or recovery->'receipt'->>'paymentId' is distinct from response->>'paymentId'
+   or recovery->'receipt'->>'replayed' is distinct from 'true'
+   or (select count(*) from generator_payments)<>1 then raise exception 'recovery mismatch'; end if;
+ caught:=false;
+ begin
+   perform moldatk_private.flutter_payment_status_v1(command||'{"amountIqd":1}',0);
+ exception when others then
+   if sqlerrm<>'request_conflict_or_reset' then raise; end if;
+   caught:=true;
+ end;
+ if not caught then raise exception 'changed recovery payload accepted'; end if;
  pid:=response->>'paymentId';
  reversal:=jsonb_build_object('requestId','abababab-0000-4000-8000-abababababab',
    'paymentId',pid,'reason','Fixture refund','expectedUpdatedAt',(select updated_at from generator_subscribers where id=sid));
@@ -138,6 +153,12 @@ begin
  if not caught then raise exception 'reversed receipt returned as active'; end if;
  if has_function_privilege('authenticated','moldatk_private.flutter_reverse_payment_v1(jsonb,bigint)','EXECUTE') then
    raise exception 'unexpected direct access'; end if;
+ recovery:=moldatk_private.flutter_payment_status_v1(command,0);
+ if recovery->>'state' is distinct from 'reversed' or recovery ? 'receipt'
+   then raise exception 'reversed payment reported active'; end if;
+ if has_function_privilege('authenticated','moldatk_private.flutter_payment_status_v1(jsonb,bigint)','EXECUTE')
+   then raise exception 'unexpected recovery direct access'; end if;
+ raise notice 'PASS: recovery unknown, committed, mismatched command, reversed';
  raise notice 'PASS: reversal restores debt, keeps receipt, offsets cashbox, rejects replay as active, rollback';
 end;
 $$;
