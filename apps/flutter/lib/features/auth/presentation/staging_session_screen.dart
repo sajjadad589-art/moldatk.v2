@@ -2,13 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../subscribers/presentation/subscribers_screen.dart';
 import '../data/staging_config.dart';
 import '../data/staging_session_gateway.dart';
 import '../domain/operator_account.dart';
 import '../domain/session_controller.dart';
 import '../domain/subscription_access.dart';
 
-/// Internal staging flow. No business data or offline access is enabled.
+/// Internal staging flow. Authorized read-only access; no offline access.
 class StagingSessionScreen extends StatefulWidget {
   const StagingSessionScreen({required this.config, super.key});
 
@@ -21,17 +22,20 @@ class StagingSessionScreen extends StatefulWidget {
 class _StagingSessionScreenState extends State<StagingSessionScreen>
     with WidgetsBindingObserver {
   late final SessionController _session;
+  late final StagingSessionGateway _gateway;
   final _form = GlobalKey<FormState>();
   final _identifier = TextEditingController();
   final _password = TextEditingController();
   Timer? _refresh;
   bool _failed = false;
   bool _foreground = true;
+  bool _showSubscribers = false;
 
   @override
   void initState() {
     super.initState();
-    _session = SessionController(StagingSessionGateway(widget.config));
+    _gateway = StagingSessionGateway(widget.config);
+    _session = SessionController(_gateway);
     _session.addListener(_changed);
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -47,7 +51,13 @@ class _StagingSessionScreenState extends State<StagingSessionScreen>
   }
 
   void _changed() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(() {
+      if (_session.phase != SessionPhase.active &&
+          _session.phase != SessionPhase.checking) {
+        _showSubscribers = false;
+      }
+    });
   }
 
   @override
@@ -55,7 +65,10 @@ class _StagingSessionScreenState extends State<StagingSessionScreen>
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.detached) {
-      setState(() => _foreground = false);
+      setState(() {
+        _foreground = false;
+        _showSubscribers = false;
+      });
       _password.clear();
       if (_session.busy) unawaited(_session.signOut());
     } else if (state == AppLifecycleState.resumed) {
@@ -133,9 +146,38 @@ class _StagingSessionScreenState extends State<StagingSessionScreen>
         final role = account.role == OperatorRole.owner
             ? 'صاحب المولدة'
             : 'جابي';
-        return _status(
-          'جلسة اختبار فعالة\n${account.generatorName}\n$role',
-          retry: true,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              '${account.generatorName}\n$role',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            if (_showSubscribers) ...[
+              OutlinedButton(
+                onPressed: () => setState(() => _showSubscribers = false),
+                child: const Text('الرجوع'),
+              ),
+              SubscribersScreen(
+                key: ValueKey('${account.userId}:${account.generatorId}'),
+                load: (afterId) => _session.readAuthorized(
+                  (verified) => _gateway.readSubscribers(verified, afterId),
+                ),
+              ),
+            ] else
+              FilledButton.icon(
+                onPressed: _session.busy
+                    ? null
+                    : () => setState(() => _showSubscribers = true),
+                icon: const Icon(Icons.people_outline),
+                label: const Text('عرض المشتركين'),
+              ),
+            TextButton(
+              onPressed: _session.signOut,
+              child: const Text('تسجيل الخروج'),
+            ),
+          ],
         );
     }
   }

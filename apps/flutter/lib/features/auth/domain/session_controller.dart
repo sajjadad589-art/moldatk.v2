@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import 'operator_account.dart';
@@ -33,6 +35,7 @@ class SessionController extends ChangeNotifier {
   int _generation = 0;
   Stopwatch? _freshness;
   Duration? _validFor;
+  Timer? _expiry;
 
   SessionPhase get phase {
     if (_phase == SessionPhase.active &&
@@ -177,6 +180,10 @@ class SessionController extends ChangeNotifier {
           ? decision.remaining!
           : freshnessBudget;
       _freshness = Stopwatch()..start();
+      _expiry?.cancel();
+      _expiry = Timer(_validFor!, () {
+        if (_current(generation)) _setPhase(SessionPhase.unavailable);
+      });
       _setPhase(SessionPhase.active);
     } else {
       _setPhase(
@@ -227,6 +234,10 @@ class SessionController extends ChangeNotifier {
   }
 
   void _setPhase(SessionPhase value) {
+    if (value != SessionPhase.active) {
+      _expiry?.cancel();
+      _expiry = null;
+    }
     _phase = value;
     if (!_disposed) notifyListeners();
   }
@@ -234,6 +245,7 @@ class SessionController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _expiry?.cancel();
     ++_generation;
     _account = null;
     if (!_busy) _releaseSafely();

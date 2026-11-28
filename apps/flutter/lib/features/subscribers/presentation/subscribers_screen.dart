@@ -26,7 +26,9 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
   @override
   void initState() {
     super.initState();
-    _load(reset: true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _load(reset: true);
+    });
   }
 
   Future<void> _load({bool reset = false}) async {

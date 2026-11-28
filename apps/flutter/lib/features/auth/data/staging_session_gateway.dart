@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../subscribers/data/subscriber_reader.dart';
+import '../../subscribers/domain/subscriber.dart';
 import '../domain/operator_account.dart';
 import '../domain/session_controller.dart';
 import '../domain/subscription_access.dart';
@@ -174,6 +176,25 @@ class StagingSessionGateway implements SessionGateway {
       expectedGeneratorId: account.generatorId,
       elapsed: timer.elapsed,
     );
+  }
+
+  /// Call only through SessionController.readAuthorized.
+  Future<SubscriberPage> readSubscribers(
+    OperatorAccount account,
+    String? afterId,
+  ) async {
+    final client = _client;
+    if (client == null || client.auth.currentUser?.id != account.userId) {
+      throw StateError('Session unavailable');
+    }
+    final page = await SubscriberReader.authenticated(
+      client,
+    ).readPage(account: account, afterId: afterId);
+    if (!identical(client, _client) ||
+        client.auth.currentUser?.id != account.userId) {
+      throw StateError('Session changed');
+    }
+    return page;
   }
 
   @override
