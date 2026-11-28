@@ -80,6 +80,10 @@ begin
    or exists(select 1 from generator_payment_allocations) then raise exception 'rollback failed'; end if;
  perform set_config('fixture.fail_invoice','no',true);
  response:=moldatk_private.flutter_collect_payment_v1(command,0);
+ if response->'printData'->>'subscriberName' is distinct from 'Fixture'
+   or response->'printData'->>'amperes' is distinct from '10'
+   or response->'printData'->>'collectorName' is distinct from 'Fixture owner'
+   then raise exception 'receipt identity snapshot mismatch'; end if;
  if response->>'debtAfter' is distinct from '40000' or response->>'appliedToPrevious' is distinct from '45000'
    or response->>'appliedToCurrent' is distinct from '0'
    or not exists(select 1 from generator_subscribers where id=sid and amount_due=40000 and amount_paid=0)

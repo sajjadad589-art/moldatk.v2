@@ -20,7 +20,7 @@ declare
  sub public.generator_subscribers%rowtype; inv public.generator_invoices%rowtype;
  month_now text; month_name text; sid text; pid text; receipt_no text; amount_value bigint; due bigint;
  cash_left bigint; applied bigint; current_paid bigint; prior_debt bigint;
- current_charge bigint; applied_prior bigint:=0; applied_current bigint:=0;
+ current_charge bigint; current_price bigint; applied_prior bigint:=0; applied_current bigint:=0;
  after_ledger jsonb;
  n integer:=0; allocation_list jsonb:='[]'::jsonb; ledger jsonb; receipt jsonb;
  received timestamptz; received_day date; portal_snapshot jsonb;
@@ -97,7 +97,7 @@ begin
  if ledger is distinct from p_command->'expectedLedger' then raise exception 'invoice_ledger_changed'; end if;
  select coalesce(sum(remaining_amount),0),coalesce(sum(remaining_amount) filter(where month_id<month_now),0)
    into due,prior_debt from public.generator_invoices where generator_id=gid and subscriber_id=sid and status<>'cancelled';
- select paid_amount,total_amount,issue_date into strict current_paid,current_charge,current_issue_date from public.generator_invoices
+ select paid_amount,total_amount,issue_date,price_per_ampere into strict current_paid,current_charge,current_issue_date,current_price from public.generator_invoices
    where generator_id=gid and subscriber_id=sid and month_id=month_now and status<>'cancelled';
  if due is distinct from sub.amount_due or amount_value>due or due<=0 then raise exception 'payment_amount_or_ledger_mismatch'; end if;
  -- Never guess chronology or resurrect a debt whose tariff was removed.
@@ -179,7 +179,10 @@ begin
  receipt:=jsonb_build_object('ok',true,'requestId',rid,'generatorId',gid,'subscriberId',sid,
    'paymentId',pid,'receiptNumber',receipt_no,'receivedAt',received,'amountIqd',amount_value,
    'debtBefore',due,'debtAfter',due-amount_value,'previousDebtBefore',prior_debt,'currentCharge',current_charge,
-   'appliedToPrevious',applied_prior,'appliedToCurrent',applied_current,'allocations',allocation_list,'replayed',false);
+   'appliedToPrevious',applied_prior,'appliedToCurrent',applied_current,'allocations',allocation_list,'replayed',false,
+   'printData',jsonb_build_object('subscriberName',sub.full_name,'subscriberCode',sub.code,
+     'phone',coalesce(sub.phone,''),'lineName',coalesce(sub.line_name,''),'amperes',sub.amperes,
+     'collectorName',actor_name,'monthNameAr',month_name,'pricePerAmpere',current_price));
  -- Preserve legacy SubscriberReceiptSnapshot field names for the QR portal.
  portal_snapshot:=jsonb_build_object('monthId',month_now,'monthNameAr',month_name,
    'issueDate',current_issue_date,'paymentDate',received,'amperes',sub.amperes,
