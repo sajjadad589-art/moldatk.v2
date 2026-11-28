@@ -138,13 +138,15 @@ class PaymentPlan {
       } else {
         appliedPrevious += applied;
       }
-      allocations.add(PaymentAllocation(
-        invoiceId: invoice.id,
-        month: invoice.month,
-        amount: applied,
-        paidAfter: invoice.paid + applied,
-        remainingAfter: invoice.remaining - applied,
-      ));
+      allocations.add(
+        PaymentAllocation(
+          invoiceId: invoice.id,
+          month: invoice.month,
+          amount: applied,
+          paidAfter: invoice.paid + applied,
+          remainingAfter: invoice.remaining - applied,
+        ),
+      );
     }
     if (left != 0 || appliedPrevious + appliedCurrent != amount) {
       throw const FormatException('Allocation mismatch');

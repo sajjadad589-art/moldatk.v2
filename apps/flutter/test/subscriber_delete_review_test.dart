@@ -3,15 +3,21 @@ import 'package:moldatk_flutter/features/auth/domain/operator_account.dart';
 import 'package:moldatk_flutter/features/subscribers/domain/subscriber_delete_review.dart';
 import 'package:moldatk_flutter/features/subscribers/domain/subscriber_detail.dart';
 
-OperatorAccount account({String tenant = 'g', String role = 'generator_admin'}) =>
-    OperatorAccount.fromJson({
-      'userId': 'owner',
-      'generatorId': tenant,
-      'generatorName': 'Test',
-      'role': role,
-    });
+OperatorAccount account({
+  String tenant = 'g',
+  String role = 'generator_admin',
+}) => OperatorAccount.fromJson({
+  'userId': 'owner',
+  'generatorId': tenant,
+  'generatorName': 'Test',
+  'role': role,
+});
 
-Map<String, dynamic> invoice({int total = 0, int paid = 0, int remaining = 0}) => {
+Map<String, dynamic> invoice({
+  int total = 0,
+  int paid = 0,
+  int remaining = 0,
+}) => {
   'id': 'i',
   'generator_id': 'g',
   'subscriber_id': 's',
@@ -73,14 +79,22 @@ void main() {
       review(detail(invoices: [invoice(total: 5000, paid: 5000)])).reasons,
       containsAll([DeleteBlock.recordedPayment, DeleteBlock.financialHistory]),
     );
-    expect(review(detail(), links: 1).reasons, contains(DeleteBlock.recordedPayment));
+    expect(
+      review(detail(), links: 1).reasons,
+      contains(DeleteBlock.recordedPayment),
+    );
   });
 
   test('debt and truncated invoice history block review', () {
-    final result = review(detail(
-      due: 5000,
-      invoices: [invoice(), {...invoice(), 'id': 'i2'}],
-    ));
+    final result = review(
+      detail(
+        due: 5000,
+        invoices: [
+          invoice(),
+          {...invoice(), 'id': 'i2'},
+        ],
+      ),
+    );
     expect(
       result.reasons,
       containsAll([DeleteBlock.outstandingDebt, DeleteBlock.incompleteHistory]),
@@ -88,7 +102,10 @@ void main() {
   });
 
   test('missing epoch and foreign tenant fail closed', () {
-    expect(review(detail(epoch: null)).reasons, contains(DeleteBlock.missingVersion));
+    expect(
+      review(detail(epoch: null)).reasons,
+      contains(DeleteBlock.missingVersion),
+    );
     expect(
       () => SubscriberDeleteReview.evaluate(
         account: account(tenant: 'foreign'),

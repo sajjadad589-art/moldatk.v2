@@ -85,11 +85,7 @@ void main() {
       paid: 0,
       remaining: 0,
     );
-    final result = plan(
-      amount: 30000,
-      due: 30000,
-      invoices: [free, old],
-    );
+    final result = plan(amount: 30000, due: 30000, invoices: [free, old]);
     expect(result.currentCharge, 0);
     expect(result.appliedToCurrent, 0);
     expect(result.debtAfter, 0);
