@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../subscribers/domain/subscriber_draft.dart';
+import '../../subscribers/presentation/subscriber_draft_form.dart';
 import '../../subscribers/presentation/subscribers_screen.dart';
 import '../data/staging_config.dart';
 import '../data/staging_session_gateway.dart';
@@ -30,6 +32,9 @@ class _StagingSessionScreenState extends State<StagingSessionScreen>
   bool _failed = false;
   bool _foreground = true;
   bool _showSubscribers = false;
+  bool _showDraft = false;
+  int _draftRequest = 0;
+  SubscriberDraftContext? _draftOptions;
 
   @override
   void initState() {
@@ -43,7 +48,9 @@ class _StagingSessionScreenState extends State<StagingSessionScreen>
     });
     _refresh = Timer.periodic(const Duration(seconds: 15), (_) {
       if (_foreground && _session.hasSession && !_session.busy) {
-        if (_session.phase != SessionPhase.denied) {
+        if (_showDraft && _session.phase == SessionPhase.active) {
+          unawaited(_refreshDraft());
+        } else if (_session.phase != SessionPhase.denied) {
           unawaited(_session.revalidate());
         }
       }
@@ -56,8 +63,49 @@ class _StagingSessionScreenState extends State<StagingSessionScreen>
       if (_session.phase != SessionPhase.active &&
           _session.phase != SessionPhase.checking) {
         _showSubscribers = false;
+        _clearDraft();
       }
     });
+  }
+
+  void _clearDraft() {
+    _draftRequest++;
+    _showDraft = false;
+    _draftOptions = null;
+  }
+
+  Future<SubscriberDraftContext> _loadDraft() async {
+    final request = ++_draftRequest;
+    final options = await _session.readAuthorized(_gateway.readDraftOptions);
+    if (!mounted ||
+        !_foreground ||
+        !_showDraft ||
+        _session.phase != SessionPhase.active ||
+        request != _draftRequest) {
+      throw StateError('Draft closed');
+    }
+    setState(() => _draftOptions = options);
+    return options;
+  }
+
+  Future<void> _refreshDraft() async {
+    if (_session.busy || !_showDraft) return;
+    try {
+      await _loadDraft();
+    } catch (_) {
+      if (mounted && _showDraft && !_session.busy) {
+        setState(_clearDraft);
+      }
+    }
+  }
+
+  void _openDraft() {
+    setState(() {
+      _showSubscribers = false;
+      _showDraft = true;
+      _draftOptions = null;
+    });
+    unawaited(_refreshDraft());
   }
 
   @override
@@ -68,6 +116,7 @@ class _StagingSessionScreenState extends State<StagingSessionScreen>
       setState(() {
         _foreground = false;
         _showSubscribers = false;
+        _clearDraft();
       });
       _password.clear();
       if (_session.busy) unawaited(_session.signOut());
@@ -154,7 +203,21 @@ class _StagingSessionScreenState extends State<StagingSessionScreen>
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
-            if (_showSubscribers) ...[
+            if (_showDraft) ...[
+              OutlinedButton(
+                onPressed: () => setState(_clearDraft),
+                child: const Text('الرجوع'),
+              ),
+              if (_draftOptions == null)
+                const LinearProgressIndicator()
+              else
+                SubscriberDraftForm(
+                  key: ValueKey(_draftOptions!.snapshotKey),
+                  options: _draftOptions!,
+                  verify: _loadDraft,
+                  enabled: !_session.busy,
+                ),
+            ] else if (_showSubscribers) ...[
               OutlinedButton(
                 onPressed: () => setState(() => _showSubscribers = false),
                 child: const Text('الرجوع'),
@@ -165,7 +228,7 @@ class _StagingSessionScreenState extends State<StagingSessionScreen>
                   (verified) => _gateway.readSubscribers(verified, afterId),
                 ),
               ),
-            ] else
+            ] else ...[
               FilledButton.icon(
                 onPressed: _session.busy
                     ? null
@@ -173,6 +236,12 @@ class _StagingSessionScreenState extends State<StagingSessionScreen>
                 icon: const Icon(Icons.people_outline),
                 label: const Text('عرض المشتركين'),
               ),
+              OutlinedButton.icon(
+                onPressed: _session.busy ? null : _openDraft,
+                icon: const Icon(Icons.person_add_outlined),
+                label: const Text('إضافة مشترك — معاينة'),
+              ),
+            ],
             TextButton(
               onPressed: _session.signOut,
               child: const Text('تسجيل الخروج'),

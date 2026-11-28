@@ -1,0 +1,3 @@
+# M03 staging subscriber preview integration
+
+The Arabic preview form is now reachable from an active staging session. Its options use the same authenticated client and serialized access checks as subscriber reads. Options refresh every 15 seconds while the form is open; the form is recreated if permissions, line scope or tariff content changes. The preview explicitly reloads options and refuses to calculate on a changed snapshot. Background, logout and denied/expired session clear the form. No save action, database mutation or production rollout is included. The periodic refresh and UI still require device and live staging validation. Dedicated staging remains a blocker.

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'onboarding_plan.dart';
 
 class SubscriberTierOption {
@@ -48,6 +50,23 @@ class SubscriberDraftContext {
   final List<SubscriberTierOption> tiers;
   final List<SubscriberLineOption> lines;
   final List<HistoricalTierOption> history;
+
+  /// Stable identity for invalidating previews when server options change.
+  String get snapshotKey => jsonEncode([
+    currentMonth,
+    hasPricing,
+    canAdd,
+    canApplyFree,
+    tiers.map((t) => jsonEncode([t.id, t.type, t.name])).toList()..sort(),
+    lines.map((l) => jsonEncode([l.id, l.name])).toList()..sort(),
+    history.map((h) => jsonEncode([
+      h.tierId,
+      h.tariff.monthId,
+      h.tariff.tier,
+      h.tariff.pricePerAmpere,
+      h.tariff.fixedFee,
+    ])).toList()..sort(),
+  ]);
 
   SubscriberDraft preview({
     required String name,

@@ -5,9 +5,16 @@ import '../domain/subscriber_draft.dart';
 
 /// Staging preview only. No save action or database writes.
 class SubscriberDraftForm extends StatefulWidget {
-  const SubscriberDraftForm({required this.options, super.key});
+  const SubscriberDraftForm({
+    required this.options,
+    required this.verify,
+    required this.enabled,
+    super.key,
+  });
 
   final SubscriberDraftContext options;
+  final Future<SubscriberDraftContext> Function() verify;
+  final bool enabled;
 
   @override
   State<SubscriberDraftForm> createState() => _SubscriberDraftFormState();
@@ -25,6 +32,7 @@ class _SubscriberDraftFormState extends State<SubscriberDraftForm> {
   OnboardingDebtMode? _mode;
   SubscriberDraft? _draft;
   bool _invalid = false;
+  bool _checking = false;
 
   bool get _free => widget.options.tiers.any(
     (tier) => tier.id == _tierId && tier.type == 'free',
@@ -46,9 +54,21 @@ class _SubscriberDraftFormState extends State<SubscriberDraftForm> {
     });
   }
 
-  void _preview() {
+  Future<void> _preview() async {
+    if (_checking || !widget.enabled) return;
+    final expected = widget.options.snapshotKey;
+    setState(() {
+      _checking = true;
+      _draft = null;
+      _invalid = false;
+    });
     try {
-      final draft = widget.options.preview(
+      final latest = await widget.verify();
+      if (!mounted) return;
+      if (latest.snapshotKey != expected) {
+        throw const FormatException('Options changed');
+      }
+      final draft = latest.preview(
         name: _name.text,
         code: _code.text,
         phone: _phone.text,
@@ -64,10 +84,14 @@ class _SubscriberDraftFormState extends State<SubscriberDraftForm> {
         _invalid = false;
       });
     } catch (_) {
-      setState(() {
-        _draft = null;
-        _invalid = true;
-      });
+      if (mounted) {
+        setState(() {
+          _draft = null;
+          _invalid = true;
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _checking = false);
     }
   }
 
@@ -99,7 +123,9 @@ class _SubscriberDraftFormState extends State<SubscriberDraftForm> {
             .toSet()
             .toList()
           ..sort((a, b) => b.compareTo(a));
-    return Column(
+    return AbsorbPointer(
+      absorbing: !widget.enabled || _checking,
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Text('إضافة مشترك — معاينة فقط'),
@@ -165,12 +191,17 @@ class _SubscriberDraftFormState extends State<SubscriberDraftForm> {
             ),
         ],
         const SizedBox(height: 16),
-        FilledButton(onPressed: _preview, child: const Text('معاينة الاحتساب')),
+        FilledButton(
+          onPressed: widget.enabled && !_checking ? _preview : null,
+          child: const Text('معاينة الاحتساب'),
+        ),
+        if (_checking || !widget.enabled) const LinearProgressIndicator(),
         if (_invalid) const Text('تحقق من البيانات والتسعيرة المختارة.'),
         if (_draft != null)
           Text('الدين المتوقع: ${_draft!.plan.amountDue} د.ع'),
         const Text('المعاينة لا تحفظ مشتركاً أو فاتورة.'),
       ],
+      ),
     );
   }
 }
