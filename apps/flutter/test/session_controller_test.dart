@@ -287,7 +287,10 @@ void main() {
       started.complete();
       return pending.future;
     });
-    final rejected = expectLater(operation, throwsA(isA<WriteOutcomeUnknown>()));
+    final rejected = expectLater(
+      operation,
+      throwsA(isA<WriteOutcomeUnknown>()),
+    );
     await started.future;
     await controller.signOut();
     pending.complete(42);

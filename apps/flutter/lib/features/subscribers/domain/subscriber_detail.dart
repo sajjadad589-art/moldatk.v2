@@ -34,7 +34,13 @@ class SubscriberInvoiceSummary {
         month is! String ||
         !RegExp(r'^\d{4}-(0[1-9]|1[0-2])$').hasMatch(month) ||
         status is! String ||
-        !const {'paid', 'partial', 'unpaid', 'cancelled', 'free'}.contains(status)) {
+        !const {
+          'paid',
+          'partial',
+          'unpaid',
+          'cancelled',
+          'free',
+        }.contains(status)) {
       throw const FormatException('Invalid invoice summary');
     }
     return SubscriberInvoiceSummary._(
@@ -88,10 +94,22 @@ class SubscriberDetail {
     if (version != null &&
         (version is! String ||
             DateTime.tryParse(version) == null ||
-            !RegExp(r'(Z|[+-]\d{2}:\d{2})
+            !RegExp(r'(Z|[+-]\d{2}:\d{2})$').hasMatch(version))) {
+      throw const FormatException('Invalid subscriber version');
+    }
+    if (syncEpoch != null && syncEpoch < 0) {
+      throw const FormatException('Invalid reset epoch');
+    }
+    final tier = row['tier'];
     final status = row['payment_status'];
     if (tier is! String ||
-        !const {'normal', 'commercial', 'golden', 'free', 'custom'}.contains(tier) ||
+        !const {
+          'normal',
+          'commercial',
+          'golden',
+          'free',
+          'custom',
+        }.contains(tier) ||
         status is! String ||
         !const {'paid', 'partial', 'unpaid', 'free'}.contains(status)) {
       throw const FormatException('Invalid subscriber detail');
@@ -118,50 +136,6 @@ class SubscriberDetail {
       hasMore: invoices.length > limit,
       updatedAt: version as String?,
       syncEpoch: syncEpoch,
-    );
-  }
-}
-
-int _money(Object? value) {
-  if (value is! int || value < 0) {
-    throw const FormatException('Invalid integer IQD amount');
-  }
-  return value;
-}
-).hasMatch(version))) {
-      throw const FormatException('Invalid subscriber version');
-    }
-    if (syncEpoch != null && syncEpoch < 0) {
-      throw const FormatException('Invalid reset epoch');
-    }
-    final tier = row['tier'];
-    final status = row['payment_status'];
-    if (tier is! String ||
-        !const {'normal', 'commercial', 'golden', 'free', 'custom'}.contains(tier) ||
-        status is! String ||
-        !const {'paid', 'partial', 'unpaid', 'free'}.contains(status)) {
-      throw const FormatException('Invalid subscriber detail');
-    }
-    final seen = <String>{};
-    final invoices = <SubscriberInvoiceSummary>[];
-    for (final row in invoiceRows) {
-      final invoice = SubscriberInvoiceSummary.fromRow(
-        row,
-        generatorId: generatorId,
-        subscriberId: subscriberId,
-      );
-      if (!seen.add(invoice.id)) {
-        throw const FormatException('Duplicate invoice');
-      }
-      invoices.add(invoice);
-    }
-    return SubscriberDetail._(
-      subscriber: subscriber,
-      tier: tier,
-      paymentStatus: status,
-      amountDue: _money(row['amount_due']),
-      invoices: invoices.take(limit).toList(),
-      hasMore: invoices.length > limit,
     );
   }
 }

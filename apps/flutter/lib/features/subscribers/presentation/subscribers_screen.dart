@@ -113,7 +113,9 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
         for (final item in visible)
           Card(
             child: ListTile(
-              onTap: _busy || widget.onOpen == null ? null : () => widget.onOpen!(item.id),
+              onTap: _busy || widget.onOpen == null
+                  ? null
+                  : () => widget.onOpen!(item.id),
               title: Text(item.name.isEmpty ? item.code : item.name),
               subtitle: Text(
                 '${item.code} • ${item.lineName ?? 'بدون خط'}\n${item.phone}',

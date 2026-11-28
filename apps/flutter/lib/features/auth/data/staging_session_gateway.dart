@@ -226,7 +226,9 @@ class StagingSessionGateway implements SessionGateway {
     if (client == null || client.auth.currentUser?.id != account.userId) {
       throw StateError('Session unavailable');
     }
-    final detail = await SubscriberDetailReader(client).read(account, subscriberId);
+    final detail = await SubscriberDetailReader(
+      client,
+    ).read(account, subscriberId);
     if (!identical(client, _client) ||
         client.auth.currentUser?.id != account.userId) {
       throw StateError('Session changed');

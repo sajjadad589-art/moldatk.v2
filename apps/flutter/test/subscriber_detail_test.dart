@@ -36,20 +36,27 @@ SubscriberDetail decode(List<Map<String, dynamic>> invoices) =>
     );
 
 void main() {
-  test('detail preserves server totals and marks truncated invoice history', () {
-    final result = decode([invoice('a'), invoice('b')]);
-    expect(result.amountDue, 50000);
-    expect(result.invoices.length, 1);
-    expect(result.hasMore, isTrue);
-  });
+  test(
+    'detail preserves server totals and marks truncated invoice history',
+    () {
+      final result = decode([invoice('a'), invoice('b')]);
+      expect(result.amountDue, 50000);
+      expect(result.invoices.length, 1);
+      expect(result.hasMore, isTrue);
+    },
+  );
 
   test('foreign invoice or subscriber and duplicate invoice fail closed', () {
     expect(
-      () => decode([{...invoice('a'), 'generator_id': 'foreign'}]),
+      () => decode([
+        {...invoice('a'), 'generator_id': 'foreign'},
+      ]),
       throwsFormatException,
     );
     expect(
-      () => decode([{...invoice('a'), 'subscriber_id': 'foreign'}]),
+      () => decode([
+        {...invoice('a'), 'subscriber_id': 'foreign'},
+      ]),
       throwsFormatException,
     );
     expect(() => decode([invoice('a'), invoice('a')]), throwsFormatException);
@@ -57,7 +64,9 @@ void main() {
 
   test('invalid monetary value is not rounded or displayed', () {
     expect(
-      () => decode([{...invoice('a'), 'remaining_amount': -1}]),
+      () => decode([
+        {...invoice('a'), 'remaining_amount': -1},
+      ]),
       throwsFormatException,
     );
   });
