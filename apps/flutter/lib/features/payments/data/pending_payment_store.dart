@@ -86,7 +86,8 @@ class PendingPaymentStore {
     );
     // Persist the confirmed receipt before releasing the pending slot.
     // If a crash occurs between these writes, recover the same request again.
-    final archiveKey = '${_key(account)}.receipt.${pending.payload['requestId']}';
+    final archiveKey =
+        '${_key(account)}.receipt.${pending.payload['requestId']}';
     final archive = jsonEncode({
       'command': pending.toRecoveryJson(),
       'receipt': serverReceipt,

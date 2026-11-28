@@ -54,10 +54,7 @@ void main() {
     controller = SessionController(RecoveryGateway());
     await session.login(controller);
     memory = storage.MemoryStorage();
-    store = PendingPaymentStore(
-      storage.config('abcdefghijklmnopqrst'),
-      memory,
-    );
+    store = PendingPaymentStore(storage.config('abcdefghijklmnopqrst'), memory);
     original = payment.command();
     await store.stage(payment.owner, original);
   });
@@ -112,18 +109,17 @@ void main() {
   });
 
   test('logout during lookup cannot clear pending request', () async {
-    final recovery = PaymentRecoveryCoordinator(
-      controller,
-      store,
-      (_, command) async {
-        await controller.signOut();
-        return {
-          'state': 'committed',
-          'requestId': command.payload['requestId'],
-          'receipt': payment.response(command),
-        };
-      },
-    );
+    final recovery = PaymentRecoveryCoordinator(controller, store, (
+      _,
+      command,
+    ) async {
+      await controller.signOut();
+      return {
+        'state': 'committed',
+        'requestId': command.payload['requestId'],
+        'receipt': payment.response(command),
+      };
+    });
     await expectLater(recovery.recover(), throwsStateError);
     expect(await store.load(payment.owner), isNotNull);
   });

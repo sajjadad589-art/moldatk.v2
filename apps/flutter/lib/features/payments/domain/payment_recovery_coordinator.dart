@@ -14,10 +14,8 @@ class PaymentRecoveryResult {
 
 /// Only an authenticated status lookup may be supplied here. The interface
 /// deliberately has no collect or retry method, so recovery cannot charge.
-typedef PaymentStatusLookup = Future<Object?> Function(
-  OperatorAccount account,
-  PaymentCommand command,
-);
+typedef PaymentStatusLookup =
+    Future<Object?> Function(OperatorAccount account, PaymentCommand command);
 
 class PaymentRecoveryCoordinator {
   const PaymentRecoveryCoordinator(this._session, this._store, this._lookup);
