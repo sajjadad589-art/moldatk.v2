@@ -81,8 +81,7 @@ class SubscriberDraftContext {
         ? history
               .singleWhere(
                 (item) =>
-                    item.tierId == tier.id &&
-                    item.tariff.monthId == priorMonth,
+                    item.tierId == tier.id && item.tariff.monthId == priorMonth,
                 orElse: () => throw const FormatException('Missing tariff'),
               )
               .tariff

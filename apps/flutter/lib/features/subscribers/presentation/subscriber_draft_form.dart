@@ -165,10 +165,7 @@ class _SubscriberDraftFormState extends State<SubscriberDraftForm> {
             ),
         ],
         const SizedBox(height: 16),
-        FilledButton(
-          onPressed: _preview,
-          child: const Text('معاينة الاحتساب'),
-        ),
+        FilledButton(onPressed: _preview, child: const Text('معاينة الاحتساب')),
         if (_invalid) const Text('تحقق من البيانات والتسعيرة المختارة.'),
         if (_draft != null)
           Text('الدين المتوقع: ${_draft!.plan.amountDue} د.ع'),
