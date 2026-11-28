@@ -1,0 +1,3 @@
+# Profile-only edit candidate
+
+The private review function allows owner name and phone edits only, checks reset epoch, authenticated tenant, active subscription, request digest and exact updated_at version, and records an audit entry atomically. Retries return the original receipt without repeating edits. The review SQL is not an active migration and no caller grant is enabled. Added synthetic regression checks proving invoices and financial fields are unchanged, stale updates rejected, and repeated request effects deduplicated. Detail reader now captures updated_at and reset epoch for future edit commands. Actual triggers, legacy timestamp conventions, profile audit naming, real staging authorization and UI save flow still need verification. No production changes.

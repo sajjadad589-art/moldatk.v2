@@ -56,6 +56,8 @@ class SubscriberDetail {
     required this.amountDue,
     required List<SubscriberInvoiceSummary> invoices,
     required this.hasMore,
+    required this.updatedAt,
+    required this.syncEpoch,
   }) : invoices = List.unmodifiable(invoices);
 
   final Subscriber subscriber;
@@ -64,6 +66,8 @@ class SubscriberDetail {
   final int amountDue;
   final List<SubscriberInvoiceSummary> invoices;
   final bool hasMore;
+  final String? updatedAt;
+  final int? syncEpoch;
 
   factory SubscriberDetail.decode({
     required String generatorId,
@@ -71,6 +75,7 @@ class SubscriberDetail {
     required Map<String, dynamic> row,
     required List<Map<String, dynamic>> invoiceRows,
     required int limit,
+    int? syncEpoch,
   }) {
     if (limit < 1 || limit > 100 || invoiceRows.length > limit + 1) {
       throw const FormatException('Invalid detail page');
@@ -78,6 +83,56 @@ class SubscriberDetail {
     final subscriber = Subscriber.fromRow(row, expectedGeneratorId: generatorId);
     if (subscriber.id != subscriberId) {
       throw const FormatException('Subscriber identity mismatch');
+    }
+    final version = row['updated_at'];
+    if (version != null &&
+        (version is! String ||
+            DateTime.tryParse(version) == null ||
+            !RegExp(r'(Z|[+-]\d{2}:\d{2})
+    final status = row['payment_status'];
+    if (tier is! String ||
+        !const {'normal', 'commercial', 'golden', 'free', 'custom'}.contains(tier) ||
+        status is! String ||
+        !const {'paid', 'partial', 'unpaid', 'free'}.contains(status)) {
+      throw const FormatException('Invalid subscriber detail');
+    }
+    final seen = <String>{};
+    final invoices = <SubscriberInvoiceSummary>[];
+    for (final row in invoiceRows) {
+      final invoice = SubscriberInvoiceSummary.fromRow(
+        row,
+        generatorId: generatorId,
+        subscriberId: subscriberId,
+      );
+      if (!seen.add(invoice.id)) {
+        throw const FormatException('Duplicate invoice');
+      }
+      invoices.add(invoice);
+    }
+    return SubscriberDetail._(
+      subscriber: subscriber,
+      tier: tier,
+      paymentStatus: status,
+      amountDue: _money(row['amount_due']),
+      invoices: invoices.take(limit).toList(),
+      hasMore: invoices.length > limit,
+      updatedAt: version as String?,
+      syncEpoch: syncEpoch,
+    );
+  }
+}
+
+int _money(Object? value) {
+  if (value is! int || value < 0) {
+    throw const FormatException('Invalid integer IQD amount');
+  }
+  return value;
+}
+).hasMatch(version))) {
+      throw const FormatException('Invalid subscriber version');
+    }
+    if (syncEpoch != null && syncEpoch < 0) {
+      throw const FormatException('Invalid reset epoch');
     }
     final tier = row['tier'];
     final status = row['payment_status'];

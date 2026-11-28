@@ -25,7 +25,7 @@ class SubscriberDetailReader {
         .from('generator_subscribers')
         .select(
           'id,generator_id,code,full_name,phone,amperes,line_name,'
-          'is_exempted,tier,payment_status,amount_due',
+          'is_exempted,tier,payment_status,amount_due,updated_at',
         )
         .eq('generator_id', account.generatorId)
         .eq('id', subscriberId)
@@ -51,6 +51,7 @@ class SubscriberDetailReader {
       row: row,
       invoiceRows: invoices,
       limit: limit,
+      syncEpoch: before,
     );
   }
 

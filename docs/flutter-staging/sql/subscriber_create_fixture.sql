@@ -30,7 +30,8 @@ create table public.generator_subscribers(
   amperes integer not null, ampere_discount numeric not null,
   line_id text, line_name text, payment_status text not null,
   amount_due bigint not null check(amount_due>=0), amount_paid bigint not null,
-  joining_date date, primary key(generator_id,id), unique(generator_id,code)
+  joining_date date, updated_at timestamptz not null default clock_timestamp(),
+  primary key(generator_id,id), unique(generator_id,code)
 );
 create table public.generator_invoices(
   generator_id uuid, id text, subscriber_id text, month_id text not null,
@@ -83,7 +84,7 @@ begin
   return new;
 end;
 $$;
-create trigger fixture_guard before insert on public.generator_subscribers
+create trigger fixture_guard before insert or update on public.generator_subscribers
   for each row execute function public.fixture_write_guard();
 create trigger fixture_guard before insert on public.generator_invoices
   for each row execute function public.fixture_write_guard();
