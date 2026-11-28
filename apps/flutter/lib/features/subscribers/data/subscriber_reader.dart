@@ -19,22 +19,20 @@ class SubscriberReader {
   final ReadSubscriberRows _readRows;
 
   static SubscriberReader authenticated(SupabaseClient client) {
-    return SubscriberReader(
-      ({
-        required generatorId,
-        required afterId,
-        required limit,
-      }) async {
-        var query = client
-            .from('generator_subscribers')
-            .select(
-              'id,generator_id,code,full_name,phone,amperes,line_name,is_exempted',
-            )
-            .eq('generator_id', generatorId);
-        if (afterId != null) query = query.gt('id', afterId);
-        return await query.order('id', ascending: true).limit(limit);
-      },
-    );
+    return SubscriberReader(({
+      required generatorId,
+      required afterId,
+      required limit,
+    }) async {
+      var query = client
+          .from('generator_subscribers')
+          .select(
+            'id,generator_id,code,full_name,phone,amperes,line_name,is_exempted',
+          )
+          .eq('generator_id', generatorId);
+      if (afterId != null) query = query.gt('id', afterId);
+      return await query.order('id', ascending: true).limit(limit);
+    });
   }
 
   Future<SubscriberPage> readPage({
@@ -67,9 +65,6 @@ class SubscriberReader {
     }
     final hasMore = items.length > pageSize;
     final page = items.take(pageSize).toList();
-    return SubscriberPage(
-      page,
-      nextCursor: hasMore ? page.last.id : null,
-    );
+    return SubscriberPage(page, nextCursor: hasMore ? page.last.id : null);
   }
 }

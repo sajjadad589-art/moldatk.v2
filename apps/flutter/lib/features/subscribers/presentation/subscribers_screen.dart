@@ -83,10 +83,7 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'المشتركين',
-          style: Theme.of(context).textTheme.headlineMedium,
-        ),
+        Text('المشتركين', style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 12),
         TextField(
           onChanged: (value) => setState(() => _query = value),
@@ -108,7 +105,9 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
           const Text('تعذر تحميل المشتركين. أعد المحاولة.')
         else if (!_busy && visible.isEmpty)
           Text(
-            _items.isEmpty ? 'لا توجد سجلات متاحة.' : 'لا توجد نتائج ضمن القائمة المحملة.',
+            _items.isEmpty
+                ? 'لا توجد سجلات متاحة.'
+                : 'لا توجد نتائج ضمن القائمة المحملة.',
           ),
         for (final item in visible)
           Card(
