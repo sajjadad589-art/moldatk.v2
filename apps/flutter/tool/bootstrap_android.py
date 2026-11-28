@@ -40,5 +40,28 @@ with tempfile.TemporaryDirectory() as temp:
         raise SystemExit("Unexpected Android manifest; review manually.")
     xml = xml.replace("<application", '<application android:allowBackup="false"', 1)
     manifest.write_text(xml, encoding="utf-8")
+    # Port the existing SUNMI SDK and receipt renderer into the Flutter shell.
+    native = ROOT / "tool" / "android_native"
+    gradle_source = gradle.read_text(encoding="utf-8")
+    gradle.write_text(
+        gradle_source + '\n\ndependencies {\n    implementation("com.sunmi:printerlibrary:1.0.18")\n}\n',
+        encoding="utf-8",
+    )
+    xml = manifest.read_text(encoding="utf-8")
+    if xml.count("<queries>") != 1:
+        raise SystemExit("Unexpected Android queries section; review manually.")
+    xml = xml.replace("<queries>", '<queries>\n        <package android:name="woyou.aidlservice.jiuiv5" />', 1)
+    manifest.write_text(xml, encoding="utf-8")
+    main = android / "app" / "src" / "main"
+    java_dest = main / "java" / "com" / "mwaldatk" / "app"
+    java_dest.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(native / "FlutterSunmiBridge.java", java_dest / "FlutterSunmiBridge.java")
+    activity = main / "kotlin" / "com" / "mwaldatk" / "app" / "MainActivity.kt"
+    if not activity.is_file():
+        raise SystemExit("Unexpected Flutter MainActivity template.")
+    shutil.copyfile(native / "MainActivity.kt", activity)
+    drawable = main / "res" / "drawable"
+    drawable.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(native / "ic_moldatk_launcher.xml", drawable / "ic_moldatk_launcher.xml")
     shutil.copytree(android, DEST)
 print("Generated Android platform. Debug ID: com.mwaldatk.app.dev.")

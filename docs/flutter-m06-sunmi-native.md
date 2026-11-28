@@ -1,0 +1,3 @@
+# M06 SUNMI native port foundation
+
+Port the existing Arabic 384px bitmap renderer, logo, layout/visibility fields, QR bitmap decoding and pinned SUNMI SDK (1.0.18) into isolated Flutter Android build sources. The generated MainActivity registers a Flutter method channel and releases the SDK service on cleanup; Android package visibility is configured. Only discovery is exposed and tested through a mocked method channel; print submission intentionally returns disabled until verified receipt integration, native acceptance and actual hardware testing. The renderer is not yet invoked. A successful SDK compile does not establish hardware availability or printing. No legacy Android files or production deployment changed.
