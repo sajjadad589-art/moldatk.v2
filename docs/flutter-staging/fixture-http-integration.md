@@ -1,3 +1,5 @@
 # Isolated HTTP integration
 
 PostgREST v12.2.12 runs only on the CI host loopback against the existing disposable PostgreSQL fixture. Test-only signed JWTs simulate Supabase claims; HTTP tests exercise all six RPCs, anonymous/expired/collector/foreign/epoch rejection, recovery, replay and reversal. The fixture JWT secret and database role are synthetic, never reused outside the fixture. No hosted Supabase instance, production data or public service is touched. This does not verify real Supabase auth or RLS, and Flutter network transport is still not wired. New HTTP workflow must pass before claiming integration success.
+
+First HTTP run exposed P0002 (no matching owner/foreign row) as HTTP 500 rather than a controlled refusal. All six fixture wrappers now translate no_data_found to SQLSTATE 42501 without revealing resource existence. HTTP regression requires 403 for collector and foreign operations and adds parallel identical payment calls with one recorded payment and one cashbox entry. Re-run required.

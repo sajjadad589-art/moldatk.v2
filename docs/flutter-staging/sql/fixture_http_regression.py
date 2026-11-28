@@ -1,5 +1,6 @@
 """HTTP regression against a disposable localhost PostgREST instance only."""
 import base64
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import hmac
 import json
@@ -48,8 +49,9 @@ def rpc(op, command, *, jwt=None, authenticated=True, epoch="0", ok=True):
     except urllib.error.HTTPError as exc:
         if ok:
             raise AssertionError(f"{op} failed: {exc.code} {exc.read().decode()}") from exc
-        assert 400 <= exc.code < 500, (op, exc.code)
-        return
+        body = exc.read().decode()
+        assert 400 <= exc.code < 500, (op, exc.code, body)
+        return exc.code
     if not ok:
         raise AssertionError(f"{op} unexpectedly succeeded")
     return value
@@ -88,7 +90,7 @@ def main():
     }
     rpc("create_subscriber", create, authenticated=False, ok=False)
     rpc("create_subscriber", create, jwt=token(expired=True), ok=False)
-    rpc("create_subscriber", create, jwt=token(COLLECTOR), ok=False)
+    assert rpc("create_subscriber", create, jwt=token(COLLECTOR), ok=False) == 403
     rpc("create_subscriber", create, jwt=token(active=False), ok=False)
     rpc("create_subscriber", create, epoch=None, ok=False)
     first = rpc("create_subscriber", create)
@@ -99,7 +101,7 @@ def main():
         "requestId": rid(), "subscriberId": sid, "fullName": "Edited HTTP",
         "phone": "", "expectedUpdatedAt": version(sid),
     }
-    rpc("edit_subscriber_profile", profile, jwt=token(FOREIGN), ok=False)
+    assert rpc("edit_subscriber_profile", profile, jwt=token(FOREIGN), ok=False) == 403
     assert rpc("edit_subscriber_profile", profile)["ok"] is True
     move = {
         "requestId": rid(), "subscriberId": sid, "lineId": "http-b",
@@ -117,8 +119,17 @@ def main():
         "expectedMonth": "2026-11", "expectedLedger": ledger, "amountIqd": 45000,
     }
     assert rpc("payment_status", payment)["state"] == "unconfirmed"
-    receipt = rpc("collect_payment", payment)
+    assert rpc("collect_payment", payment, jwt=token(COLLECTOR), ok=False) == 403
+    assert rpc("collect_payment", payment, jwt=token(FOREIGN), ok=False) == 403
+    # Concurrent retry of the identical immutable command must charge once.
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        receipts = list(pool.map(lambda _: rpc("collect_payment", payment), range(2)))
+    assert sorted(r["replayed"] for r in receipts) == [False, True]
+    assert receipts[0]["paymentId"] == receipts[1]["paymentId"]
+    receipt = receipts[0]
     assert receipt["debtAfter"] == 40000
+    assert db(f"select count(*) from generator_payments where generator_id='{GEN}'") == "1"
+    assert db(f"select sum(amount) from generator_cashbox_entries where generator_id='{GEN}'") == "45000"
     assert receipt["printData"]["subscriberName"] == "Edited HTTP"
     assert rpc("collect_payment", payment)["replayed"] is True
     assert rpc("payment_status", payment)["state"] == "committed"
@@ -126,6 +137,7 @@ def main():
         "requestId": rid(), "paymentId": receipt["paymentId"],
         "reason": "HTTP fixture reversal", "expectedUpdatedAt": version(sid),
     }
+    assert rpc("reverse_payment", reversal, jwt=token(COLLECTOR), ok=False) == 403
     assert rpc("reverse_payment", reversal)["debtAfter"] == 85000
     assert rpc("reverse_payment", reversal)["replayed"] is True
     assert rpc("payment_status", payment)["state"] == "reversed"

@@ -17,6 +17,9 @@ begin
    raise exception 'MOLDATK_STALE_SYNC_EPOCH';
  end if;
  return moldatk_private.flutter_create_subscriber_v1(p_command,p_expected_epoch);
+exception when no_data_found then
+ -- Do not reveal whether a foreign resource or unauthorized actor exists.
+ raise exception 'operation_not_authorized_or_unavailable' using errcode='42501';
 end;
 $$;
 revoke all on function public.flutter_stage_create_subscriber_v1(jsonb,bigint) from public,anon,authenticated,service_role;
@@ -31,6 +34,9 @@ begin
    raise exception 'MOLDATK_STALE_SYNC_EPOCH';
  end if;
  return moldatk_private.flutter_edit_subscriber_profile_v1(p_command,p_expected_epoch);
+exception when no_data_found then
+ -- Do not reveal whether a foreign resource or unauthorized actor exists.
+ raise exception 'operation_not_authorized_or_unavailable' using errcode='42501';
 end;
 $$;
 revoke all on function public.flutter_stage_edit_subscriber_profile_v1(jsonb,bigint) from public,anon,authenticated,service_role;
@@ -45,6 +51,9 @@ begin
    raise exception 'MOLDATK_STALE_SYNC_EPOCH';
  end if;
  return moldatk_private.flutter_move_subscriber_line_v1(p_command,p_expected_epoch);
+exception when no_data_found then
+ -- Do not reveal whether a foreign resource or unauthorized actor exists.
+ raise exception 'operation_not_authorized_or_unavailable' using errcode='42501';
 end;
 $$;
 revoke all on function public.flutter_stage_move_subscriber_line_v1(jsonb,bigint) from public,anon,authenticated,service_role;
@@ -59,6 +68,9 @@ begin
    raise exception 'MOLDATK_STALE_SYNC_EPOCH';
  end if;
  return moldatk_private.flutter_collect_payment_v1(p_command,p_expected_epoch);
+exception when no_data_found then
+ -- Do not reveal whether a foreign resource or unauthorized actor exists.
+ raise exception 'operation_not_authorized_or_unavailable' using errcode='42501';
 end;
 $$;
 revoke all on function public.flutter_stage_collect_payment_v1(jsonb,bigint) from public,anon,authenticated,service_role;
@@ -73,6 +85,9 @@ begin
    raise exception 'MOLDATK_STALE_SYNC_EPOCH';
  end if;
  return moldatk_private.flutter_reverse_payment_v1(p_command,p_expected_epoch);
+exception when no_data_found then
+ -- Do not reveal whether a foreign resource or unauthorized actor exists.
+ raise exception 'operation_not_authorized_or_unavailable' using errcode='42501';
 end;
 $$;
 revoke all on function public.flutter_stage_reverse_payment_v1(jsonb,bigint) from public,anon,authenticated,service_role;
@@ -87,6 +102,9 @@ begin
    raise exception 'MOLDATK_STALE_SYNC_EPOCH';
  end if;
  return moldatk_private.flutter_payment_status_v1(p_command,p_expected_epoch);
+exception when no_data_found then
+ -- Do not reveal whether a foreign resource or unauthorized actor exists.
+ raise exception 'operation_not_authorized_or_unavailable' using errcode='42501';
 end;
 $$;
 revoke all on function public.flutter_stage_payment_status_v1(jsonb,bigint) from public,anon,authenticated,service_role;
