@@ -84,6 +84,36 @@ class PendingPaymentStore {
       serverReceipt,
       command: pending,
     );
+    // Persist the confirmed receipt before releasing the pending slot.
+    // If a crash occurs between these writes, recover the same request again.
+    final archiveKey = '${_key(account)}.receipt.${pending.payload['requestId']}';
+    final archive = jsonEncode({
+      'command': pending.toRecoveryJson(),
+      'receipt': serverReceipt,
+    });
+    if (archive.length > 256000) {
+      throw const FormatException('Receipt archive too large');
+    }
+    final existing = await _storage.read(archiveKey);
+    if (existing != null) {
+      final old = jsonDecode(existing);
+      if (old is! Map ||
+          jsonEncode(old['command']) != jsonEncode(pending.toRecoveryJson())) {
+        throw StateError('Receipt archive conflict');
+      }
+      final oldReceipt = VerifiedPaymentReceipt.decode(
+        old['receipt'],
+        command: pending,
+      );
+      if (oldReceipt.paymentId != receipt.paymentId ||
+          oldReceipt.receivedAt != receipt.receivedAt) {
+        throw StateError('Receipt archive identity conflict');
+      }
+    }
+    await _storage.write(archiveKey, archive);
+    if (await _storage.read(archiveKey) != archive) {
+      throw StateError('Receipt archive was not verified on disk');
+    }
     await _storage.delete(_key(account));
     if (await _storage.read(_key(account)) != null) {
       throw StateError('Pending payment was not cleared');

@@ -1,0 +1,3 @@
+# M05 recovery coordinator
+
+Authenticated status-only coordinator checks session before and after a lookup, validates request identity and receipt, preserves unknown/reversed pending operations, and archives a verified receipt before clearing a pending slot. The encrypted archive is one entry per confirmed payment; retention and authenticated server revalidation before printing remain required. Four tests cover unknown/reversed, committed archive, archive failure and logout. No real transport or user interface wiring, offline authorization, production database change, or automatic resubmission.
