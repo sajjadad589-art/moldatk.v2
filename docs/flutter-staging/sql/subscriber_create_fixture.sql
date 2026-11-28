@@ -30,7 +30,7 @@ create table public.generator_subscribers(
   amperes integer not null, ampere_discount numeric not null,
   line_id text, line_name text, payment_status text not null,
   amount_due bigint not null check(amount_due>=0), amount_paid bigint not null,
-  joining_date date, updated_at timestamptz not null default clock_timestamp(),
+  joining_date date, last_payment_date date, updated_at timestamptz not null default clock_timestamp(),
   primary key(generator_id,id), unique(generator_id,code)
 );
 create table public.generator_invoices(
@@ -40,13 +40,15 @@ create table public.generator_invoices(
   total_amount bigint not null, paid_amount bigint not null, remaining_amount bigint not null,
   status text not null, notes text, original_amperes numeric, discounted_amperes numeric,
   billed_amperes numeric, gross_amount_before_discount bigint, discount_amount bigint,
+  payment_date date, updated_at timestamptz not null default now(),
   primary key(generator_id,id),
   foreign key(generator_id,subscriber_id) references generator_subscribers(generator_id,id) on delete cascade
 );
 create table public.generator_audit_logs(
   generator_id uuid references generators(id), id text, category text not null,
   title text not null, details text not null, entity_id text, entity_name text,
-  actor_name text not null, primary key(generator_id,id)
+  actor_name text not null, amount bigint, timestamp timestamptz not null default now(),
+  primary key(generator_id,id)
 );
 create function public.is_generator_admin_for(target_generator uuid) returns boolean
 language sql stable as $$
@@ -86,5 +88,39 @@ end;
 $$;
 create trigger fixture_guard before insert or update on public.generator_subscribers
   for each row execute function public.fixture_write_guard();
-create trigger fixture_guard before insert on public.generator_invoices
+create trigger fixture_guard before insert or update on public.generator_invoices
   for each row execute function public.fixture_write_guard();
+
+-- Minimal ledger/cashbox model; no direct cashbox insertion by the payment function.
+create table public.generator_payments(
+ generator_id uuid, id text, subscriber_id text not null, received_at timestamptz not null,
+ amount bigint not null check(amount>0), collector_name text not null, receipt_number text not null,
+ notes text, receipt_snapshot jsonb, primary key(generator_id,id),
+ foreign key(generator_id,subscriber_id) references generator_subscribers(generator_id,id)
+);
+create table public.generator_payment_allocations(
+ generator_id uuid, id text, payment_id text not null, subscriber_id text not null,
+ month_id text not null, amount bigint not null check(amount>0), allocation_order integer not null,
+ primary key(generator_id,id),
+ foreign key(generator_id,payment_id) references generator_payments(generator_id,id)
+);
+create table public.generator_monthly_accounts(generator_id uuid,subscriber_id text,month_id text);
+create table public.generator_cashbox_entries(
+ sequence bigint generated always as identity, generator_id uuid, source_id text,
+ occurred_at timestamptz not null, amount bigint not null, unique(generator_id,source_id)
+);
+create function public.fixture_capture_cash() returns trigger language plpgsql as $$
+begin
+ if new.category='payment' then
+  insert into public.generator_cashbox_entries(generator_id,source_id,occurred_at,amount)
+   values(new.generator_id,new.id,new.timestamp,new.amount);
+ end if;
+ return new;
+end;
+$$;
+create trigger fixture_capture_cash after insert on generator_audit_logs
+ for each row execute function public.fixture_capture_cash();
+create trigger fixture_guard before insert or update on generator_payments
+ for each row execute function public.fixture_write_guard();
+create trigger fixture_guard before insert or update on generator_payment_allocations
+ for each row execute function public.fixture_write_guard();
