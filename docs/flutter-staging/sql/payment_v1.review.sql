@@ -5,7 +5,8 @@ create table moldatk_private.flutter_payment_requests(
  generator_id uuid not null references public.generators(id) on delete cascade,
  actor_id uuid not null, request_id uuid not null, epoch bigint not null,
  fingerprint text not null, subscriber_id text not null, payment_id text not null,
- receipt jsonb not null, primary key(generator_id,actor_id,request_id)
+ receipt jsonb not null, before_ledger jsonb not null, after_ledger jsonb not null,
+ primary key(generator_id,actor_id,request_id)
 );
 alter table moldatk_private.flutter_payment_requests enable row level security;
 revoke all on moldatk_private.flutter_payment_requests from public,anon,authenticated,service_role;
@@ -20,6 +21,7 @@ declare
  month_now text; month_name text; sid text; pid text; receipt_no text; amount_value bigint; due bigint;
  cash_left bigint; applied bigint; current_paid bigint; prior_debt bigint;
  current_charge bigint; applied_prior bigint:=0; applied_current bigint:=0;
+ after_ledger jsonb;
  n integer:=0; allocation_list jsonb:='[]'::jsonb; ledger jsonb; receipt jsonb;
  received timestamptz; received_day date; portal_snapshot jsonb;
  portal_allocations jsonb:='[]'::jsonb; current_issue_date date;
@@ -65,6 +67,9 @@ begin
      or not exists(select 1 from public.generator_payments where generator_id=gid and id=old_request.payment_id)
      or not exists(select 1 from public.generator_subscribers where generator_id=gid and id=sid) then
      raise exception 'request_conflict_or_reset';
+   end if;
+   if exists(select 1 from public.generator_audit_logs where generator_id=gid and id='flutter-void-'||old_request.payment_id) then
+     raise exception 'payment_already_reversed';
    end if;
    return old_request.receipt||jsonb_build_object('replayed',true);
  end if;
@@ -190,8 +195,10 @@ begin
    values(pid,gid,'payment','تسديد المشترك','توزيع الدفعة على الديون الأقدم أولاً',sid,sub.full_name,actor_name,amount_value,received);
  if not exists(select 1 from public.generator_cashbox_entries where generator_id=gid and source_id=pid and amount=amount_value)
    then raise exception 'cashbox_projection_missing'; end if;
- insert into moldatk_private.flutter_payment_requests(generator_id,actor_id,request_id,epoch,fingerprint,subscriber_id,payment_id,receipt)
-   values(gid,actor,rid,epoch_now,fingerprint,sid,pid,receipt);
+ select coalesce(jsonb_agg(jsonb_build_object('id',id,'month',month_id,'status',status,'total',total_amount,'paid',paid_amount,'remaining',remaining_amount) order by month_id,id),'[]'::jsonb)
+   into after_ledger from public.generator_invoices where generator_id=gid and subscriber_id=sid;
+ insert into moldatk_private.flutter_payment_requests(generator_id,actor_id,request_id,epoch,fingerprint,subscriber_id,payment_id,receipt,before_ledger,after_ledger)
+   values(gid,actor,rid,epoch_now,fingerprint,sid,pid,receipt,ledger,after_ledger);
  return receipt;
 end;
 $$;

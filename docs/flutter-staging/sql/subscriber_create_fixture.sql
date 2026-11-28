@@ -118,9 +118,9 @@ create table public.generator_cashbox_entries(
 );
 create function public.fixture_capture_cash() returns trigger language plpgsql as $$
 begin
- if new.category='payment' then
+ if new.category in ('payment','cancellation') then
   insert into public.generator_cashbox_entries(generator_id,source_id,occurred_at,amount)
-   values(new.generator_id,new.id,new.timestamp,new.amount);
+   values(new.generator_id,new.id,new.timestamp,case when new.category='cancellation' then -new.amount else new.amount end);
  end if;
  return new;
 end;
