@@ -1,0 +1,3 @@
+# Profile edit client preview
+
+Owner-only name/phone preview uses the exact server row version and reset epoch from the detail reader. Payload is restricted to the five fields accepted by the private review SQL; request ID, tenant/account binding and receipt validation are included. UI never calls a write endpoint. Added four domain tests. The profile SQL regression passed on the earlier disposable PostgreSQL run. Actual Supabase staging and endpoint authorization are still required before enabling saving.

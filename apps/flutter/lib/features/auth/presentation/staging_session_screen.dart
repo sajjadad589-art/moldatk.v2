@@ -228,6 +228,7 @@ class _StagingSessionScreenState extends State<StagingSessionScreen>
                 child: const Text('الرجوع للمشتركين'),
               ),
               SubscriberDetailScreen(
+                account: account,
                 key: ValueKey('${account.userId}:${_selectedSubscriberId!}'),
                 load: () {
                   final id = _selectedSubscriberId!;

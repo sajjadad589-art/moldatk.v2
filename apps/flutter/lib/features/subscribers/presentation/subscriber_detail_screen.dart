@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../../auth/domain/operator_account.dart';
 import '../domain/subscriber_detail.dart';
+import 'subscriber_profile_preview.dart';
 
 class SubscriberDetailScreen extends StatefulWidget {
-  const SubscriberDetailScreen({required this.load, super.key});
+  const SubscriberDetailScreen({required this.load, this.account, super.key});
 
   final Future<SubscriberDetail> Function() load;
+  final OperatorAccount? account;
 
   @override
   State<SubscriberDetailScreen> createState() => _SubscriberDetailScreenState();
@@ -82,6 +85,14 @@ class _SubscriberDetailScreenState extends State<SubscriberDetailScreen> {
           ),
         if (detail.hasMore) const Text('توجد فواتير أقدم غير معروضة.'),
         const Text('لا يمكن التسديد أو تعديل الفواتير من هذه المعاينة.'),
+        if (widget.account != null &&
+            detail.updatedAt != null &&
+            detail.syncEpoch != null)
+          SubscriberProfilePreview(
+            key: ValueKey('${detail.subscriber.id}:${detail.updatedAt}:${detail.syncEpoch}'),
+            account: widget.account!,
+            detail: detail,
+          ),
       ],
     );
   }
