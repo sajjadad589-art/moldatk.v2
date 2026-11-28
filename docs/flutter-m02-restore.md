@@ -1,0 +1,5 @@
+# M02 staging session restoration
+
+Integrated the encrypted refresh credential vault with the staging session gateway. Restore uses the SDK, verifies the authenticated user against the stored user ID, reloads active profile and collector identity, checks tenant and role, then asks the subscription RPC for current access. Rotated credentials are saved; explicit logout deletes the slot and attempts server sign-out. Idle disposal releases the SDK client without revoking the stored refresh credential. Background UI is hidden; resume triggers revalidation, and an in-flight operation at background transition is conservatively cancelled via logout.
+
+Tests added for restored active, denied and absent sessions. No production credentials or network tests performed. Actual device storage, failure recovery (including inability to delete secure storage), token rotation, timeouts, lifecycle race cases, server-side RLS and dedicated staging integration still require verification. Development build remains a bootstrap shell until valid staging build parameters are supplied. No release publication.

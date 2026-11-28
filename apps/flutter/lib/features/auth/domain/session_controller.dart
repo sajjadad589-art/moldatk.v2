@@ -11,12 +11,16 @@ abstract interface class SessionGateway {
 
   Future<SubscriptionDecision> checkAccess(OperatorAccount account);
 
+  Future<OperatorAccount?> restore();
+
   Future<void> close();
+
+  Future<void> release();
 }
 
 enum SessionPhase { signedOut, checking, active, denied, unavailable }
 
-/// An in-memory, single-account session. No offline authorization.
+/// A single-account session. No offline authorization.
 class SessionController extends ChangeNotifier {
   SessionController(this._gateway);
 
@@ -67,6 +71,33 @@ class SessionController extends ChangeNotifier {
       if (_current(generation)) {
         await _closeSafely();
       }
+      if (_current(generation)) {
+        _account = null;
+        _setPhase(SessionPhase.signedOut);
+      }
+    } finally {
+      if (!_current(generation)) await _closeSafely();
+      _busy = false;
+      if (!_disposed) notifyListeners();
+    }
+  }
+
+  Future<void> restore() async {
+    if (_busy || _disposed || _phase != SessionPhase.signedOut) return;
+    _busy = true;
+    final generation = ++_generation;
+    _setPhase(SessionPhase.checking);
+    try {
+      final account = await _gateway.restore();
+      if (!_current(generation)) return;
+      if (account == null) {
+        _setPhase(SessionPhase.signedOut);
+        return;
+      }
+      _account = account;
+      await _check(generation);
+    } catch (_) {
+      await _closeSafely();
       if (_current(generation)) {
         _account = null;
         _setPhase(SessionPhase.signedOut);
@@ -149,6 +180,14 @@ class SessionController extends ChangeNotifier {
     }
   }
 
+  Future<void> _releaseSafely() async {
+    try {
+      await _gateway.release();
+    } catch (_) {
+      // No local access after disposal.
+    }
+  }
+
   void _setPhase(SessionPhase value) {
     _phase = value;
     if (!_disposed) notifyListeners();
@@ -159,7 +198,7 @@ class SessionController extends ChangeNotifier {
     _disposed = true;
     ++_generation;
     _account = null;
-    if (!_busy) _closeSafely();
+    if (!_busy) _releaseSafely();
     super.dispose();
   }
 }

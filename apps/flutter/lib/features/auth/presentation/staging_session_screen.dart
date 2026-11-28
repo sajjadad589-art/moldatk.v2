@@ -34,6 +34,9 @@ class _StagingSessionScreenState extends State<StagingSessionScreen>
     _session = SessionController(StagingSessionGateway(widget.config));
     _session.addListener(_changed);
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _foreground) unawaited(_session.restore());
+    });
     _refresh = Timer.periodic(const Duration(seconds: 15), (_) {
       if (_foreground && _session.hasSession && !_session.busy) {
         if (_session.phase != SessionPhase.denied) {
@@ -52,11 +55,12 @@ class _StagingSessionScreenState extends State<StagingSessionScreen>
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.detached) {
-      _foreground = false;
+      setState(() => _foreground = false);
       _password.clear();
-      unawaited(_session.signOut());
+      if (_session.busy) unawaited(_session.signOut());
     } else if (state == AppLifecycleState.resumed) {
-      _foreground = true;
+      setState(() => _foreground = true);
+      if (_session.hasSession) unawaited(_session.revalidate());
     }
   }
 
@@ -108,6 +112,7 @@ class _StagingSessionScreenState extends State<StagingSessionScreen>
   }
 
   Widget _body() {
+    if (!_foreground) return const SizedBox.shrink();
     switch (_session.phase) {
       case SessionPhase.signedOut:
         return _loginForm();

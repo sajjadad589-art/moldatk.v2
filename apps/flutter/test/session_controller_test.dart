@@ -36,6 +36,7 @@ class FakeGateway implements SessionGateway {
   Completer<SubscriptionDecision>? pendingCheck;
   bool fail = false;
   int closes = 0;
+  OperatorAccount? savedAccount;
 
   @override
   Future<OperatorAccount> signIn({
@@ -55,7 +56,14 @@ class FakeGateway implements SessionGateway {
   }
 
   @override
+  Future<OperatorAccount?> restore() async => savedAccount;
+
+  @override
+  Future<void> release() async {}
+
+  @override
   Future<void> close() async {
+    savedAccount = null;
     closes++;
   }
 }
@@ -126,5 +134,33 @@ void main() {
     expect(controller.phase, SessionPhase.signedOut);
     expect(controller.account, isNull);
     expect(gateway.closes, 1);
+  });
+
+  test('restored account is granted only after server access check', () async {
+    final gateway = FakeGateway()..savedAccount = fixture;
+    final controller = SessionController(gateway);
+    addTearDown(controller.dispose);
+    await controller.restore();
+    expect(controller.phase, SessionPhase.active);
+    expect(controller.account?.userId, fixture.userId);
+  });
+
+  test('restored account cannot bypass expired subscription', () async {
+    final gateway = FakeGateway()
+      ..savedAccount = fixture
+      ..result = decision(active: false);
+    final controller = SessionController(gateway);
+    addTearDown(controller.dispose);
+    await controller.restore();
+    expect(controller.phase, SessionPhase.denied);
+    expect(controller.account, isNull);
+  });
+
+  test('missing stored credentials stays signed out', () async {
+    final controller = SessionController(FakeGateway());
+    addTearDown(controller.dispose);
+    await controller.restore();
+    expect(controller.phase, SessionPhase.signedOut);
+    expect(controller.account, isNull);
   });
 }
