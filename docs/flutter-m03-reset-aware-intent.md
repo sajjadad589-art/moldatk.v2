@@ -1,0 +1,3 @@
+# M03 reset-aware client intent
+
+Added an immutable owner-only create intent that captures an authorized generator reset epoch. Both the SQL argument and existing x-moldatk-sync-epoch header use the same value. Retry retains the original command and epoch rather than refreshing it after reset. Account/tenant checks and strict receipt parsing are provided. No RPC write is dispatched, no private SQL function is exposed and no save button is enabled. The epoch reader callback must later be bound to get_generator_sync_state through the authorized session, and the transport must preserve the header. Capture epoch at initial confirmation, not after ambiguous write failure. Persistent pending requests and live rollback/replay tests remain pending.
