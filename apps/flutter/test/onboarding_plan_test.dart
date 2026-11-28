@@ -44,10 +44,7 @@ void main() {
   });
 
   test('older debt uses historical price and prevents double billing', () {
-    final result = plan(
-      mode: OnboardingDebtMode.prior,
-      tariff: historical,
-    );
+    final result = plan(mode: OnboardingDebtMode.prior, tariff: historical);
     expect(result.gross, 105000);
     expect(result.discount, 20000);
     expect(result.amountDue, 85000);
@@ -74,10 +71,7 @@ void main() {
     expect(() => plan(pricing: false), throwsFormatException);
     expect(() => plan(discount: 11), throwsFormatException);
     expect(() => plan(tier: 'free'), throwsFormatException);
-    expect(
-      () => plan(mode: OnboardingDebtMode.prior),
-      throwsFormatException,
-    );
+    expect(() => plan(mode: OnboardingDebtMode.prior), throwsFormatException);
     expect(() => plan(tariff: historical), throwsFormatException);
     expect(
       () => plan(
