@@ -1,0 +1,3 @@
+# M06 SUNMI hardware diagnostic
+
+The debug package com.mwaldatk.app.dev exposes a development-only printer test panel. Native code rejects diagnostic printing outside the debug installation and constructs a fixed nonfinancial Arabic test ticket with no QR, subscriber identity, receipt number or amount. Serializes concurrent diagnostic requests, does not automatically retry, and distinguishes submitted from verified physical paper output. Financial printReceipt remains disabled. Added mocked channel assertions; Android build and actual hardware acceptance are still pending for this revision. To test: install debug APK on SUNMI, select check connection, then print a test ticket and inspect paper. No production changes.

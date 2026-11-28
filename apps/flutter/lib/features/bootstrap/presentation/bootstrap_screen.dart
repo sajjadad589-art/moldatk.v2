@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../printing/presentation/sunmi_diagnostic_panel.dart';
 
 /// Internal engineering screen, not a completed sign-in or production UI.
 class BootstrapScreen extends ConsumerWidget {
@@ -21,7 +22,8 @@ class BootstrapScreen extends ConsumerWidget {
         child: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Column(
+            child: SingleChildScrollView(
+              child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(Icons.bolt, size: 56),
@@ -36,7 +38,12 @@ class BootstrapScreen extends ConsumerWidget {
                   'نسخة هندسية داخلية. تسجيل الدخول والبيانات غير متصلين بعد.',
                   textAlign: TextAlign.center,
                 ),
+                if (config.environment == AppEnvironment.development) ...[
+                  const SizedBox(height: 24),
+                  const SunmiDiagnosticPanel(),
+                ],
               ],
+            ),
             ),
           ),
         ),

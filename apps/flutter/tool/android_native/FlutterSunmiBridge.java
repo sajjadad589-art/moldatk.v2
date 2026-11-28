@@ -22,6 +22,7 @@ import com.sunmi.peripheral.printer.SunmiPrinterService;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import android.content.Context;
 import android.os.Build;
@@ -33,6 +34,8 @@ import io.flutter.plugin.common.MethodChannel;
 // that the paper was printed. No automatic print retries.
 public final class FlutterSunmiBridge implements MethodChannel.MethodCallHandler {
     private final Context context;
+    private final AtomicBoolean diagnosticInFlight = new AtomicBoolean(false);
+    private final Handler main = new Handler(Looper.getMainLooper());
     private volatile SunmiPrinterService printerService;
     private volatile boolean binding = false;
     private volatile boolean closed = false;
@@ -72,6 +75,10 @@ public final class FlutterSunmiBridge implements MethodChannel.MethodCallHandler
             result.success(Build.VERSION.SDK_INT >= 23 && printerService != null);
             return;
         }
+        if ("printDiagnostic".equals(call.method)) {
+            printDiagnostic(result);
+            return;
+        }
         // Print is deliberately disabled until an authenticated verified
         // receipt flow and real SUNMI hardware acceptance test are complete.
         if ("printReceipt".equals(call.method)) {
@@ -79,6 +86,60 @@ public final class FlutterSunmiBridge implements MethodChannel.MethodCallHandler
             return;
         }
         result.notImplemented();
+    }
+
+    private void printDiagnostic(MethodChannel.Result result) {
+        // Debug installation only. The native side constructs the entire
+        // diagnostic payload; no arbitrary receipt or financial data accepted.
+        if (!"com.mwaldatk.app.dev".equals(context.getPackageName())) {
+            result.error("disabled", "Diagnostic requires debug installation", null);
+            return;
+        }
+        final SunmiPrinterService service = printerService;
+        if (service == null || closed || Build.VERSION.SDK_INT < 23) {
+            bindPrinter();
+            result.success("unavailable");
+            return;
+        }
+        if (!diagnosticInFlight.compareAndSet(false, true)) {
+            result.success("busy");
+            return;
+        }
+        new Thread(() -> {
+            Bitmap bitmap = null;
+            boolean attempted = false;
+            String outcome;
+            try {
+                JSONObject ticket = new JSONObject();
+                ticket.put("systemTitle", "مولدتك");
+                ticket.put("header", "اختبار طابعة SUNMI");
+                ticket.put("showSubscriberName", false);
+                ticket.put("showQr", false);
+                ticket.put("showThankYou", false);
+                ticket.put("showReceivedAmount", false);
+                ticket.put("showReceiptNumber", false);
+                ticket.put("note", "اختبار تقني فقط — ليس إيصال تسديد");
+                bitmap = buildReceiptBitmap(ticket);
+                if (closed || printerService != service) {
+                    outcome = "unavailable";
+                } else {
+                    attempted = true;
+                    service.printerInit(null);
+                    service.setAlignment(1, null);
+                    service.printBitmap(bitmap, null);
+                    service.lineWrap(1, null);
+                    // Binder accepted the calls; paper output is not confirmed.
+                    outcome = "submitted";
+                }
+            } catch (Exception e) {
+                outcome = attempted ? "unknown" : "unavailable";
+            } finally {
+                if (bitmap != null) bitmap.recycle();
+                diagnosticInFlight.set(false);
+            }
+            final String status = outcome;
+            main.post(() -> result.success(status));
+        }, "moldatk-sunmi-diagnostic").start();
     }
 
     public void close() {
