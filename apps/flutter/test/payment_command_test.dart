@@ -106,10 +106,10 @@ void main() {
       response(value),
       command: value,
     );
-    final replay = VerifiedPaymentReceipt.decode(
-      {...response(value), 'replayed': true},
-      command: value,
-    );
+    final replay = VerifiedPaymentReceipt.decode({
+      ...response(value),
+      'replayed': true,
+    }, command: value);
     expect(first.paymentId, replay.paymentId);
     expect(replay.replayed, isTrue);
   });
@@ -124,10 +124,10 @@ void main() {
       {'receiptNumber': 'wrong'},
     ]) {
       expect(
-        () => VerifiedPaymentReceipt.decode(
-          {...response(value), ...change},
-          command: value,
-        ),
+        () => VerifiedPaymentReceipt.decode({
+          ...response(value),
+          ...change,
+        }, command: value),
         throwsFormatException,
       );
     }

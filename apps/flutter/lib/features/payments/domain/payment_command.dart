@@ -35,19 +35,20 @@ class PaymentCommand {
         epoch == null) {
       throw const FormatException('Payment scope unavailable');
     }
-    final invoices = detail.invoices.map((invoice) {
-      return PayableInvoice(
-        id: invoice.id,
-        month: invoice.month,
-        status: invoice.status,
-        total: invoice.total,
-        paid: invoice.paid,
-        remaining: invoice.remaining,
-      );
-    }).toList()..sort((a, b) {
-      final byMonth = a.month.compareTo(b.month);
-      return byMonth == 0 ? a.id.compareTo(b.id) : byMonth;
-    });
+    final invoices =
+        detail.invoices.map((invoice) {
+          return PayableInvoice(
+            id: invoice.id,
+            month: invoice.month,
+            status: invoice.status,
+            total: invoice.total,
+            paid: invoice.paid,
+            remaining: invoice.remaining,
+          );
+        }).toList()..sort((a, b) {
+          final byMonth = a.month.compareTo(b.month);
+          return byMonth == 0 ? a.id.compareTo(b.id) : byMonth;
+        });
     final plan = PaymentPlan.calculate(
       activeMonth: activeMonth,
       amount: amount,
