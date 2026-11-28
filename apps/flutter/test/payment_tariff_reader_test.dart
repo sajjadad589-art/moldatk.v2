@@ -6,7 +6,9 @@ void main() {
     final row = <String, dynamic>{
       'id': '2026-11',
       'generator_id': 'g',
-      'tiers': [{'id': 'normal'}],
+      'tiers': [
+        {'id': 'normal'},
+      ],
     };
     expect(SubscriberDetailReader.decodeTariff([], 'g'), isNull);
     expect(

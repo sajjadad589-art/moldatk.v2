@@ -166,14 +166,16 @@ class PaymentCommand {
       }
       invoices.add(invoice);
       if (invoice.status != 'cancelled') due += invoice.remaining;
-      frozen.add(Map<String, Object?>.unmodifiable({
-        'id': invoice.id,
-        'month': invoice.month,
-        'status': invoice.status,
-        'total': invoice.total,
-        'paid': invoice.paid,
-        'remaining': invoice.remaining,
-      }));
+      frozen.add(
+        Map<String, Object?>.unmodifiable({
+          'id': invoice.id,
+          'month': invoice.month,
+          'status': invoice.status,
+          'total': invoice.total,
+          'paid': invoice.paid,
+          'remaining': invoice.remaining,
+        }),
+      );
     }
     final plan = PaymentPlan.calculate(
       activeMonth: month,

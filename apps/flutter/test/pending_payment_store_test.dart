@@ -55,27 +55,33 @@ void main() {
       throwsFormatException,
     );
     expect(await store.load(fixture.owner), isNotNull);
-    final receipt = await store.resolve(fixture.owner, fixture.response(original));
+    final receipt = await store.resolve(
+      fixture.owner,
+      fixture.response(original),
+    );
     expect(receipt.receiptNumber, fixture.response(original)['receiptNumber']);
     expect(await store.load(fixture.owner), isNull);
   });
 
-  test('corrupted pending operation is preserved and blocks replacement', () async {
-    final storage = storage_fixture.MemoryStorage();
-    final store = PendingPaymentStore(
-      storage_fixture.config('abcdefghijklmnopqrst'),
-      storage,
-    );
-    await store.stage(fixture.owner, fixture.command());
-    final key = storage.values.keys.single;
-    storage.values[key] = '{bad';
-    await expectLater(store.load(fixture.owner), throwsFormatException);
-    await expectLater(
-      store.stage(fixture.owner, fixture.command()),
-      throwsFormatException,
-    );
-    expect(storage.values[key], '{bad');
-  });
+  test(
+    'corrupted pending operation is preserved and blocks replacement',
+    () async {
+      final storage = storage_fixture.MemoryStorage();
+      final store = PendingPaymentStore(
+        storage_fixture.config('abcdefghijklmnopqrst'),
+        storage,
+      );
+      await store.stage(fixture.owner, fixture.command());
+      final key = storage.values.keys.single;
+      storage.values[key] = '{bad';
+      await expectLater(store.load(fixture.owner), throwsFormatException);
+      await expectLater(
+        store.stage(fixture.owner, fixture.command()),
+        throwsFormatException,
+      );
+      expect(storage.values[key], '{bad');
+    },
+  );
 
   test('different staging projects cannot load each other', () async {
     final storage = storage_fixture.MemoryStorage();

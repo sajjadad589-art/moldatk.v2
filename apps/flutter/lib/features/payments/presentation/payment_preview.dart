@@ -63,7 +63,10 @@ class _PaymentPreviewState extends State<PaymentPreview> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('معاينة التسديد', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              'معاينة التسديد',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             Text('الشهر الفعال: ${widget.detail.activeMonth}'),
             TextField(
               controller: _amount,
@@ -82,8 +85,7 @@ class _PaymentPreviewState extends State<PaymentPreview> {
               onPressed: () => _calculate(full: true),
               child: const Text('معاينة التسديد الكامل'),
             ),
-            if (_invalid)
-              const Text('المبلغ أو بيانات الفواتير غير متطابقة.'),
+            if (_invalid) const Text('المبلغ أو بيانات الفواتير غير متطابقة.'),
             if (plan != null) ...[
               const Divider(),
               Text('المبلغ: ${plan.received} د.ع'),
