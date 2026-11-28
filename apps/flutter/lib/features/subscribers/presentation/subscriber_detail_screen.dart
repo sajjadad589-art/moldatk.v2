@@ -89,7 +89,9 @@ class _SubscriberDetailScreenState extends State<SubscriberDetailScreen> {
             detail.updatedAt != null &&
             detail.syncEpoch != null)
           SubscriberProfilePreview(
-            key: ValueKey('${detail.subscriber.id}:${detail.updatedAt}:${detail.syncEpoch}'),
+            key: ValueKey(
+              '${detail.subscriber.id}:${detail.updatedAt}:${detail.syncEpoch}',
+            ),
             account: widget.account!,
             detail: detail,
           ),

@@ -43,7 +43,8 @@ class SubscriberProfileCommand {
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
     final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-    final requestId = '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
+    final requestId =
+        '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
         '${hex.substring(12, 16)}-${hex.substring(16, 20)}-'
         '${hex.substring(20)}';
     return SubscriberProfileCommand._(
@@ -63,10 +64,8 @@ class SubscriberProfileCommand {
   Map<String, String> get headers =>
       Map.unmodifiable({'x-moldatk-sync-epoch': epoch.toString()});
 
-  Map<String, Object?> get arguments => Map.unmodifiable({
-    'p_command': payload,
-    'p_expected_epoch': epoch,
-  });
+  Map<String, Object?> get arguments =>
+      Map.unmodifiable({'p_command': payload, 'p_expected_epoch': epoch});
 
   void assertAccount(OperatorAccount account) {
     if (account.role != OperatorRole.owner ||

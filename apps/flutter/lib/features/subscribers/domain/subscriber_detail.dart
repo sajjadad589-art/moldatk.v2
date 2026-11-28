@@ -86,7 +86,10 @@ class SubscriberDetail {
     if (limit < 1 || limit > 100 || invoiceRows.length > limit + 1) {
       throw const FormatException('Invalid detail page');
     }
-    final subscriber = Subscriber.fromRow(row, expectedGeneratorId: generatorId);
+    final subscriber = Subscriber.fromRow(
+      row,
+      expectedGeneratorId: generatorId,
+    );
     if (subscriber.id != subscriberId) {
       throw const FormatException('Subscriber identity mismatch');
     }

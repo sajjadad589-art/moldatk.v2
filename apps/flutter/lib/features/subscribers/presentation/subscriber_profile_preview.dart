@@ -16,7 +16,8 @@ class SubscriberProfilePreview extends StatefulWidget {
   final SubscriberDetail detail;
 
   @override
-  State<SubscriberProfilePreview> createState() => _SubscriberProfilePreviewState();
+  State<SubscriberProfilePreview> createState() =>
+      _SubscriberProfilePreviewState();
 }
 
 class _SubscriberProfilePreviewState extends State<SubscriberProfilePreview> {
@@ -85,7 +86,10 @@ class _SubscriberProfilePreviewState extends State<SubscriberProfilePreview> {
           onChanged: _changed,
           decoration: const InputDecoration(labelText: 'الهاتف'),
         ),
-        OutlinedButton(onPressed: _preview, child: const Text('معاينة التعديل')),
+        OutlinedButton(
+          onPressed: _preview,
+          child: const Text('معاينة التعديل'),
+        ),
         if (_invalid) const Text('تحقق من البيانات أو عدم وجود تغيير.'),
         if (_command != null)
           const Text('تم تجهيز التعديل للمعاينة. لم يُحفظ في السيرفر.'),

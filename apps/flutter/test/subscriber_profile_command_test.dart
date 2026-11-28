@@ -3,36 +3,40 @@ import 'package:moldatk_flutter/features/auth/domain/operator_account.dart';
 import 'package:moldatk_flutter/features/subscribers/domain/subscriber_detail.dart';
 import 'package:moldatk_flutter/features/subscribers/domain/subscriber_profile_command.dart';
 
-OperatorAccount account({String role = 'generator_admin', String tenant = 'g'}) =>
-    OperatorAccount.fromJson({
-      'userId': 'owner',
-      'generatorId': tenant,
-      'generatorName': 'Fixture',
-      'role': role,
-    });
+OperatorAccount account({
+  String role = 'generator_admin',
+  String tenant = 'g',
+}) => OperatorAccount.fromJson({
+  'userId': 'owner',
+  'generatorId': tenant,
+  'generatorName': 'Fixture',
+  'role': role,
+});
 
-SubscriberDetail detail({int? epoch = 3, String? version = '2026-11-28T00:00:00Z'}) =>
-    SubscriberDetail.decode(
-      generatorId: 'g',
-      subscriberId: 's',
-      row: {
-        'id': 's',
-        'generator_id': 'g',
-        'code': '1',
-        'full_name': 'Old',
-        'phone': '',
-        'amperes': 5,
-        'line_name': 'A',
-        'is_exempted': false,
-        'tier': 'normal',
-        'payment_status': 'unpaid',
-        'amount_due': 10000,
-        'updated_at': version,
-      },
-      invoiceRows: [],
-      limit: 1,
-      syncEpoch: epoch,
-    );
+SubscriberDetail detail({
+  int? epoch = 3,
+  String? version = '2026-11-28T00:00:00Z',
+}) => SubscriberDetail.decode(
+  generatorId: 'g',
+  subscriberId: 's',
+  row: {
+    'id': 's',
+    'generator_id': 'g',
+    'code': '1',
+    'full_name': 'Old',
+    'phone': '',
+    'amperes': 5,
+    'line_name': 'A',
+    'is_exempted': false,
+    'tier': 'normal',
+    'payment_status': 'unpaid',
+    'amount_due': 10000,
+    'updated_at': version,
+  },
+  invoiceRows: [],
+  limit: 1,
+  syncEpoch: epoch,
+);
 
 SubscriberProfileCommand command() => SubscriberProfileCommand.prepare(
   account: account(),
