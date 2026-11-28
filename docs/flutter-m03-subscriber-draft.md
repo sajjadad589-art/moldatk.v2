@@ -1,0 +1,3 @@
+# M03 subscriber draft preview
+
+Added an Arabic reusable preview form, typed line/tier choices, exact historical tier identity and permission gates. The component accepts a caller-provided snapshot; no mock options are shipped into the running app. It is intentionally not mounted in staging until a verified server context loader exists. It has no database save action. Blank code remains a draft only: unique server-side allocation and validation are still required. Historical tier fallback by type in legacy is intentionally rejected to avoid ambiguous custom tariffs; verify migration compatibility. Server-side transaction, authoritative permissions, edit parity, and integration tests remain required.
