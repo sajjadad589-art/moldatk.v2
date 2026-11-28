@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../payments/data/staging_payment_rpc.dart';
+import '../../payments/domain/payment_command.dart';
 import '../../subscribers/data/subscriber_detail_reader.dart';
 import '../../subscribers/data/subscriber_draft_reader.dart';
 import '../../subscribers/data/subscriber_reader.dart';
@@ -234,6 +236,44 @@ class StagingSessionGateway implements SessionGateway {
       throw StateError('Session changed');
     }
     return detail;
+  }
+
+  /// Called only from the serialized, owner-authorized coordinator.
+  Future<Object?> collectPayment(
+    OperatorAccount account,
+    PaymentCommand command,
+  ) => _paymentRpc(account, command, PaymentRpcOperation.collect);
+
+  Future<Object?> lookupPayment(
+    OperatorAccount account,
+    PaymentCommand command,
+  ) => _paymentRpc(account, command, PaymentRpcOperation.status);
+
+  Future<Object?> _paymentRpc(
+    OperatorAccount account,
+    PaymentCommand command,
+    PaymentRpcOperation operation,
+  ) async {
+    command.assertAccount(account);
+    final client = _client;
+    final session = client?.auth.currentSession;
+    if (client == null ||
+        session == null ||
+        session.isExpired ||
+        session.user.id != account.userId) {
+      throw StateError('Payment session unavailable');
+    }
+    final value = await StagingPaymentRpc(_config).call(
+      operation: operation,
+      account: account,
+      command: command,
+      accessToken: session.accessToken,
+    );
+    if (!identical(_client, client) ||
+        client.auth.currentUser?.id != account.userId) {
+      throw StateError('Payment session changed');
+    }
+    return value;
   }
 
   @override

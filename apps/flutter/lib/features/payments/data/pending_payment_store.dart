@@ -49,6 +49,32 @@ class PendingPaymentStore {
   Future<PaymentCommand?> load(OperatorAccount account) =>
       _exclusive(() => _read(account));
 
+  /// Start a new collection only when no unresolved request exists.
+  /// Unlike stage(), even an identical pending request is not a new payment.
+  Future<void> stageNew(OperatorAccount account, PaymentCommand command) =>
+      _exclusive(() async {
+        command.assertAccount(account);
+        if (await _read(account) != null) {
+          throw StateError('Recover the existing payment first');
+        }
+        await _saveNew(account, command);
+      });
+
+  Future<void> _saveNew(
+    OperatorAccount account,
+    PaymentCommand command,
+  ) async {
+    final encoded = jsonEncode(command.toRecoveryJson());
+    if (encoded.length > 128000) {
+      throw const FormatException('Pending payment too large');
+    }
+    await _storage.write(_key(account), encoded);
+    final saved = await _read(account);
+    if (saved == null || jsonEncode(saved.toRecoveryJson()) != encoded) {
+      throw StateError('Pending payment was not verified on disk');
+    }
+  }
+
   /// Must finish successfully before dispatch. If a write failed after
   /// committing locally, loading the same record remains the recovery path.
   Future<void> stage(OperatorAccount account, PaymentCommand command) =>
@@ -65,11 +91,7 @@ class PendingPaymentStore {
           }
           return;
         }
-        await _storage.write(_key(account), encoded);
-        final saved = await _read(account);
-        if (saved == null || jsonEncode(saved.toRecoveryJson()) != encoded) {
-          throw StateError('Pending payment was not verified on disk');
-        }
+        await _saveNew(account, command);
       });
 
   /// Call only with a fresh authenticated server response, not local data.
