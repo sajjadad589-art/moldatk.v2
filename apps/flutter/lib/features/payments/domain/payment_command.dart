@@ -93,6 +93,120 @@ class PaymentCommand {
     );
   }
 
+  /// Local recovery is not an authorization grant. The original immutable
+  /// request must be reconciled with the server before another is created.
+  factory PaymentCommand.restore(
+    Object? value, {
+    required OperatorAccount account,
+  }) {
+    if (value is! Map ||
+        value.length != 5 ||
+        value['v'] != 1 ||
+        value['actorId'] != account.userId ||
+        value['generatorId'] != account.generatorId ||
+        account.role != OperatorRole.owner ||
+        value['epoch'] is! int ||
+        (value['epoch'] as int) < 0 ||
+        value['payload'] is! Map) {
+      throw const FormatException('Invalid pending payment scope');
+    }
+    final raw = value['payload'] as Map;
+    final requestId = raw['requestId'];
+    final sid = raw['subscriberId'];
+    final version = raw['expectedUpdatedAt'];
+    final month = raw['expectedMonth'];
+    final amount = raw['amountIqd'];
+    final ledger = raw['expectedLedger'];
+    if (raw.length != 6 ||
+        requestId is! String ||
+        !RegExp(
+          r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+        ).hasMatch(requestId) ||
+        sid is! String ||
+        sid.trim().isEmpty ||
+        version is! String ||
+        DateTime.tryParse(version) == null ||
+        !RegExp(r'(Z|[+-]\d{2}:\d{2})$').hasMatch(version) ||
+        month is! String ||
+        amount is! int ||
+        ledger is! List ||
+        ledger.isEmpty ||
+        ledger.length > 100) {
+      throw const FormatException('Invalid pending payment payload');
+    }
+    final invoices = <PayableInvoice>[];
+    final frozen = <Map<String, Object?>>[];
+    var due = 0;
+    for (final row in ledger) {
+      if (row is! Map ||
+          row.length != 6 ||
+          row['id'] is! String ||
+          row['month'] is! String ||
+          row['status'] is! String ||
+          row['total'] is! int ||
+          row['paid'] is! int ||
+          row['remaining'] is! int) {
+        throw const FormatException('Invalid pending invoice');
+      }
+      final invoice = PayableInvoice(
+        id: row['id'] as String,
+        month: row['month'] as String,
+        status: row['status'] as String,
+        total: row['total'] as int,
+        paid: row['paid'] as int,
+        remaining: row['remaining'] as int,
+      );
+      if (invoices.isNotEmpty) {
+        final previous = invoices.last;
+        final order = previous.month.compareTo(invoice.month);
+        if (order > 0 ||
+            (order == 0 && previous.id.compareTo(invoice.id) >= 0)) {
+          throw const FormatException('Invalid pending invoice order');
+        }
+      }
+      invoices.add(invoice);
+      if (invoice.status != 'cancelled') due += invoice.remaining;
+      frozen.add(Map<String, Object?>.unmodifiable({
+        'id': invoice.id,
+        'month': invoice.month,
+        'status': invoice.status,
+        'total': invoice.total,
+        'paid': invoice.paid,
+        'remaining': invoice.remaining,
+      }));
+    }
+    final plan = PaymentPlan.calculate(
+      activeMonth: month,
+      amount: amount,
+      recordedOutstanding: due,
+      completeHistory: true,
+      hasActiveTariff: true,
+      invoices: invoices,
+    );
+    return PaymentCommand._(
+      actorId: account.userId,
+      generatorId: account.generatorId,
+      epoch: value['epoch'] as int,
+      plan: plan,
+      payload: Map.unmodifiable({
+        'requestId': requestId,
+        'subscriberId': sid,
+        'expectedUpdatedAt': version,
+        'expectedMonth': month,
+        'amountIqd': amount,
+        'expectedLedger': List.unmodifiable(frozen),
+      }),
+    );
+  }
+
+  Map<String, Object?> toRecoveryJson() => Map.unmodifiable({
+    'v': 1,
+    'actorId': actorId,
+    'generatorId': generatorId,
+    'epoch': epoch,
+    'payload': payload,
+  });
+
   Map<String, String> get headers =>
       Map.unmodifiable({'x-moldatk-sync-epoch': epoch.toString()});
 

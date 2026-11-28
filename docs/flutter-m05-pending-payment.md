@@ -1,0 +1,3 @@
+# M05 first recovery primitive
+
+Encrypted single-pending-payment slot per staging project, owner and generator. Restores the exact immutable request after a restart, refuses replacement, validates returned server receipt before clearing, and never automatically deletes corrupted records. Five synthetic tests cover restart, conflicting request, invalid receipt, corrupted record and project/account isolation. Not connected to dispatch, logout, or UI yet. Storage is secure-storage, not the planned transactional Drift/SQLite outbox. One process instance only; OS backup, device loss, crash between receipt persistence and clear, signed-out recovery and authorization must be addressed before real payment use. No offline payment authorization or production change.
