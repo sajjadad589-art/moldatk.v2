@@ -17,11 +17,12 @@ declare
  rid uuid; fingerprint text; epoch_now bigint;
  old_request moldatk_private.flutter_payment_requests%rowtype;
  sub public.generator_subscribers%rowtype; inv public.generator_invoices%rowtype;
- month_now text; sid text; pid text; receipt_no text; amount_value bigint; due bigint;
+ month_now text; month_name text; sid text; pid text; receipt_no text; amount_value bigint; due bigint;
  cash_left bigint; applied bigint; current_paid bigint; prior_debt bigint;
  current_charge bigint; applied_prior bigint:=0; applied_current bigint:=0;
  n integer:=0; allocation_list jsonb:='[]'::jsonb; ledger jsonb; receipt jsonb;
- received timestamptz; received_day date;
+ received timestamptz; received_day date; portal_snapshot jsonb;
+ portal_allocations jsonb:='[]'::jsonb; current_issue_date date;
 begin
  if actor is null then raise exception 'not_authorized' using errcode='42501'; end if;
  select p.generator_id,p.full_name into strict gid,actor_name from public.profiles p
@@ -67,7 +68,7 @@ begin
    end if;
    return old_request.receipt||jsonb_build_object('replayed',true);
  end if;
- select id into strict month_now from public.generator_monthly_tariffs
+ select id,month_name_ar into strict month_now,month_name from public.generator_monthly_tariffs
    where generator_id=gid and is_current_active and jsonb_typeof(tiers)='array' and jsonb_array_length(tiers)>0 for share;
  if month_now is distinct from p_command->>'expectedMonth' then raise exception 'stale_tariff'; end if;
  select * into strict sub from public.generator_subscribers where generator_id=gid and id=sid for update;
@@ -93,7 +94,7 @@ begin
  if ledger is distinct from p_command->'expectedLedger' then raise exception 'invoice_ledger_changed'; end if;
  select coalesce(sum(remaining_amount),0),coalesce(sum(remaining_amount) filter(where month_id<month_now),0)
    into due,prior_debt from public.generator_invoices where generator_id=gid and subscriber_id=sid and status<>'cancelled';
- select paid_amount,total_amount into strict current_paid,current_charge from public.generator_invoices
+ select paid_amount,total_amount,issue_date into strict current_paid,current_charge,current_issue_date from public.generator_invoices
    where generator_id=gid and subscriber_id=sid and month_id=month_now and status<>'cancelled';
  if due is distinct from sub.amount_due or amount_value>due or due<=0 then raise exception 'payment_amount_or_ledger_mismatch'; end if;
  pid:='flutter-pay-'||rid::text;
@@ -114,6 +115,7 @@ begin
    insert into public.generator_payment_allocations(generator_id,id,payment_id,subscriber_id,month_id,amount,allocation_order)
      values(gid,pid||'-'||n,pid,sid,inv.month_id,applied,n);
    allocation_list:=allocation_list||jsonb_build_array(jsonb_build_object('invoiceId',inv.id,'month',inv.month_id,'amount',applied));
+   portal_allocations:=portal_allocations||jsonb_build_array(jsonb_build_object('monthId',inv.month_id,'monthNameAr',inv.month_name_ar,'amount',applied));
    if inv.month_id=month_now then applied_current:=applied_current+applied;
    else applied_prior:=applied_prior+applied; end if;
    cash_left:=cash_left-applied;
@@ -126,7 +128,16 @@ begin
    'paymentId',pid,'receiptNumber',receipt_no,'receivedAt',received,'amountIqd',amount_value,
    'debtBefore',due,'debtAfter',due-amount_value,'previousDebtBefore',prior_debt,'currentCharge',current_charge,
    'appliedToPrevious',applied_prior,'appliedToCurrent',applied_current,'allocations',allocation_list,'replayed',false);
- update public.generator_payments set receipt_snapshot=receipt where generator_id=gid and id=pid;
+ -- Preserve legacy SubscriberReceiptSnapshot field names for the QR portal.
+ portal_snapshot:=jsonb_build_object('monthId',month_now,'monthNameAr',month_name,
+   'issueDate',current_issue_date,'paymentDate',received,'amperes',sub.amperes,
+   'totalAmount',current_charge,'paidAmount',amount_value,'remainingAmount',due-amount_value,
+   'status',case when due=amount_value then 'paid' else 'partial' end,
+   'receiptNumber',receipt_no,'collectorName',actor_name,'previousDebtBefore',prior_debt,
+   'currentCharge',current_charge,'totalBeforePayment',due,'appliedToPreviousDebt',applied_prior,
+   'appliedToCurrentMonth',applied_current,'totalOutstandingAfter',due-amount_value,
+   'paymentAllocations',portal_allocations);
+ update public.generator_payments set receipt_snapshot=portal_snapshot where generator_id=gid and id=pid;
  -- Existing AFTER INSERT audit trigger projects the cashbox entry. Never insert it twice.
  insert into public.generator_audit_logs(id,generator_id,category,title,details,entity_id,entity_name,actor_name,amount,timestamp)
    values(pid,gid,'payment','تسديد المشترك','توزيع الدفعة على الديون الأقدم أولاً',sid,sub.full_name,actor_name,amount_value,received);

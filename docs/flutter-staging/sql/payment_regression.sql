@@ -61,6 +61,14 @@ begin
    or not exists(select 1 from generator_subscribers where id=sid and amount_due=40000 and amount_paid=0)
    or not exists(select 1 from generator_invoices where subscriber_id=sid and month_id='2026-10' and paid_amount=45000 and remaining_amount=40000)
    then raise exception 'payment mismatch'; end if;
+ if not exists(select 1 from generator_payments where subscriber_id=sid
+   and receipt_snapshot->>'paidAmount'='45000'
+   and receipt_snapshot->>'totalOutstandingAfter'='40000'
+   and receipt_snapshot->>'previousDebtBefore'='85000'
+   and receipt_snapshot->'paymentAllocations'->0->>'monthId'='2026-10'
+   and receipt_snapshot->'paymentAllocations'->0->>'amount'='45000'
+   and receipt_snapshot->>'receiptNumber'=receipt_number)
+ then raise exception 'legacy receipt snapshot mismatch'; end if;
  response:=moldatk_private.flutter_collect_payment_v1(command,0);
  if response->>'replayed' is distinct from 'true' or (select count(*) from generator_payments)<>1
    or (select count(*) from generator_payment_allocations)<>1
