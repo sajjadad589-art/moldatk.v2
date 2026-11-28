@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../auth/domain/operator_account.dart';
+import '../../payments/presentation/payment_preview.dart';
 import '../domain/subscriber_detail.dart';
 import 'subscriber_profile_preview.dart';
 
@@ -84,7 +85,20 @@ class _SubscriberDetailScreenState extends State<SubscriberDetailScreen> {
             ),
           ),
         if (detail.hasMore) const Text('توجد فواتير أقدم غير معروضة.'),
-        const Text('لا يمكن التسديد أو تعديل الفواتير من هذه المعاينة.'),
+        if (widget.account != null &&
+            detail.activeMonth != null &&
+            detail.updatedAt != null &&
+            detail.syncEpoch != null &&
+            !detail.hasMore &&
+            detail.amountDue > 0)
+          PaymentPreview(
+            key: ValueKey(
+              '${detail.subscriber.id}:${detail.updatedAt}:${detail.syncEpoch}:${detail.activeMonth}',
+            ),
+            account: widget.account!,
+            detail: detail,
+          ),
+        const Text('لا يمكن تسجيل تسديد فعلي في هذه النسخة التجريبية.'),
         if (widget.account != null &&
             detail.updatedAt != null &&
             detail.syncEpoch != null)

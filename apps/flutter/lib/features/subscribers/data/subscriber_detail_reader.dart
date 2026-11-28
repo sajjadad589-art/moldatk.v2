@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../auth/domain/operator_account.dart';
@@ -21,6 +23,7 @@ class SubscriberDetailReader {
       throw StateError('Detail unavailable');
     }
     final before = await _epoch(account);
+    final tariffBefore = await _tariff(account);
     final row = await _client
         .from('generator_subscribers')
         .select(
@@ -41,8 +44,11 @@ class SubscriberDetailReader {
         .order('month_id', ascending: false)
         .order('id')
         .limit(limit + 1);
+    final tariffAfter = await _tariff(account);
     final after = await _epoch(account);
-    if (before != after || _client.auth.currentUser?.id != account.userId) {
+    if (before != after ||
+        tariffBefore != tariffAfter ||
+        _client.auth.currentUser?.id != account.userId) {
       throw StateError('Detail snapshot changed');
     }
     return SubscriberDetail.decode(
@@ -52,7 +58,41 @@ class SubscriberDetailReader {
       invoiceRows: invoices,
       limit: limit,
       syncEpoch: before,
+      activeMonth: tariffBefore == null
+          ? null
+          : (jsonDecode(tariffBefore) as Map)['id'] as String,
     );
+  }
+
+  Future<String?> _tariff(OperatorAccount account) async {
+    final rows = await _client
+        .from('generator_monthly_tariffs')
+        .select('id,generator_id,tiers')
+        .eq('generator_id', account.generatorId)
+        .eq('is_current_active', true)
+        .limit(2);
+    return decodeTariff(rows, account.generatorId);
+  }
+
+  static String? decodeTariff(
+    List<Map<String, dynamic>> rows,
+    String generatorId,
+  ) {
+    if (rows.isEmpty) return null;
+    if (rows.length != 1) {
+      throw const FormatException('Ambiguous active tariff');
+    }
+    final row = rows.single;
+    final id = row['id'];
+    final tiers = row['tiers'];
+    if (row['generator_id'] != generatorId ||
+        id is! String ||
+        !RegExp(r'^\d{4}-(0[1-9]|1[0-2])$').hasMatch(id) ||
+        tiers is! List) {
+      throw const FormatException('Invalid active tariff');
+    }
+    if (tiers.isEmpty) return null;
+    return jsonEncode({'id': id, 'tiers': tiers});
   }
 
   Future<int> _epoch(OperatorAccount account) async {

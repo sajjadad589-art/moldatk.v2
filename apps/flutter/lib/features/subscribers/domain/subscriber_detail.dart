@@ -64,6 +64,7 @@ class SubscriberDetail {
     required this.hasMore,
     required this.updatedAt,
     required this.syncEpoch,
+    required this.activeMonth,
   }) : invoices = List.unmodifiable(invoices);
 
   final Subscriber subscriber;
@@ -74,6 +75,7 @@ class SubscriberDetail {
   final bool hasMore;
   final String? updatedAt;
   final int? syncEpoch;
+  final String? activeMonth;
 
   factory SubscriberDetail.decode({
     required String generatorId,
@@ -82,6 +84,7 @@ class SubscriberDetail {
     required List<Map<String, dynamic>> invoiceRows,
     required int limit,
     int? syncEpoch,
+    String? activeMonth,
   }) {
     if (limit < 1 || limit > 100 || invoiceRows.length > limit + 1) {
       throw const FormatException('Invalid detail page');
@@ -102,6 +105,10 @@ class SubscriberDetail {
     }
     if (syncEpoch != null && syncEpoch < 0) {
       throw const FormatException('Invalid reset epoch');
+    }
+    if (activeMonth != null &&
+        !RegExp(r'^\d{4}-(0[1-9]|1[0-2])$').hasMatch(activeMonth)) {
+      throw const FormatException('Invalid active month');
     }
     final tier = row['tier'];
     final status = row['payment_status'];
@@ -139,6 +146,7 @@ class SubscriberDetail {
       hasMore: invoices.length > limit,
       updatedAt: version as String?,
       syncEpoch: syncEpoch,
+      activeMonth: activeMonth,
     );
   }
 }
