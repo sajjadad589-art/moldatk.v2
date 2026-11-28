@@ -6,9 +6,10 @@ import 'subscriber_draft.dart';
 /// Immutable command for a future atomic server endpoint. Not a database row.
 /// Reuse the same instance for a retry after an ambiguous transport failure.
 class SubscriberCreateCommand {
-  SubscriberCreateCommand._(this.requestId, this.payload);
+  SubscriberCreateCommand._(this.requestId, this.epoch, this.payload);
 
   final String requestId;
+  final int epoch;
   final Map<String, Object?> payload;
 
   factory SubscriberCreateCommand.prepare({
@@ -24,6 +25,10 @@ class SubscriberCreateCommand {
     String? priorMonth,
     String? requestId,
   }) {
+    final epoch = context.syncEpoch;
+    if (epoch == null || epoch < 0) {
+      throw const FormatException('Missing verified reset epoch');
+    }
     final id = requestId ?? _newId();
     if (!RegExp(
       r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
@@ -43,6 +48,7 @@ class SubscriberCreateCommand {
     );
     return SubscriberCreateCommand._(
       id,
+      epoch,
       Map.unmodifiable({
         'requestId': id,
         'fullName': draft.name,

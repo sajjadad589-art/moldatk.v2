@@ -1,0 +1,3 @@
+# M03 reset-aware option snapshot
+
+The authenticated option reader brackets its reads with get_generator_sync_state; mismatched or unauthorized epochs fail closed. Epoch changes invalidate the form snapshot even when the same lines and tariffs are recreated after reset. The immutable command now requires a verified epoch from the preview context, and preparing its intent compares it against a fresh authorized epoch instead of adopting the new epoch. Retry must preserve the original command and epoch. Three additional tests cover epoch decoding, snapshot invalidation and rejecting a stale draft. This change reads only; no SQL deployment or write transport is enabled. Live staging tests remain pending.

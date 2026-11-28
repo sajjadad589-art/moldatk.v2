@@ -33,6 +33,7 @@ class HistoricalTierOption {
 class SubscriberDraftContext {
   SubscriberDraftContext({
     required this.currentMonth,
+    this.syncEpoch,
     required this.hasPricing,
     required this.canAdd,
     required this.canApplyFree,
@@ -44,6 +45,7 @@ class SubscriberDraftContext {
        history = List.unmodifiable(history);
 
   final String currentMonth;
+  final int? syncEpoch;
   final bool hasPricing;
   final bool canAdd;
   final bool canApplyFree;
@@ -54,6 +56,7 @@ class SubscriberDraftContext {
   /// Stable identity for invalidating previews when server options change.
   String get snapshotKey => jsonEncode([
     currentMonth,
+    syncEpoch,
     hasPricing,
     canAdd,
     canApplyFree,

@@ -32,6 +32,9 @@ class SubscriberCreateIntent {
         (state['epoch'] as int) < 0) {
       throw const FormatException('Invalid sync epoch');
     }
+    if (state['epoch'] != command.epoch) {
+      throw StateError('Draft reset epoch changed');
+    }
     return SubscriberCreateIntent._(
       command: command,
       generatorId: account.generatorId,

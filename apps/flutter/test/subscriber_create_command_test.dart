@@ -9,6 +9,7 @@ SubscriberCreateCommand command({String? id = requestId}) {
   return SubscriberCreateCommand.prepare(
     context: SubscriberDraftContext(
       currentMonth: '2026-11',
+      syncEpoch: 0,
       hasPricing: true,
       canAdd: true,
       canApplyFree: false,

@@ -16,9 +16,11 @@ OperatorAccount account({
   'role': collector ? 'collector' : 'generator_admin',
 });
 
-SubscriberCreateCommand command() => SubscriberCreateCommand.prepare(
+SubscriberCreateCommand command({int epoch = 0}) =>
+    SubscriberCreateCommand.prepare(
   context: SubscriberDraftContext(
     currentMonth: '2026-11',
+    syncEpoch: epoch,
     hasPricing: true,
     canAdd: true,
     canApplyFree: false,
@@ -43,7 +45,7 @@ void main() {
     var reads = 0;
     final intent = await SubscriberCreateIntent.prepare(
       account: account(),
-      command: command(),
+      command: command(epoch: 7),
       readState: (tenant) async {
         expect(tenant, 'g');
         reads++;
@@ -56,6 +58,17 @@ void main() {
     expect(reads, 1);
     expect(() => intent.headers['x-moldatk-sync-epoch'] = '8',
         throwsUnsupportedError);
+  });
+
+  test('old draft cannot adopt a new epoch after reset', () async {
+    await expectLater(
+      SubscriberCreateIntent.prepare(
+        account: account(),
+        command: command(epoch: 7),
+        readState: (_) async => {'authorized': true, 'epoch': 8},
+      ),
+      throwsStateError,
+    );
   });
 
   test('invalid or unauthorized epochs are rejected', () async {

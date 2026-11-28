@@ -15,6 +15,7 @@ class SubscriberDraftReader {
     if (_client.auth.currentUser?.id != account.userId) {
       throw StateError('Session unavailable');
     }
+    final firstEpoch = await _readEpoch(account);
     final lines = await _client
         .from('generator_lines')
         .select('id,generator_id,name')
@@ -36,15 +37,36 @@ class SubscriberDraftReader {
               .eq('id', account.userId)
               .single()
         : null;
-    if (_client.auth.currentUser?.id != account.userId) {
-      throw StateError('Session changed');
+    final lastEpoch = await _readEpoch(account);
+    if (_client.auth.currentUser?.id != account.userId ||
+        firstEpoch != lastEpoch) {
+      throw StateError('Session or reset epoch changed');
     }
     return decode(
       account: account,
       lines: lines,
       tariffs: tariffs,
       collector: collector,
+      syncEpoch: firstEpoch,
     );
+  }
+
+  Future<int> _readEpoch(OperatorAccount account) async {
+    final state = await _client.rpc(
+      'get_generator_sync_state',
+      params: {'p_generator_id': account.generatorId},
+    );
+    return decodeEpoch(state);
+  }
+
+  static int decodeEpoch(Object? state) {
+    if (state is! Map ||
+        state['authorized'] != true ||
+        state['epoch'] is! int ||
+        (state['epoch'] as int) < 0) {
+      throw const FormatException('Invalid sync epoch');
+    }
+    return state['epoch'] as int;
   }
 
   static SubscriberDraftContext decode({
@@ -52,6 +74,7 @@ class SubscriberDraftReader {
     required List<Map<String, dynamic>> lines,
     required List<Map<String, dynamic>> tariffs,
     Map<String, dynamic>? collector,
+    int? syncEpoch,
   }) {
     if (lines.length > maxRows || tariffs.length > maxRows) {
       throw const FormatException('Incomplete option snapshot');
@@ -140,6 +163,7 @@ class SubscriberDraftReader {
     final month = active.isEmpty ? '' : active.single;
     return SubscriberDraftContext(
       currentMonth: month,
+      syncEpoch: syncEpoch,
       hasPricing: active.length == 1 && current.isNotEmpty,
       canAdd: canAdd,
       canApplyFree: canFree,

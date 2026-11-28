@@ -30,6 +30,38 @@ Map<String, dynamic> tariff(String month, {bool active = true}) => {
 };
 
 void main() {
+  test('sync epoch must be authorized and nonnegative', () {
+    expect(
+      SubscriberDraftReader.decodeEpoch({'authorized': true, 'epoch': 7}),
+      7,
+    );
+    expect(
+      () => SubscriberDraftReader.decodeEpoch({'authorized': false, 'epoch': 7}),
+      throwsFormatException,
+    );
+    expect(
+      () => SubscriberDraftReader.decodeEpoch({'authorized': true, 'epoch': -1}),
+      throwsFormatException,
+    );
+  });
+
+  test('epoch participates in option snapshot identity', () {
+    final first = SubscriberDraftReader.decode(
+      account: account(),
+      lines: lines,
+      tariffs: [tariff('2026-11')],
+      syncEpoch: 7,
+    );
+    final second = SubscriberDraftReader.decode(
+      account: account(),
+      lines: lines,
+      tariffs: [tariff('2026-11')],
+      syncEpoch: 8,
+    );
+    expect(first.syncEpoch, 7);
+    expect(first.snapshotKey, isNot(second.snapshotKey));
+  });
+
   test('owner reads explicit active tariff and all scoped lines', () {
     final options = SubscriberDraftReader.decode(
       account: account(),
