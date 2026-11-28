@@ -1,0 +1,5 @@
+# M03 onboarding calculation increment
+
+Compared against main src/components/SubscriberModal.tsx lines 177–349 and the financial hardening migration. New subscribers require a current tariff; permanent free, no prior debt, and prior debt have distinct invoice markers. A historical debt uses the selected historical tier rate, not today's rate; older debt also requires a zero marker for the current month to prevent automatic double billing.
+
+This pure Dart draft implements those core branches using integer IQD. It deliberately rejects invalid input (including negative/over-limit discounts, future debt months, zero debt and missing pricing). The legacy UI clamps discounts instead; this stricter boundary is intentional. Tier/line permission checks, authoritative month/tariff lookup, code uniqueness, full invoice snapshots, atomic subscriber/invoice/audit persistence, line recount and legacy edit parity remain pending. Do not use this draft to persist financial records. No database writes or migration deployments in this increment.
