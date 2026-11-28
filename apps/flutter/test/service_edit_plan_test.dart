@@ -76,7 +76,13 @@ void main() {
     ]) {
       final result = plan([
         history,
-        current(status: 'unpaid', total: 0, paid: 0, remaining: 0, notes: marker),
+        current(
+          status: 'unpaid',
+          total: 0,
+          paid: 0,
+          remaining: 0,
+          notes: marker,
+        ),
       ]);
       expect(result.reprice, isFalse);
       expect(result.totalOutstanding, 20000);
@@ -90,11 +96,14 @@ void main() {
     );
   });
 
-  test('truncated history, missing current invoice and duplicates are blocked', () {
-    expect(() => plan([current()], complete: false), throwsFormatException);
-    expect(() => plan([history]), throwsFormatException);
-    expect(() => plan([current(), current()]), throwsFormatException);
-  });
+  test(
+    'truncated history, missing current invoice and duplicates are blocked',
+    () {
+      expect(() => plan([current()], complete: false), throwsFormatException);
+      expect(() => plan([history]), throwsFormatException);
+      expect(() => plan([current(), current()]), throwsFormatException);
+    },
+  );
 
   test('free transition and fractional IQD are blocked', () {
     expect(() => plan([current()], tier: 'free'), throwsFormatException);
