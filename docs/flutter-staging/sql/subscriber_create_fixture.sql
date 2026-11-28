@@ -104,7 +104,13 @@ create table public.generator_payment_allocations(
  primary key(generator_id,id),
  foreign key(generator_id,payment_id) references generator_payments(generator_id,id)
 );
-create table public.generator_monthly_accounts(generator_id uuid,subscriber_id text,month_id text);
+create table public.generator_monthly_accounts(
+ generator_id uuid,subscriber_id text,month_id text,month_charge bigint not null default 0,
+ carried_debt bigint not null default 0,paid_amount bigint not null default 0,
+ remaining_amount bigint not null default 0,status text not null default 'unpaid',
+ is_exempted boolean not null default false,updated_at timestamptz not null default now(),
+ primary key(generator_id,subscriber_id,month_id)
+);
 create table public.generator_cashbox_entries(
  sequence bigint generated always as identity, generator_id uuid, source_id text,
  occurred_at timestamptz not null, amount bigint not null, unique(generator_id,source_id)
@@ -123,4 +129,7 @@ create trigger fixture_capture_cash after insert on generator_audit_logs
 create trigger fixture_guard before insert or update on generator_payments
  for each row execute function public.fixture_write_guard();
 create trigger fixture_guard before insert or update on generator_payment_allocations
+ for each row execute function public.fixture_write_guard();
+
+create trigger fixture_guard before insert or update on generator_monthly_accounts
  for each row execute function public.fixture_write_guard();

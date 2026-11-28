@@ -34,7 +34,7 @@ begin
   caught:=true;
  end;
  if not caught then raise exception 'overpayment accepted'; end if;
- insert into generator_monthly_accounts values ('11111111-1111-4111-8111-111111111111',sid,'2026-11');
+ insert into generator_monthly_accounts(generator_id,subscriber_id,month_id) values ('11111111-1111-4111-8111-111111111111',sid,'2026-11');
  caught:=false;
  begin
   perform moldatk_private.flutter_collect_payment_v1(command,0);
@@ -44,6 +44,9 @@ begin
  end;
  if not caught then raise exception 'unverified monthly account mutation'; end if;
  delete from generator_monthly_accounts where subscriber_id=sid;
+ insert into generator_monthly_accounts(generator_id,subscriber_id,month_id,month_charge,carried_debt,paid_amount,remaining_amount,status)
+ values ('11111111-1111-4111-8111-111111111111',sid,'2026-10',85000,0,0,85000,'unpaid'),
+        ('11111111-1111-4111-8111-111111111111',sid,'2026-11',0,85000,0,85000,'unpaid');
  perform set_config('fixture.fail_invoice','yes',true);
  caught:=false;
  begin
@@ -61,6 +64,11 @@ begin
    or not exists(select 1 from generator_subscribers where id=sid and amount_due=40000 and amount_paid=0)
    or not exists(select 1 from generator_invoices where subscriber_id=sid and month_id='2026-10' and paid_amount=45000 and remaining_amount=40000)
    then raise exception 'payment mismatch'; end if;
+ if not exists(select 1 from generator_monthly_accounts where subscriber_id=sid and month_id='2026-10'
+   and month_charge=85000 and paid_amount=45000 and remaining_amount=40000 and status='partial')
+   or not exists(select 1 from generator_monthly_accounts where subscriber_id=sid and month_id='2026-11'
+     and month_charge=0 and carried_debt=40000 and remaining_amount=40000 and paid_amount=0)
+   then raise exception 'monthly projection mismatch'; end if;
  if not exists(select 1 from generator_payments where subscriber_id=sid
    and receipt_snapshot->>'paidAmount'='45000'
    and receipt_snapshot->>'totalOutstandingAfter'='40000'

@@ -1,5 +1,5 @@
 -- PRIVATE REVIEW ONLY. Not a migration or callable API.
--- Initial narrow scope: existing reconciled invoice ledger, no monthly-account rows.
+-- Reconcile existing monthly-account projections only when the baseline agrees.
 begin;
 create table moldatk_private.flutter_payment_requests(
  generator_id uuid not null references public.generators(id) on delete cascade,
@@ -73,10 +73,8 @@ begin
  if month_now is distinct from p_command->>'expectedMonth' then raise exception 'stale_tariff'; end if;
  select * into strict sub from public.generator_subscribers where generator_id=gid and id=sid for update;
  if sub.updated_at is distinct from (p_command->>'expectedUpdatedAt')::timestamptz then raise exception 'subscriber_changed'; end if;
- -- Monthly-account synchronization semantics are not yet verified: refuse rather than leave a split ledger.
- if exists(select 1 from public.generator_monthly_accounts where generator_id=gid and subscriber_id=sid) then
-   raise exception 'monthly_account_reconciliation_required';
- end if;
+ -- Account projections must match their invoice ledger before collecting cash.
+ perform 1 from public.generator_monthly_accounts where generator_id=gid and subscriber_id=sid order by month_id for update;
  perform 1 from public.generator_invoices where generator_id=gid and subscriber_id=sid order by id for update;
  if exists(select 1 from public.generator_invoices where generator_id=gid and subscriber_id=sid
    and (month_id !~ '^[0-9]{4}-(0[1-9]|1[0-2])$' or month_id>month_now
@@ -97,6 +95,23 @@ begin
  select paid_amount,total_amount,issue_date into strict current_paid,current_charge,current_issue_date from public.generator_invoices
    where generator_id=gid and subscriber_id=sid and month_id=month_now and status<>'cancelled';
  if due is distinct from sub.amount_due or amount_value>due or due<=0 then raise exception 'payment_amount_or_ledger_mismatch'; end if;
+ -- Legacy repair calculates carried debt from earlier tariff creation order.
+ -- Require every affected live month to be canonical before applying a payment.
+ -- Existing archived/deleted-tariff account rows are not silently rewritten.
+ if exists(
+   select 1 from public.generator_monthly_accounts a
+   left join public.generator_monthly_tariffs t on t.generator_id=a.generator_id and t.id=a.month_id
+   left join public.generator_invoices i on i.generator_id=a.generator_id and i.subscriber_id=a.subscriber_id
+       and i.month_id=a.month_id and i.status<>'cancelled'
+   where a.generator_id=gid and a.subscriber_id=sid
+     and (t.id is null or i.id is null or a.month_id>month_now
+       or a.month_charge is distinct from i.total_amount
+       or a.paid_amount is distinct from i.paid_amount
+       or a.carried_debt is distinct from coalesce((select sum(j.remaining_amount)
+         from public.generator_invoices j where j.generator_id=gid and j.subscriber_id=sid
+           and j.month_id<a.month_id and j.status not in ('cancelled','free')),0)
+       or a.remaining_amount is distinct from a.carried_debt+i.remaining_amount)
+ ) then raise exception 'monthly_account_reconciliation_required'; end if;
  pid:='flutter-pay-'||rid::text;
  receipt_no:='REC-'||rid::text;
  received:=clock_timestamp(); received_day:=(received at time zone 'Asia/Baghdad')::date;
@@ -124,6 +139,23 @@ begin
  update public.generator_subscribers set amount_due=due-amount_value,amount_paid=current_paid+applied_current,
    payment_status=case when due=amount_value then 'paid' else 'partial' end,
    last_payment_date=received_day,updated_at=received where generator_id=gid and id=sid;
+ -- Refresh each existing account projection from the post-payment ledger.
+ -- No historical charge, tariff, identity or exemption flag is rewritten.
+ with account_calc as (
+   select a.month_id,i.paid_amount as paid,i.remaining_amount as current_remaining,
+     coalesce((select sum(j.remaining_amount) from public.generator_invoices j
+       where j.generator_id=gid and j.subscriber_id=sid and j.month_id<a.month_id
+         and j.status not in ('cancelled','free')),0)::bigint as carried
+   from public.generator_monthly_accounts a join public.generator_invoices i
+     on i.generator_id=a.generator_id and i.subscriber_id=a.subscriber_id
+       and i.month_id=a.month_id and i.status<>'cancelled'
+   where a.generator_id=gid and a.subscriber_id=sid
+ )
+ update public.generator_monthly_accounts a set carried_debt=c.carried,paid_amount=c.paid,
+   remaining_amount=c.carried+c.current_remaining,
+   status=case when a.is_exempted then 'free' when c.carried+c.current_remaining=0 then 'paid'
+     when c.paid>0 then 'partial' else 'unpaid' end,updated_at=received
+ from account_calc c where a.generator_id=gid and a.subscriber_id=sid and a.month_id=c.month_id;
  receipt:=jsonb_build_object('ok',true,'requestId',rid,'generatorId',gid,'subscriberId',sid,
    'paymentId',pid,'receiptNumber',receipt_no,'receivedAt',received,'amountIqd',amount_value,
    'debtBefore',due,'debtAfter',due-amount_value,'previousDebtBefore',prior_debt,'currentCharge',current_charge,
