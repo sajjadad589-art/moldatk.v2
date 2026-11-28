@@ -126,81 +126,81 @@ class _SubscriberDraftFormState extends State<SubscriberDraftForm> {
     return AbsorbPointer(
       absorbing: !widget.enabled || _checking,
       child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Text('إضافة مشترك — معاينة فقط'),
-        _field('اسم المشترك', _name),
-        _field('كود المشترك', _code),
-        _field('رقم الهاتف', _phone, keyboard: TextInputType.phone),
-        DropdownButton<String>(
-          isExpanded: true,
-          value: _tierId,
-          hint: const Text('فئة الاشتراك'),
-          items: [
-            for (final tier in tiers)
-              DropdownMenuItem(value: tier.id, child: Text(tier.name)),
-          ],
-          onChanged: (value) => _change(() {
-            _tierId = value;
-            _mode = null;
-            _month = null;
-          }),
-        ),
-        DropdownButton<String>(
-          isExpanded: true,
-          value: _lineId,
-          hint: const Text('الخط / الكابينة'),
-          items: [
-            for (final line in widget.options.lines)
-              DropdownMenuItem(value: line.id, child: Text(line.name)),
-          ],
-          onChanged: (value) => _change(() => _lineId = value),
-        ),
-        _field('الأمبيرات', _amperes, keyboard: TextInputType.number),
-        if (!_free) ...[
-          _field('خصم الأمبيرات', _discount, keyboard: TextInputType.number),
-          DropdownButton<OnboardingDebtMode>(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text('إضافة مشترك — معاينة فقط'),
+          _field('اسم المشترك', _name),
+          _field('كود المشترك', _code),
+          _field('رقم الهاتف', _phone, keyboard: TextInputType.phone),
+          DropdownButton<String>(
             isExpanded: true,
-            value: _mode,
-            hint: const Text('هل يوجد دين سابق؟'),
-            items: const [
-              DropdownMenuItem(
-                value: OnboardingDebtMode.none,
-                child: Text('بدون دين سابق'),
-              ),
-              DropdownMenuItem(
-                value: OnboardingDebtMode.prior,
-                child: Text('يوجد دين سابق'),
-              ),
+            value: _tierId,
+            hint: const Text('فئة الاشتراك'),
+            items: [
+              for (final tier in tiers)
+                DropdownMenuItem(value: tier.id, child: Text(tier.name)),
             ],
             onChanged: (value) => _change(() {
-              _mode = value;
+              _tierId = value;
+              _mode = null;
               _month = null;
             }),
           ),
-          if (_mode == OnboardingDebtMode.prior)
-            DropdownButton<String>(
+          DropdownButton<String>(
+            isExpanded: true,
+            value: _lineId,
+            hint: const Text('الخط / الكابينة'),
+            items: [
+              for (final line in widget.options.lines)
+                DropdownMenuItem(value: line.id, child: Text(line.name)),
+            ],
+            onChanged: (value) => _change(() => _lineId = value),
+          ),
+          _field('الأمبيرات', _amperes, keyboard: TextInputType.number),
+          if (!_free) ...[
+            _field('خصم الأمبيرات', _discount, keyboard: TextInputType.number),
+            DropdownButton<OnboardingDebtMode>(
               isExpanded: true,
-              value: _month,
-              hint: const Text('شهر الدين السابق'),
-              items: [
-                for (final month in months)
-                  DropdownMenuItem(value: month, child: Text(month)),
+              value: _mode,
+              hint: const Text('هل يوجد دين سابق؟'),
+              items: const [
+                DropdownMenuItem(
+                  value: OnboardingDebtMode.none,
+                  child: Text('بدون دين سابق'),
+                ),
+                DropdownMenuItem(
+                  value: OnboardingDebtMode.prior,
+                  child: Text('يوجد دين سابق'),
+                ),
               ],
-              onChanged: (value) => _change(() => _month = value),
+              onChanged: (value) => _change(() {
+                _mode = value;
+                _month = null;
+              }),
             ),
+            if (_mode == OnboardingDebtMode.prior)
+              DropdownButton<String>(
+                isExpanded: true,
+                value: _month,
+                hint: const Text('شهر الدين السابق'),
+                items: [
+                  for (final month in months)
+                    DropdownMenuItem(value: month, child: Text(month)),
+                ],
+                onChanged: (value) => _change(() => _month = value),
+              ),
+          ],
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: widget.enabled && !_checking ? _preview : null,
+            child: const Text('معاينة الاحتساب'),
+          ),
+          if (_checking || !widget.enabled) const LinearProgressIndicator(),
+          if (_invalid) const Text('تحقق من البيانات والتسعيرة المختارة.'),
+          if (_draft != null)
+            Text('الدين المتوقع: ${_draft!.plan.amountDue} د.ع'),
+          const Text('المعاينة لا تحفظ مشتركاً أو فاتورة.'),
         ],
-        const SizedBox(height: 16),
-        FilledButton(
-          onPressed: widget.enabled && !_checking ? _preview : null,
-          child: const Text('معاينة الاحتساب'),
-        ),
-        if (_checking || !widget.enabled) const LinearProgressIndicator(),
-        if (_invalid) const Text('تحقق من البيانات والتسعيرة المختارة.'),
-        if (_draft != null)
-          Text('الدين المتوقع: ${_draft!.plan.amountDue} د.ع'),
-        const Text('المعاينة لا تحفظ مشتركاً أو فاتورة.'),
-      ],
       ),
     );
   }

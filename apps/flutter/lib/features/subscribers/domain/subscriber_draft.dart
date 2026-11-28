@@ -59,13 +59,18 @@ class SubscriberDraftContext {
     canApplyFree,
     tiers.map((t) => jsonEncode([t.id, t.type, t.name])).toList()..sort(),
     lines.map((l) => jsonEncode([l.id, l.name])).toList()..sort(),
-    history.map((h) => jsonEncode([
-      h.tierId,
-      h.tariff.monthId,
-      h.tariff.tier,
-      h.tariff.pricePerAmpere,
-      h.tariff.fixedFee,
-    ])).toList()..sort(),
+    history
+        .map(
+          (h) => jsonEncode([
+            h.tierId,
+            h.tariff.monthId,
+            h.tariff.tier,
+            h.tariff.pricePerAmpere,
+            h.tariff.fixedFee,
+          ]),
+        )
+        .toList()
+      ..sort(),
   ]);
 
   SubscriberDraft preview({

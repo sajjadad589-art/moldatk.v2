@@ -34,10 +34,7 @@ void main() {
     final options = SubscriberDraftReader.decode(
       account: account(),
       lines: lines,
-      tariffs: [
-        tariff('2026-10', active: false),
-        tariff('2026-11'),
-      ],
+      tariffs: [tariff('2026-10', active: false), tariff('2026-11')],
     );
     expect(options.currentMonth, '2026-11');
     expect(options.hasPricing, isTrue);
