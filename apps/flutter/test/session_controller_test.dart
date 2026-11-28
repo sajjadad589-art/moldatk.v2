@@ -156,6 +156,80 @@ void main() {
     expect(controller.account, isNull);
   });
 
+  test('authorized reads require a verified active session', () async {
+    final controller = SessionController(FakeGateway());
+    addTearDown(controller.dispose);
+    var called = false;
+    await expectLater(
+      controller.readAuthorized((_) async {
+        called = true;
+        return 1;
+      }),
+      throwsStateError,
+    );
+    expect(called, isFalse);
+    await login(controller);
+    expect(await controller.readAuthorized((_) async => 42), 42);
+  });
+
+  test('revocation before a read prevents the data request', () async {
+    final gateway = FakeGateway();
+    final controller = SessionController(gateway);
+    addTearDown(controller.dispose);
+    await login(controller);
+    gateway.result = decision(active: false);
+    var called = false;
+    await expectLater(
+      controller.readAuthorized((_) async {
+        called = true;
+        return 1;
+      }),
+      throwsStateError,
+    );
+    expect(called, isFalse);
+    expect(controller.phase, SessionPhase.denied);
+  });
+
+  test('revocation during a read discards the result', () async {
+    final gateway = FakeGateway();
+    final controller = SessionController(gateway);
+    addTearDown(controller.dispose);
+    await login(controller);
+    await expectLater(
+      controller.readAuthorized((_) async {
+        gateway.result = decision(active: false);
+        return 42;
+      }),
+      throwsStateError,
+    );
+    expect(controller.phase, SessionPhase.denied);
+  });
+
+  test('logout during a read discards data and serializes access', () async {
+    final gateway = FakeGateway();
+    final controller = SessionController(gateway);
+    addTearDown(controller.dispose);
+    await login(controller);
+    final started = Completer<void>();
+    final pending = Completer<int>();
+    final operation = controller.readAuthorized((_) {
+      started.complete();
+      return pending.future;
+    });
+    final rejected = expectLater(operation, throwsStateError);
+    await started.future;
+    await expectLater(
+      controller.readAuthorized((_) async => 2),
+      throwsStateError,
+    );
+    await controller.signOut();
+    expect(controller.account, isNull);
+    pending.complete(42);
+    await rejected;
+    expect(controller.phase, SessionPhase.signedOut);
+    expect(gateway.closes, 1);
+  });
+
   test('missing stored credentials stays signed out', () async {
     final controller = SessionController(FakeGateway());
     addTearDown(controller.dispose);

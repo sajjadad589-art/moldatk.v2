@@ -125,6 +125,44 @@ class SessionController extends ChangeNotifier {
     }
   }
 
+  /// Serialize read-only requests with authentication and subscription checks.
+  /// A result is never returned after logout, disposal or denied access.
+  Future<T> readAuthorized<T>(
+    Future<T> Function(OperatorAccount account) read,
+  ) async {
+    final account = this.account;
+    if (_busy || _disposed || account == null) {
+      throw StateError('Session not available');
+    }
+    _busy = true;
+    final generation = _generation;
+    notifyListeners();
+    try {
+      await _check(generation);
+      if (!_current(generation) || this.account == null) {
+        throw StateError('Session not available');
+      }
+      final result = await read(account);
+      if (!_current(generation)) {
+        throw StateError('Session changed');
+      }
+      await _check(generation);
+      if (!_current(generation) || this.account == null) {
+        throw StateError('Session not available');
+      }
+      return result;
+    } catch (_) {
+      if (_current(generation) && _phase == SessionPhase.active) {
+        _setPhase(SessionPhase.unavailable);
+      }
+      rethrow;
+    } finally {
+      if (!_current(generation)) await _closeSafely();
+      _busy = false;
+      if (!_disposed) notifyListeners();
+    }
+  }
+
   Future<void> _check(int generation) async {
     final watch = Stopwatch()..start();
     final decision = await _gateway.checkAccess(_account!);
